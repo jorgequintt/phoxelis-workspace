@@ -1,0 +1,23 @@
+{
+  "name": "phoxelis",
+  "private": true,
+  "version": "1.0.2",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/phoxelis.umd.cjs",
+  "module": "./dist/phoxelis.js",
+  "types": "./dist/src/index.d.ts",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "bdfparser": "^2.2.5",
+    "fetchline": "^1.0.1",
+    "lodash": "^4.18.1"
+  },
+  "yalcSig": "280f60167559546131ff06d47ae9f1c0"
+}
