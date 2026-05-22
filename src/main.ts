@@ -146,3 +146,24 @@ canvasContainer.addEventListener('pointermove', (e) => {
       panzoom.zoom(panzoom.getScale() + (e.movementY / 35) * -1);
     }
 });
+
+canvas.addEventListener('mousemove', (event) => {
+  const { width, top, left } = canvas.getBoundingClientRect();
+  const scale = width / (cols * font.width); // original width / current width
+
+  const mousePostX = event.clientX - left;
+  const mousePostY = event.clientY - top;
+  // const mouseX = Math.min(
+  //   cols - 1,
+  //   Math.max(0, Math.floor(mousePostX / (font.width * scale)))
+  // );
+  // const mouseY = Math.min(
+  //   rows - 1,
+  //   Math.max(0, Math.floor(mousePostY / (font.height * scale)))
+  // );
+
+  const mouseX = Math.floor(mousePostX / (font.width * scale));
+  const mouseY = Math.floor(mousePostY / (font.height * scale));
+
+  console.log({ size: canvas.getBoundingClientRect(), mouseX, mouseY });
+});
