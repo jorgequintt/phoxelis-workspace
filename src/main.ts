@@ -17,15 +17,18 @@ const panzoomConfiguration = {
   excludeClass: 'panzoom-exclude',
 };
 
+const isMousePosVisible = (mousePos: CellPosition) =>
+  mousePos.x >= 0 && mousePos.x < cols && mousePos.y >= 0 && mousePos.y < rows;
+
 let scale = panzoomConfiguration.startScale;
 
 const font = await getFont('1_Trithemius8x16');
 const { canvas, renderFrame, renderPhoxel } = Phoxelis(rows, cols, font);
-const canvasContainer = document.createElement('div');
-canvasContainer.style =
+const drawboard = document.createElement('div');
+drawboard.style =
   'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
-canvasContainer.append(canvas);
-document.body.append(canvasContainer);
+drawboard.append(canvas);
+document.body.append(drawboard);
 
 const renderLoop = () => {
   renderFrame();
@@ -123,7 +126,7 @@ for (let i = 0; i < cols; i++) {
 // RENDERING CONTENT END
 
 const panzoom = Panzoom(canvas, panzoomConfiguration);
-const hammer = new Hammer(canvasContainer);
+const hammer = new Hammer(drawboard);
 hammer.get('pinch').set({ enable: true });
 hammer.on('pinchstart', () => {
   scale = panzoom.getScale();
@@ -137,7 +140,7 @@ hammer.on('pinchmove', (e) => {
   );
 });
 
-canvasContainer.addEventListener('pointermove', (e) => {
+drawboard.addEventListener('pointermove', (e) => {
   if (e.ctrlKey) {
     panzoom.pan(e.movementX / panzoom.getScale(), e.movementY / panzoom.getScale());
   } else if (e.shiftKey) {
@@ -145,15 +148,65 @@ canvasContainer.addEventListener('pointermove', (e) => {
   }
 });
 
-canvasContainer.addEventListener('mousemove', (event) => {
+type CellPosition = { x: number; y: number };
+const mousePos: CellPosition = { x: -1, y: -1 };
+
+drawboard.addEventListener('pointermove', (event) => {
   const { width, top, left } = canvas.getBoundingClientRect();
   const scale = width / (cols * font.width);
+  const mouseScreenPosX = event.clientX - left;
+  const mouseScreenPosY = event.clientY - top;
+  mousePos.x = Math.floor(mouseScreenPosX / (font.width * scale));
+  mousePos.y = Math.floor(mouseScreenPosY / (font.height * scale));
+});
 
-  const mousePostX = event.clientX - left;
-  const mousePostY = event.clientY - top;
+const mouseButtons = {
+  leftClick: false,
+  rightClick: false,
+  middleClick: false,
+};
 
-  const mouseX = Math.floor(mousePostX / (font.width * scale));
-  const mouseY = Math.floor(mousePostY / (font.height * scale));
+drawboard.addEventListener('pointerdown', (e) => {
+  switch (e.button) {
+    case 0:
+      mouseButtons.leftClick = true;
+      break;
+    case 1:
+      mouseButtons.middleClick = true;
+      break;
+    case 0:
+      mouseButtons.rightClick = true;
+      break;
+    default:
+      break;
+  }
+});
 
-  console.log({ size: canvas.getBoundingClientRect(), mouseX, mouseY });
+drawboard.addEventListener('pointerup', (e: PointerEvent) => {
+  switch (e.button) {
+    case 0:
+      mouseButtons.leftClick = false;
+      break;
+    case 1:
+      mouseButtons.middleClick = false;
+      break;
+    case 0:
+      mouseButtons.rightClick = false;
+      break;
+    default:
+      break;
+  }
+});
+
+const abortActions = () => {
+  mouseButtons.leftClick = false;
+  mouseButtons.middleClick = false;
+  mouseButtons.rightClick = false;
+};
+document.addEventListener('mouseout', abortActions);
+
+drawboard.addEventListener('pointermove', (e) => {
+  if (mouseButtons.leftClick && isMousePosVisible(mousePos)) {
+    renderPhoxel('A', '#FFFFFF', '#FF0000', mousePos.y, mousePos.x);
+  }
 });
