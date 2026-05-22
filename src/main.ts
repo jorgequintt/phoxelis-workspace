@@ -1,5 +1,5 @@
 import { getFont, Phoxelis } from 'phoxelis';
-import './style.css'
+import './style.css';
 import Panzoom from '@panzoom/panzoom';
 import Hammer from 'hammerjs';
 
@@ -14,82 +14,83 @@ const panzoomConfiguration = {
   startX: 0,
   startY: 0,
   startScale: 1,
-  excludeClass: 'panzoom-exclude'
+  excludeClass: 'panzoom-exclude',
 };
 
 let scale = panzoomConfiguration.startScale;
 
 const font = await getFont('1_Trithemius8x16');
-const {canvas, renderFrame, renderPhoxel} = Phoxelis(rows, cols, font);
+const { canvas, renderFrame, renderPhoxel } = Phoxelis(rows, cols, font);
 const canvasContainer = document.createElement('div');
-canvasContainer.style = 'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
+canvasContainer.style =
+  'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
 canvasContainer.append(canvas);
 document.body.append(canvasContainer);
 
 const renderLoop = () => {
   renderFrame();
   window.requestAnimationFrame(renderLoop);
-}
+};
 window.requestAnimationFrame(renderLoop);
 
 // RENDERING CONTENT
 const colors = {
-   white: '#FFFFFF',
-   bluedark: '#8c8cfb',
-   bluemid: '#5353fa',
-   bluelow: '#2a2afa',
-   blue: '#0000FF',
+  white: '#FFFFFF',
+  bluedark: '#8c8cfb',
+  bluemid: '#5353fa',
+  bluelow: '#2a2afa',
+  blue: '#0000FF',
 };
 const takenCells = new Set();
 function renderPhoxelBack(char: string, fg: string, bg: string, r: number, c: number) {
-  if(!takenCells.has(`${r};${c}`)) {
+  if (!takenCells.has(`${r};${c}`)) {
     renderPhoxel(char, fg, bg, r, c);
   }
 }
 function fill(color: string) {
-   for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-         renderPhoxel(' ', color, color, r, c);
-      }
-   }
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      renderPhoxel(' ', color, color, r, c);
+    }
+  }
 }
 function write(x: number, y: number, text: string, maxWidth: number = 70) {
-   let charCount = 0;
-   let currentRow = y;
-   text.split('').forEach((char) => {
-      charCount++;
-      if (char === '\n' || charCount === maxWidth - 1) {
-         currentRow++;
-         charCount = 0;
-         return;
-      }
-      renderPhoxel(char, colors.white, colors.blue, currentRow, x + charCount);
-      takenCells.add(`${currentRow};${x + charCount}`);
-   });
+  let charCount = 0;
+  let currentRow = y;
+  text.split('').forEach((char) => {
+    charCount++;
+    if (char === '\n' || charCount === maxWidth - 1) {
+      currentRow++;
+      charCount = 0;
+      return;
+    }
+    renderPhoxel(char, colors.white, colors.blue, currentRow, x + charCount);
+    takenCells.add(`${currentRow};${x + charCount}`);
+  });
 }
 function drop(char: string, x: number, y: number, speedMs = 40) {
-   let currentY = y;
-   const dropFall = () => {
-      renderPhoxelBack(' ', colors.blue, colors.blue, currentY, x);
-      renderPhoxelBack(char, colors.bluelow, colors.blue, currentY + 1, x);
-      renderPhoxelBack(char, colors.bluelow, colors.blue, currentY + 2, x);
-      renderPhoxelBack(char, colors.bluemid, colors.blue, currentY + 3, x);
-      renderPhoxelBack(char, colors.bluemid, colors.blue, currentY + 4, x);
-      renderPhoxelBack(char, colors.bluedark, colors.blue, currentY + 5, x);
-      currentY++;
+  let currentY = y;
+  const dropFall = () => {
+    renderPhoxelBack(' ', colors.blue, colors.blue, currentY, x);
+    renderPhoxelBack(char, colors.bluelow, colors.blue, currentY + 1, x);
+    renderPhoxelBack(char, colors.bluelow, colors.blue, currentY + 2, x);
+    renderPhoxelBack(char, colors.bluemid, colors.blue, currentY + 3, x);
+    renderPhoxelBack(char, colors.bluemid, colors.blue, currentY + 4, x);
+    renderPhoxelBack(char, colors.bluedark, colors.blue, currentY + 5, x);
+    currentY++;
 
-      if (currentY > rows) {
-         currentY = -6;
-      }
-   };
+    if (currentY > rows) {
+      currentY = -6;
+    }
+  };
 
-   setInterval(dropFall, speedMs);
+  setInterval(dropFall, speedMs);
 }
 fill(colors.blue);
 write(
-      16,
-      7,
-      `
+  16,
+  7,
+  `
 Who am I?
 
 I don't know that. But call me Jorelus.
@@ -109,15 +110,15 @@ In any case, welcome, and follow me, as I'm looking to connect with other souls 
 
 Take care.
 `,
-      100,
-   );
+  100,
+);
 for (let i = 0; i < cols; i++) {
-   drop(
-      'i',
-      i,
-      (Math.floor(Math.random() * 80) + 6) * -1,
-      Math.floor(Math.random() * 40) + 170,
-   );
+  drop(
+    'i',
+    i,
+    (Math.floor(Math.random() * 80) + 6) * -1,
+    Math.floor(Math.random() * 40) + 170,
+  );
 }
 // RENDERING CONTENT END
 
@@ -128,39 +129,28 @@ hammer.on('pinchstart', () => {
   scale = panzoom.getScale();
 });
 hammer.on('pinchmove', (e) => {
-      const newZoomVal = scale * e.scale;
-      panzoom.zoom(newZoomVal);
-      panzoom.pan(
-        (e.velocityX * 11) / panzoom.getScale(),
-        (e.velocityY * 11) / panzoom.getScale()
-      );
+  const newZoomVal = scale * e.scale;
+  panzoom.zoom(newZoomVal);
+  panzoom.pan(
+    (e.velocityX * 11) / panzoom.getScale(),
+    (e.velocityY * 11) / panzoom.getScale(),
+  );
 });
 
 canvasContainer.addEventListener('pointermove', (e) => {
   if (e.ctrlKey) {
-      panzoom.pan(
-        e.movementX / panzoom.getScale(),
-        e.movementY / panzoom.getScale()
-      );
-    } else if (e.shiftKey) {
-      panzoom.zoom(panzoom.getScale() + (e.movementY / 35) * -1);
-    }
+    panzoom.pan(e.movementX / panzoom.getScale(), e.movementY / panzoom.getScale());
+  } else if (e.shiftKey) {
+    panzoom.zoom(panzoom.getScale() + (e.movementY / 35) * -1);
+  }
 });
 
-canvas.addEventListener('mousemove', (event) => {
+canvasContainer.addEventListener('mousemove', (event) => {
   const { width, top, left } = canvas.getBoundingClientRect();
-  const scale = width / (cols * font.width); // original width / current width
+  const scale = width / (cols * font.width);
 
   const mousePostX = event.clientX - left;
   const mousePostY = event.clientY - top;
-  // const mouseX = Math.min(
-  //   cols - 1,
-  //   Math.max(0, Math.floor(mousePostX / (font.width * scale)))
-  // );
-  // const mouseY = Math.min(
-  //   rows - 1,
-  //   Math.max(0, Math.floor(mousePostY / (font.height * scale)))
-  // );
 
   const mouseX = Math.floor(mousePostX / (font.width * scale));
   const mouseY = Math.floor(mousePostY / (font.height * scale));
