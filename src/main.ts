@@ -24,10 +24,14 @@ let scale = panzoomConfiguration.startScale;
 
 const font = await getFont('1_Trithemius8x16');
 const { canvas, renderFrame, renderPhoxel } = Phoxelis(rows, cols, font);
+const draftScreen = Phoxelis(rows, cols, font);
 const drawboard = document.createElement('div');
 drawboard.style =
   'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
+canvas.style = `position: absolute;`;
+draftScreen.canvas.style = `position: absolute;`;
 drawboard.append(canvas);
+drawboard.append(draftScreen.canvas);
 document.body.append(drawboard);
 
 const renderLoop = () => {
@@ -45,7 +49,13 @@ const colors = {
   blue: '#0000FF',
 };
 const takenCells = new Set();
-function renderPhoxelBack(char: string, fg: string, bg: string, r: number, c: number) {
+function renderPhoxelBack(
+  char: string,
+  fg: string,
+  bg: string,
+  r: number,
+  c: number,
+) {
   if (!takenCells.has(`${r};${c}`)) {
     renderPhoxel(char, fg, bg, r, c);
   }
@@ -100,11 +110,11 @@ I don't know that. But call me Jorelus.
 I'm fascinated by the liminal area between the digital and the heart.
 So I'm drawn to art and programming, constantly in pursue of channeling my soul through both.
 
-I enjoy... 
+I enjoy...
 * Exercising (weights)
 * Riding my bike around the city
 * Cooking new recipes
-* Feeling music deeply 
+* Feeling music deeply
 * Videogames
 
 Here I will share my ASCII art, my esoteric software and my soul.
@@ -142,7 +152,10 @@ hammer.on('pinchmove', (e) => {
 
 drawboard.addEventListener('pointermove', (e) => {
   if (e.ctrlKey) {
-    panzoom.pan(e.movementX / panzoom.getScale(), e.movementY / panzoom.getScale());
+    panzoom.pan(
+      e.movementX / panzoom.getScale(),
+      e.movementY / panzoom.getScale(),
+    );
   } else if (e.shiftKey) {
     panzoom.zoom(panzoom.getScale() + (e.movementY / 35) * -1);
   }
@@ -210,3 +223,32 @@ drawboard.addEventListener('pointermove', (e) => {
     renderPhoxel('A', '#FFFFFF', '#FF0000', mousePos.y, mousePos.x);
   }
 });
+
+// MOTIONS
+const dp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
+
+type Motion = {
+  onPointerDown: (e: PointerEvent) => void;
+  onPointerMove: (e: PointerEvent) => void;
+  onPointerUp: (e: PointerEvent) => void;
+  onSubmit: () => void;
+  onAbort: () => void;
+  data: Record<string, any>;
+};
+
+// const drawMotion: Motion = {
+//    onPointerDown(e) {
+//       draftScreen.reset();
+//    },
+// };
+
+draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, 2, 2);
+draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, 3, 3);
+draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, 4, 4);
+draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, 5, 5);
+draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, 6, 6);
+function renderDraftScreen() {
+  draftScreen.renderFrame();
+  window.requestAnimationFrame(renderDraftScreen);
+}
+window.requestAnimationFrame(renderDraftScreen);

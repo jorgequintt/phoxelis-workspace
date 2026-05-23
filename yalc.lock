@@ -2,8 +2,7 @@
   "version": "v1",
   "packages": {
     "phoxelis": {
-      "version": "1.0.2",
-      "signature": "280f60167559546131ff06d47ae9f1c0",
+      "signature": "d1b90baa231249f7f874a05a76c88ca3",
       "file": true
     }
   }

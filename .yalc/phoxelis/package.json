@@ -1,7 +1,7 @@
 {
   "name": "phoxelis",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.11.1",
   "type": "module",
   "files": [
     "dist"
@@ -12,12 +12,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "publish": "npm run build"
   },
   "dependencies": {
     "bdfparser": "^2.2.5",
     "fetchline": "^1.0.1",
     "lodash": "^4.18.1"
   },
-  "yalcSig": "280f60167559546131ff06d47ae9f1c0"
+  "yalcSig": "d1b90baa231249f7f874a05a76c88ca3"
 }
