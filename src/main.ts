@@ -215,38 +215,116 @@ const abortActions = () => {
   mouseButtons.leftClick = false;
   mouseButtons.middleClick = false;
   mouseButtons.rightClick = false;
+  mot?.motion.onAbort?.();
 };
 document.addEventListener('mouseout', abortActions);
 
-drawboard.addEventListener('pointermove', (e) => {
-  if (mouseButtons.leftClick && isMousePosVisible(mousePos)) {
-    renderPhoxel('A', '#FFFFFF', '#FF0000', mousePos.y, mousePos.x);
-  }
-});
+// drawboard.addEventListener('pointermove', (e) => {
+//   if (mouseButtons.leftClick && isMousePosVisible(mousePos)) {
+//     renderPhoxel('A', '#FFFFFF', '#FF0000', mousePos.y, mousePos.x);
+//   }
+// });
 
 // MOTIONS
 const dp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
 
-type Motion = {
-  onPointerDown: (e: PointerEvent) => void;
-  onPointerMove: (e: PointerEvent) => void;
-  onPointerUp: (e: PointerEvent) => void;
-  onSubmit: () => void;
-  onAbort: () => void;
-  data: Record<string, any>;
+interface Motion {
+  name: string;
+  onPointerDown?: (e: PointerEvent) => void;
+  onPointerMove?: (e: PointerEvent) => void;
+  onPointerUp?: (e: PointerEvent) => void;
+  onSubmit?: () => void;
+  onAbort?: () => void;
+  resetMotion?: () => void;
+  data?: Record<string, any>;
+}
+
+type Phoxel = {
+  char: string;
+  fg: string;
+  bg: string;
+  r: number;
+  c: number;
 };
 
-// const drawMotion: Motion = {
-//    onPointerDown(e) {
-//       draftScreen.reset();
-//    },
-// };
+interface DrawMotion extends Motion {
+  data: {
+    draftPhoxels: Map<string, Phoxel>;
+    drawing: boolean;
+  };
+  addPhoxelToDraft: (p: Phoxel) => void;
+}
+const drawMotion: DrawMotion = {
+  name: 'draw',
+  data: {
+    draftPhoxels: new Map(),
+    drawing: false,
+  },
+  addPhoxelToDraft(p: Phoxel) {
+    this.data!.draftPhoxels.set(`${p.r};${p.c}`, p);
+    draftScreen.renderPhoxel(p.char, p.fg, p.bg, p.r, p.c);
+  },
+  onPointerDown() {
+    this.data.drawing = true;
+    this.addPhoxelToDraft({ ...dp, r: mousePos.y, c: mousePos.x });
+  },
+  onPointerMove() {
+    if (this.data.drawing) {
+      this.addPhoxelToDraft({ ...dp, r: mousePos.y, c: mousePos.x });
+    }
+  },
+  onPointerUp() {
+    this.data.drawing = false;
+    this.onSubmit!();
+  },
+  onSubmit() {
+    this.data.draftPhoxels.forEach((p) => {
+      renderPhoxel(p.char, p.fg, p.bg, p.r, p.c);
+    });
+    this.resetMotion!();
+  },
+  resetMotion() {
+    this.data.draftPhoxels = new Map();
+    draftScreen.reset();
+    this.data.drawing = false;
+  },
+  onAbort() {
+    this.resetMotion!();
+  },
+};
 
-draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, 2, 2);
-draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, 3, 3);
-draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, 4, 4);
-draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, 5, 5);
-draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, 6, 6);
+let mot: {
+  motion: Motion;
+  handlers: {
+    onPointerDown: (e: PointerEvent) => void;
+    onPointerUp: (e: PointerEvent) => void;
+    onPointerMove: (e: PointerEvent) => void;
+  };
+} | null = null;
+
+function setMotion(motion: Motion) {
+  if (mot) {
+    mot.motion.onAbort?.();
+    drawboard.removeEventListener('pointerdown', mot.handlers.onPointerDown);
+    drawboard.removeEventListener('pointermove', mot.handlers.onPointerMove);
+    drawboard.removeEventListener('pointerup', mot.handlers.onPointerUp);
+  }
+
+  mot = {
+    motion,
+    handlers: {
+      onPointerDown: (e) => motion.onPointerDown!(e),
+      onPointerMove: (e) => motion.onPointerMove!(e),
+      onPointerUp: (e) => motion.onPointerUp!(e),
+    },
+  };
+  drawboard.addEventListener('pointerdown', mot.handlers.onPointerDown);
+  drawboard.addEventListener('pointermove', mot.handlers.onPointerMove);
+  drawboard.addEventListener('pointerup', mot.handlers.onPointerUp);
+}
+
+setMotion(drawMotion);
+
 function renderDraftScreen() {
   draftScreen.renderFrame();
   window.requestAnimationFrame(renderDraftScreen);
