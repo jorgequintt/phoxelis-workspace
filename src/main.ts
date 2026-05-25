@@ -141,6 +141,7 @@ const panzoom = Panzoom(layersWrapper, panzoomConfiguration);
 const hammer = new Hammer(drawboard);
 hammer.get('pinch').set({ enable: true });
 hammer.on('pinchstart', () => {
+  abortMotion();
   scale = panzoom.getScale();
 });
 hammer.on('pinchmove', (e) => {
@@ -154,11 +155,13 @@ hammer.on('pinchmove', (e) => {
 
 drawboard.addEventListener('pointermove', (e) => {
   if (e.ctrlKey) {
+    abortMotion();
     panzoom.pan(
       e.movementX / panzoom.getScale(),
       e.movementY / panzoom.getScale(),
     );
   } else if (e.shiftKey) {
+    abortMotion();
     panzoom.zoom(panzoom.getScale() + (e.movementY / 35) * -1);
   }
 });
@@ -213,7 +216,7 @@ drawboard.addEventListener('pointerup', (e: PointerEvent) => {
   }
 });
 
-const abortActions = () => {
+const abortMotion = () => {
   mouseButtons.leftClick = false;
   mouseButtons.middleClick = false;
   mouseButtons.rightClick = false;
@@ -221,7 +224,7 @@ const abortActions = () => {
 };
 window.addEventListener('mouseout', (e) => {
   if(e.relatedTarget === null) {
-    abortActions();
+    abortMotion();
   }
 });
 
