@@ -24,14 +24,16 @@ let scale = panzoomConfiguration.startScale;
 
 const font = await getFont('1_Trithemius8x16');
 const { canvas, renderFrame, renderPhoxel } = Phoxelis(rows, cols, font);
+canvas.style = `position: relative;`;
 const draftScreen = Phoxelis(rows, cols, font);
+draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px;`;
 const drawboard = document.createElement('div');
 drawboard.style =
   'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
-canvas.style = `position: absolute;`;
-draftScreen.canvas.style = `position: absolute;`;
-drawboard.append(canvas);
-drawboard.append(draftScreen.canvas);
+const layersWrapper = document.createElement('div');
+layersWrapper.appendChild(canvas)
+layersWrapper.appendChild(draftScreen.canvas)
+drawboard.append(layersWrapper);
 document.body.append(drawboard);
 
 const renderLoop = () => {
@@ -135,7 +137,7 @@ for (let i = 0; i < cols; i++) {
 }
 // RENDERING CONTENT END
 
-const panzoom = Panzoom(canvas, panzoomConfiguration);
+const panzoom = Panzoom(layersWrapper, panzoomConfiguration);
 const hammer = new Hammer(drawboard);
 hammer.get('pinch').set({ enable: true });
 hammer.on('pinchstart', () => {
@@ -217,13 +219,11 @@ const abortActions = () => {
   mouseButtons.rightClick = false;
   mot?.motion.onAbort?.();
 };
-document.addEventListener('mouseout', abortActions);
-
-// drawboard.addEventListener('pointermove', (e) => {
-//   if (mouseButtons.leftClick && isMousePosVisible(mousePos)) {
-//     renderPhoxel('A', '#FFFFFF', '#FF0000', mousePos.y, mousePos.x);
-//   }
-// });
+window.addEventListener('mouseout', (e) => {
+  if(e.relatedTarget === null) {
+    abortActions();
+  }
+});
 
 // MOTIONS
 const dp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
