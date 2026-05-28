@@ -351,14 +351,25 @@ function renderDraftScreen() {
 }
 window.requestAnimationFrame(renderDraftScreen);
 
-font.charactersList.forEach((charShape, i) => {
+font.charactersList.forEach((char, i) => {
   const yOffset = Math.floor(i / alphabetCols) * font.height;
   const xOffset = (i % alphabetCols) * font.width;
-  for (let y = 0; y < charShape.length; y++) {
-    for (let x = 0; x < charShape.length; x++) {
-      const pixelVal = charShape[y][x];
+  for (let y = 0; y < char.shape.length; y++) {
+    for (let x = 0; x < char.shape.length; x++) {
+      const pixelVal = char.shape[y][x];
       alphabetCtx.fillStyle = pixelVal ? 'white' : 'black';
       alphabetCtx.fillRect(xOffset + x, yOffset + y, 1, 1);
     }
   }
+});
+
+alphabetCanvas.addEventListener('click', (e) => {
+  const r = Math.floor(e.offsetY / font.height);
+  const c = Math.floor(e.offsetX / font.width);
+  const index = r * alphabetCols + c;
+  const char = font.charactersList[index];
+  if(!char) throw new Error(`No char found for position y${r},x${c}`);
+  const charStr = String.fromCodePoint(char.codepoint);
+  console.log({charStr, char, r, c});
+  dp.char = charStr;
 });
