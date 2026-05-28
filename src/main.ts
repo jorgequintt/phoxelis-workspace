@@ -17,24 +17,42 @@ const panzoomConfiguration = {
   excludeClass: 'panzoom-exclude',
 };
 
-const isMousePosVisible = (mousePos: CellPosition) =>
-  mousePos.x >= 0 && mousePos.x < cols && mousePos.y >= 0 && mousePos.y < rows;
-
 let scale = panzoomConfiguration.startScale;
 
 const font = await getFont('1_Trithemius8x16');
+
 const { canvas, renderFrame, renderPhoxel } = Phoxelis(rows, cols, font);
 canvas.style = `position: relative;`;
 const draftScreen = Phoxelis(rows, cols, font);
 draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px;`;
+
 const drawboard = document.createElement('div');
 drawboard.style =
-  'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
+  'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; flex: 1;';
+
 const layersWrapper = document.createElement('div');
-layersWrapper.appendChild(canvas)
-layersWrapper.appendChild(draftScreen.canvas)
-drawboard.append(layersWrapper);
-document.body.append(drawboard);
+layersWrapper.appendChild(canvas);
+layersWrapper.appendChild(draftScreen.canvas);
+drawboard.appendChild(layersWrapper);
+
+const appContainer = document.createElement('div');
+appContainer.style = 'width: 100%; height: 100%; display: flex;';
+appContainer.appendChild(drawboard);
+
+const alphabetCanvas = document.createElement('canvas');
+const alphabetCols = 32;
+const alphabetRows = Math.ceil(font.length / alphabetCols);
+alphabetCanvas.width = alphabetCols * font.width;
+alphabetCanvas.height = alphabetRows * font.height;
+alphabetCanvas.style.width = `${alphabetCanvas.width}px`;
+alphabetCanvas.style.height = `${alphabetCanvas.height}px`;
+const alphabetCtx = alphabetCanvas.getContext('2d')!;
+alphabetCtx.fillStyle = 'red';
+alphabetCtx.fillRect(0, 0, alphabetCanvas.width, alphabetCanvas.height);
+appContainer.append(alphabetCanvas);
+
+
+document.body.appendChild(appContainer);
 
 const renderLoop = () => {
   renderFrame();
@@ -223,7 +241,7 @@ const abortMotion = () => {
   mot?.motion.onAbort?.();
 };
 window.addEventListener('mouseout', (e) => {
-  if(e.relatedTarget === null) {
+  if (e.relatedTarget === null) {
     abortMotion();
   }
 });
