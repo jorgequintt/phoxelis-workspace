@@ -51,7 +51,6 @@ alphabetCtx.fillStyle = 'red';
 alphabetCtx.fillRect(0, 0, alphabetCanvas.width, alphabetCanvas.height);
 appContainer.append(alphabetCanvas);
 
-
 document.body.appendChild(appContainer);
 
 const renderLoop = () => {
@@ -351,3 +350,15 @@ function renderDraftScreen() {
   window.requestAnimationFrame(renderDraftScreen);
 }
 window.requestAnimationFrame(renderDraftScreen);
+
+font.charactersList.forEach((charShape, i) => {
+  const yOffset = Math.floor(i / alphabetCols) * font.height;
+  const xOffset = (i % alphabetCols) * font.width;
+  for (let y = 0; y < charShape.length; y++) {
+    for (let x = 0; x < charShape.length; x++) {
+      const pixelVal = charShape[y][x];
+      alphabetCtx.fillStyle = pixelVal ? 'white' : 'black';
+      alphabetCtx.fillRect(xOffset + x, yOffset + y, 1, 1);
+    }
+  }
+});
