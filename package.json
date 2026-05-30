@@ -14,6 +14,7 @@
     "vite": "^8.0.12"
   },
   "dependencies": {
+    "@jaames/iro": "^5.5.2",
     "@panzoom/panzoom": "^4.6.2",
     "hammerjs": "^2.0.8",
     "phoxelis": "file:.yalc/phoxelis"

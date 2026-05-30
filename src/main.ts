@@ -2,6 +2,7 @@ import { getFont, Phoxelis } from 'phoxelis';
 import './style.css';
 import Panzoom from '@panzoom/panzoom';
 import Hammer from 'hammerjs';
+import iro from '@jaames/iro';
 
 const rows = 37;
 const cols = 152;
@@ -21,6 +22,8 @@ let scale = panzoomConfiguration.startScale;
 
 const font = await getFont('1_Trithemius8x16');
 
+const dp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
+
 const { canvas, renderFrame, renderPhoxel } = Phoxelis(rows, cols, font);
 canvas.style = `position: relative;`;
 const draftScreen = Phoxelis(rows, cols, font);
@@ -39,6 +42,8 @@ const appContainer = document.createElement('div');
 appContainer.style = 'width: 100%; height: 100%; display: flex;';
 appContainer.appendChild(drawboard);
 
+const sidebar = document.createElement('div');
+sidebar.style = `display: flex; flex-direction: column;`;
 const alphabetCanvas = document.createElement('canvas');
 const alphabetCols = 32;
 const alphabetRows = Math.ceil(font.length / alphabetCols);
@@ -49,9 +54,42 @@ alphabetCanvas.style.height = `${alphabetCanvas.height}px`;
 const alphabetCtx = alphabetCanvas.getContext('2d')!;
 alphabetCtx.fillStyle = 'red';
 alphabetCtx.fillRect(0, 0, alphabetCanvas.width, alphabetCanvas.height);
-appContainer.append(alphabetCanvas);
-
+sidebar.append(alphabetCanvas);
+const colorPickerContainer = document.createElement('div');
+colorPickerContainer.id = 'colorpicker';
+sidebar.append(colorPickerContainer);
+const fgColorButton = document.createElement('button');
+fgColorButton.innerHTML = 'Foreground';
+function selectColorType(type: 'fg' | 'bg') { 
+  selectedColorType = type;
+  colorPicker.color.hexString = dp[type];
+}
+fgColorButton.addEventListener('click', () => selectColorType('fg'));
+const bgColorButton = document.createElement('button');
+bgColorButton.innerHTML = 'Background';
+bgColorButton.addEventListener('click', () => selectColorType('bg'));
+colorPickerContainer.append(fgColorButton);
+colorPickerContainer.append(bgColorButton);
+appContainer.append(sidebar);
 document.body.appendChild(appContainer);
+
+let selectedColorType: 'fg' | 'bg' = 'fg';
+const colorPicker = iro.ColorPicker('#colorpicker', {
+  width: 200,
+  layout: [
+    { 
+      component: iro.ui.Wheel,
+    },
+    { 
+      component: iro.ui.Slider,
+    },
+  ]
+});
+colorPicker.on('color:change', (color: any) => {
+  dp[selectedColorType] = color.hexString;
+});
+selectColorType('fg');
+
 
 const renderLoop = () => {
   renderFrame();
@@ -245,8 +283,6 @@ window.addEventListener('mouseout', (e) => {
   }
 });
 
-// MOTIONS
-const dp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
 
 interface Motion {
   name: string;
@@ -369,7 +405,5 @@ alphabetCanvas.addEventListener('click', (e) => {
   const index = r * alphabetCols + c;
   const char = font.charactersList[index];
   if(!char) throw new Error(`No char found for position y${r},x${c}`);
-  const charStr = String.fromCodePoint(char.codepoint);
-  console.log({charStr, char, r, c});
-  dp.char = charStr;
+  dp.char = String.fromCodePoint(char.codepoint);
 });
