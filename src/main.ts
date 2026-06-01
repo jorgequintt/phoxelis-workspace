@@ -24,7 +24,15 @@ const font = await getFont('1_Trithemius8x16');
 
 const dp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
 
-const { canvas, renderFrame, renderPhoxel } = Phoxelis(rows, cols, font);
+const {
+  canvas,
+  renderFrame,
+  renderPhoxel,
+  importPhoxelis,
+  exportPhoxelis,
+  reset,
+  clearScreen,
+} = Phoxelis(rows, cols, font);
 canvas.style = `position: relative;`;
 const draftScreen = Phoxelis(rows, cols, font);
 draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px;`;
@@ -60,7 +68,7 @@ colorPickerContainer.id = 'colorpicker';
 sidebar.append(colorPickerContainer);
 const fgColorButton = document.createElement('button');
 fgColorButton.innerHTML = 'Foreground';
-function selectColorType(type: 'fg' | 'bg') { 
+function selectColorType(type: 'fg' | 'bg') {
   selectedColorType = type;
   colorPicker.color.hexString = dp[type];
 }
@@ -77,19 +85,18 @@ let selectedColorType: 'fg' | 'bg' = 'fg';
 const colorPicker = iro.ColorPicker('#colorpicker', {
   width: 200,
   layout: [
-    { 
+    {
       component: iro.ui.Wheel,
     },
-    { 
+    {
       component: iro.ui.Slider,
     },
-  ]
+  ],
 });
 colorPicker.on('color:change', (color: any) => {
   dp[selectedColorType] = color.hexString;
 });
 selectColorType('fg');
-
 
 const renderLoop = () => {
   renderFrame();
@@ -283,7 +290,6 @@ window.addEventListener('mouseout', (e) => {
   }
 });
 
-
 interface Motion {
   name: string;
   onPointerDown?: (e: PointerEvent) => void;
@@ -404,6 +410,30 @@ alphabetCanvas.addEventListener('click', (e) => {
   const c = Math.floor(e.offsetX / font.width);
   const index = r * alphabetCols + c;
   const char = font.charactersList[index];
-  if(!char) throw new Error(`No char found for position y${r},x${c}`);
+  if (!char) throw new Error(`No char found for position y${r},x${c}`);
   dp.char = String.fromCodePoint(char.codepoint);
 });
+
+async function savePhoxelis(data: Uint32Array<ArrayBuffer>, name = 'data') {
+  const root = await navigator.storage.getDirectory();
+  const fileHandle = await root.getFileHandle(`${name}.bin`, { create: true });
+  const accessHandle = await fileHandle.createWritable();
+
+  accessHandle.write(data.buffer);
+  accessHandle.close();
+}
+
+async function loadPhoxelis(name = 'data') {
+  const root = await navigator.storage.getDirectory();
+  const fileHandle = await root.getFileHandle(`${name}.bin`);
+  if (!fileHandle) throw new Error(`No file "${name}" found in OPFS`);
+  const file = await fileHandle.getFile();
+  const fileBuffer = await file.arrayBuffer();
+  importPhoxelis(new Uint32Array(fileBuffer));
+}
+
+await savePhoxelis(exportPhoxelis('data'));
+reset();
+setTimeout(() => {
+  loadPhoxelis();
+}, 3000);
