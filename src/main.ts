@@ -3,6 +3,7 @@ import './style.css';
 import Panzoom from '@panzoom/panzoom';
 import Hammer from 'hammerjs';
 import iro from '@jaames/iro';
+import { downloadArrayBuffer, toggleFullScreen } from './utils';
 
 const rows = 37;
 const cols = 152;
@@ -19,7 +20,7 @@ const panzoomConfiguration = {
 };
 
 let scale = panzoomConfiguration.startScale;
-
+const filename = 'current_work';
 const font = await getFont('1_Trithemius8x16');
 
 const dp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
@@ -39,15 +40,74 @@ draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px;`;
 
 const drawboard = document.createElement('div');
 drawboard.style =
-  'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; flex: 1;';
+'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; flex: 1;';
+const refImage = document.createElement('img');
+refImage.style = `position: absolute; top: 0px; right: 0px;`;
 
 const layersWrapper = document.createElement('div');
+layersWrapper.appendChild(refImage);
 layersWrapper.appendChild(canvas);
 layersWrapper.appendChild(draftScreen.canvas);
 drawboard.appendChild(layersWrapper);
 
 const appContainer = document.createElement('div');
 appContainer.style = 'width: 100%; height: 100%; display: flex;';
+
+const navBar = document.createElement('div');
+navBar.style = `width: 100%; background: #888888`;
+const saveButton = document.createElement('button');
+saveButton.innerHTML = 'Save';
+saveButton.onclick = async () => {
+  await savePhoxelis(exportPhoxelis(filename), filename);
+};
+navBar.appendChild(saveButton);
+
+const fullscreenButton = document.createElement('button');
+fullscreenButton.innerHTML = 'Fullscreen';
+fullscreenButton.onclick = () => toggleFullScreen(document.body);
+navBar.appendChild(fullscreenButton);
+
+const exportButton = document.createElement('button');
+exportButton.innerHTML = 'Export';
+exportButton.onclick = () =>
+  downloadArrayBuffer(exportPhoxelis(filename).buffer, `${filename}.phoxelis`);
+navBar.appendChild(exportButton);
+
+const referenceImageButton = document.createElement('input');
+referenceImageButton.type = 'file';
+referenceImageButton.accept = 'image/*';
+referenceImageButton.addEventListener('change', (e) => {
+  if (!e?.target) {
+    console.log('no event');
+    return;
+  }
+
+  if (e.target instanceof HTMLInputElement) {
+    const file = e.target.files?.[0]; // Get the selected file
+    console.log('file', e.target.files)
+
+    if (file) {
+      // Generate a temporary URL representing the local file
+      const objectURL = URL.createObjectURL(file);
+
+      refImage.src = objectURL;
+      refImage.style.display = 'block';
+
+      // Free memory when the image finishes loading
+      refImage.onload = () => {
+        URL.revokeObjectURL(objectURL);
+      };
+    }
+  }
+});
+navBar.appendChild(referenceImageButton);
+
+const moveRefImageToggle = document.createElement('input');
+moveRefImageToggle.type = "checkbox";
+navBar.appendChild(moveRefImageToggle);
+
+
+document.body.appendChild(navBar);
 appContainer.appendChild(drawboard);
 
 const sidebar = document.createElement('div');
@@ -200,31 +260,36 @@ for (let i = 0; i < cols; i++) {
 // RENDERING CONTENT END
 
 const panzoom = Panzoom(layersWrapper, panzoomConfiguration);
+const refImagePanzoom = Panzoom(refImage, panzoomConfiguration);
 const hammer = new Hammer(drawboard);
 hammer.get('pinch').set({ enable: true });
 hammer.on('pinchstart', () => {
+  const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
   abortMotion();
-  scale = panzoom.getScale();
+  scale = targetZoom.getScale();
 });
 hammer.on('pinchmove', (e) => {
+  const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
+
   const newZoomVal = scale * e.scale;
-  panzoom.zoom(newZoomVal);
-  panzoom.pan(
-    (e.velocityX * 11) / panzoom.getScale(),
-    (e.velocityY * 11) / panzoom.getScale(),
+  targetZoom.zoom(newZoomVal);
+  targetZoom.pan(
+    (e.velocityX * 11) / targetZoom.getScale(),
+    (e.velocityY * 11) / targetZoom.getScale(),
   );
 });
 
 drawboard.addEventListener('pointermove', (e) => {
+  const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
   if (e.ctrlKey) {
     abortMotion();
-    panzoom.pan(
-      e.movementX / panzoom.getScale(),
-      e.movementY / panzoom.getScale(),
+    targetZoom.pan(
+      e.movementX / targetZoom.getScale(),
+      e.movementY / targetZoom.getScale(),
     );
   } else if (e.shiftKey) {
     abortMotion();
-    panzoom.zoom(panzoom.getScale() + (e.movementY / 35) * -1);
+    targetZoom.zoom(targetZoom.getScale() + (e.movementY / 35) * -1);
   }
 });
 
@@ -432,8 +497,4 @@ async function loadPhoxelis(name = 'data') {
   importPhoxelis(new Uint32Array(fileBuffer));
 }
 
-await savePhoxelis(exportPhoxelis('data'));
-reset();
-setTimeout(() => {
-  loadPhoxelis();
-}, 3000);
+loadPhoxelis(filename);
