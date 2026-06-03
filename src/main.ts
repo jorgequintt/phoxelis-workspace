@@ -18,6 +18,8 @@ const panzoomConfiguration = {
   startScale: 1,
   excludeClass: 'panzoom-exclude',
 };
+const refImagePanzoomConfig = {...panzoomConfiguration};
+let refImageScale = refImagePanzoomConfig.startScale;
 
 let scale = panzoomConfiguration.startScale;
 const filename = 'current_work';
@@ -42,11 +44,13 @@ const drawboard = document.createElement('div');
 drawboard.style =
 'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; flex: 1;';
 const refImage = document.createElement('img');
-refImage.style = `position: absolute; top: 0px; right: 0px;`;
+const refImageWrapper = document.createElement('div');
+refImageWrapper.append(refImage);
+refImageWrapper.style = `position: absolute; top: 0px; right: 0px; z-index: -999; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;`;
 
 const layersWrapper = document.createElement('div');
-layersWrapper.appendChild(refImage);
 layersWrapper.appendChild(canvas);
+layersWrapper.appendChild(refImageWrapper);
 layersWrapper.appendChild(draftScreen.canvas);
 drawboard.appendChild(layersWrapper);
 
@@ -260,18 +264,24 @@ for (let i = 0; i < cols; i++) {
 // RENDERING CONTENT END
 
 const panzoom = Panzoom(layersWrapper, panzoomConfiguration);
-const refImagePanzoom = Panzoom(refImage, panzoomConfiguration);
+const refImagePanzoom = Panzoom(refImage, refImagePanzoomConfig);
 const hammer = new Hammer(drawboard);
 hammer.get('pinch').set({ enable: true });
 hammer.on('pinchstart', () => {
   const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
   abortMotion();
-  scale = targetZoom.getScale();
+
+  if(moveRefImageToggle.checked) {
+    refImageScale = targetZoom.getScale(); 
+  } else {
+    scale = targetZoom.getScale();
+  }
 });
 hammer.on('pinchmove', (e) => {
   const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
 
-  const newZoomVal = scale * e.scale;
+  const s = moveRefImageToggle.checked ? refImageScale : scale;
+  const newZoomVal = s * e.scale;
   targetZoom.zoom(newZoomVal);
   targetZoom.pan(
     (e.velocityX * 11) / targetZoom.getScale(),
