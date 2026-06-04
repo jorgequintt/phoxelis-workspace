@@ -40,6 +40,8 @@ canvas.style = `position: relative; border: 1px solid black`;
 const draftScreen = Phoxelis(rows, cols, font);
 draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black`;
 
+const content = document.createElement('div');
+content.style = 'width: 100%; display: flex; flex: 1; flex-direction: column;';
 const drawboard = document.createElement('div');
 drawboard.style =
 'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; flex: 1;';
@@ -53,9 +55,14 @@ layersWrapper.appendChild(canvas);
 layersWrapper.appendChild(refImageWrapper);
 layersWrapper.appendChild(draftScreen.canvas);
 drawboard.appendChild(layersWrapper);
+content.append(drawboard);
+
+const contentFooter = document.createElement('div');
+contentFooter.innerHTML = "Works";
+content.append(contentFooter);
 
 const appContainer = document.createElement('div');
-appContainer.style = 'width: 100%; height: 100%; display: flex;';
+appContainer.style = 'width: 100%; height: 100%; display: flex; flex-direction: row;';
 
 const navBar = document.createElement('div');
 navBar.style = `width: 100%; background: #888888`;
@@ -111,8 +118,8 @@ moveRefImageToggle.type = "checkbox";
 navBar.appendChild(moveRefImageToggle);
 
 
-document.body.appendChild(navBar);
-appContainer.appendChild(drawboard);
+appContainer.appendChild(navBar);
+appContainer.appendChild(content);
 
 const sidebar = document.createElement('div');
 sidebar.style = `display: flex; flex-direction: column;`;
