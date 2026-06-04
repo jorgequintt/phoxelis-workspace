@@ -4,6 +4,7 @@ import Panzoom from '@panzoom/panzoom';
 import Hammer from 'hammerjs';
 import iro from '@jaames/iro';
 import { downloadArrayBuffer, toggleFullScreen } from './utils';
+import { sampleRenderContent } from './sampleRenderContent';
 
 const rows = 37;
 const cols = 152;
@@ -27,18 +28,17 @@ const font = await getFont('1_Trithemius8x16');
 
 const dp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
 
+const phoxelis = Phoxelis(rows, cols, font);
 const {
   canvas,
   renderFrame,
   renderPhoxel,
   importPhoxelis,
   exportPhoxelis,
-  reset,
-  clearScreen,
-} = Phoxelis(rows, cols, font);
-canvas.style = `position: relative;`;
+} = phoxelis;
+canvas.style = `position: relative; border: 1px solid black`;
 const draftScreen = Phoxelis(rows, cols, font);
-draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px;`;
+draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black`;
 
 const drawboard = document.createElement('div');
 drawboard.style =
@@ -168,100 +168,7 @@ const renderLoop = () => {
 };
 window.requestAnimationFrame(renderLoop);
 
-// RENDERING CONTENT
-const colors = {
-  white: '#FFFFFF',
-  bluedark: '#8c8cfb',
-  bluemid: '#5353fa',
-  bluelow: '#2a2afa',
-  blue: '#0000FF',
-};
-const takenCells = new Set();
-function renderPhoxelBack(
-  char: string,
-  fg: string,
-  bg: string,
-  r: number,
-  c: number,
-) {
-  if (!takenCells.has(`${r};${c}`)) {
-    renderPhoxel(char, fg, bg, r, c);
-  }
-}
-function fill(color: string) {
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      renderPhoxel(' ', color, color, r, c);
-    }
-  }
-}
-function write(x: number, y: number, text: string, maxWidth: number = 70) {
-  let charCount = 0;
-  let currentRow = y;
-  text.split('').forEach((char) => {
-    charCount++;
-    if (char === '\n' || charCount === maxWidth - 1) {
-      currentRow++;
-      charCount = 0;
-      return;
-    }
-    renderPhoxel(char, colors.white, colors.blue, currentRow, x + charCount);
-    takenCells.add(`${currentRow};${x + charCount}`);
-  });
-}
-function drop(char: string, x: number, y: number, speedMs = 40) {
-  let currentY = y;
-  const dropFall = () => {
-    renderPhoxelBack(' ', colors.blue, colors.blue, currentY, x);
-    renderPhoxelBack(char, colors.bluelow, colors.blue, currentY + 1, x);
-    renderPhoxelBack(char, colors.bluelow, colors.blue, currentY + 2, x);
-    renderPhoxelBack(char, colors.bluemid, colors.blue, currentY + 3, x);
-    renderPhoxelBack(char, colors.bluemid, colors.blue, currentY + 4, x);
-    renderPhoxelBack(char, colors.bluedark, colors.blue, currentY + 5, x);
-    currentY++;
-
-    if (currentY > rows) {
-      currentY = -6;
-    }
-  };
-
-  setInterval(dropFall, speedMs);
-}
-fill(colors.blue);
-write(
-  16,
-  7,
-  `
-Who am I?
-
-I don't know that. But call me Jorelus.
-I'm fascinated by the liminal area between the digital and the heart.
-So I'm drawn to art and programming, constantly in pursue of channeling my soul through both.
-
-I enjoy...
-* Exercising (weights)
-* Riding my bike around the city
-* Cooking new recipes
-* Feeling music deeply
-* Videogames
-
-Here I will share my ASCII art, my esoteric software and my soul.
-The website is barebones right now, so excuse the simplicity.
-In any case, welcome, and follow me, as I'm looking to connect with other souls here.
-
-Take care.
-`,
-  100,
-);
-for (let i = 0; i < cols; i++) {
-  drop(
-    'i',
-    i,
-    (Math.floor(Math.random() * 80) + 6) * -1,
-    Math.floor(Math.random() * 40) + 170,
-  );
-}
-// RENDERING CONTENT END
+// sampleRenderContent(phoxelis, rows, cols);
 
 const panzoom = Panzoom(layersWrapper, panzoomConfiguration);
 const refImagePanzoom = Panzoom(refImage, refImagePanzoomConfig);
