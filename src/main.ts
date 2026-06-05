@@ -28,23 +28,40 @@ const font = await getFont('1_Trithemius8x16');
 
 const dp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
 
-const phoxelis = Phoxelis(rows, cols, font);
+const phoxelis = Phoxelis(rows, cols, font, true);
 const {
   canvas,
   renderFrame,
   renderPhoxel,
   importPhoxelis,
   exportPhoxelis,
+  palette
 } = phoxelis;
-canvas.style = `position: relative; border: 1px solid black`;
-const draftScreen = Phoxelis(rows, cols, font);
-draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black`;
+
+const appContainer = document.createElement('div');
+appContainer.style = 'width: 100%; height: 100%; display: flex; flex-direction: column;';
+
+const navBar = document.createElement('div');
+navBar.style = `width: 100%; background: #888888;`;
 
 const content = document.createElement('div');
-content.style = 'width: 100%; display: flex; flex: 1; flex-direction: column;';
+content.style = 'width: 100%; display: flex; flex: 1; flex-direction: row;';
+
+const contentFooter = document.createElement('div');
+contentFooter.style = "overflow-x: scroll;";
+palette.style = "height: 40px; image-rendering: pixelated; border: 1px solid black;";
+contentFooter.append(palette);
+
+const sidebar = document.createElement('div');
+sidebar.style = `display: flex; flex-direction: column;`;
+
+// Drawboard
 const drawboard = document.createElement('div');
 drawboard.style =
 'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; flex: 1;';
+canvas.style = `position: relative; border: 1px solid black; image-rendering: pixelated;`;
+const draftScreen = Phoxelis(rows, cols, font);
+draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black; image-rendering: pixelated;`;
 const refImage = document.createElement('img');
 const refImageWrapper = document.createElement('div');
 refImageWrapper.append(refImage);
@@ -55,17 +72,8 @@ layersWrapper.appendChild(canvas);
 layersWrapper.appendChild(refImageWrapper);
 layersWrapper.appendChild(draftScreen.canvas);
 drawboard.appendChild(layersWrapper);
-content.append(drawboard);
 
-const contentFooter = document.createElement('div');
-contentFooter.innerHTML = "Works";
-content.append(contentFooter);
-
-const appContainer = document.createElement('div');
-appContainer.style = 'width: 100%; height: 100%; display: flex; flex-direction: row;';
-
-const navBar = document.createElement('div');
-navBar.style = `width: 100%; background: #888888`;
+// Navbar
 const saveButton = document.createElement('button');
 saveButton.innerHTML = 'Save';
 saveButton.onclick = async () => {
@@ -112,17 +120,11 @@ referenceImageButton.addEventListener('change', (e) => {
   }
 });
 navBar.appendChild(referenceImageButton);
-
 const moveRefImageToggle = document.createElement('input');
 moveRefImageToggle.type = "checkbox";
 navBar.appendChild(moveRefImageToggle);
 
-
-appContainer.appendChild(navBar);
-appContainer.appendChild(content);
-
-const sidebar = document.createElement('div');
-sidebar.style = `display: flex; flex-direction: column;`;
+// Sidebar
 const alphabetCanvas = document.createElement('canvas');
 const alphabetCols = 32;
 const alphabetRows = Math.ceil(font.length / alphabetCols);
@@ -149,7 +151,14 @@ bgColorButton.innerHTML = 'Background';
 bgColorButton.addEventListener('click', () => selectColorType('bg'));
 colorPickerContainer.append(fgColorButton);
 colorPickerContainer.append(bgColorButton);
-appContainer.append(sidebar);
+
+
+
+content.append(drawboard);
+content.append(sidebar);
+appContainer.appendChild(navBar);
+appContainer.appendChild(content);
+appContainer.append(contentFooter);
 document.body.appendChild(appContainer);
 
 let selectedColorType: 'fg' | 'bg' = 'fg';
