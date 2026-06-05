@@ -47,7 +47,7 @@ const navBar = document.createElement('div');
 navBar.style = `width: 100%; background: #888888;`;
 
 const content = document.createElement('div');
-content.style = 'width: 100%; display: flex; flex: 1; flex-direction: row;';
+content.style = 'width: 100%; display: flex; flex: 1; flex-direction: row; min-height: 0;';
 
 const contentFooter = document.createElement('div');
 contentFooter.style = 'overflow-x: scroll;';
@@ -71,7 +71,7 @@ sidebar.style = `display: flex; flex-direction: column;`;
 // Drawboard
 const drawboard = document.createElement('div');
 drawboard.style =
-  'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; flex: 1;';
+  'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
 canvas.style = `position: relative; border: 1px solid black; image-rendering: pixelated;`;
 const draftScreen = Phoxelis(rows, cols, font);
 draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black; image-rendering: pixelated;`;
