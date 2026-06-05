@@ -26,7 +26,7 @@ let scale = panzoomConfiguration.startScale;
 const filename = 'current_work';
 const font = await getFont('1_Trithemius8x16');
 
-const dp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
+let dp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
 
 const phoxelis = Phoxelis(rows, cols, font, true);
 const {
@@ -35,7 +35,8 @@ const {
   renderPhoxel,
   importPhoxelis,
   exportPhoxelis,
-  palette
+  palette,
+  getPhoxFromPaletteIndex
 } = phoxelis;
 
 const appContainer = document.createElement('div');
@@ -49,7 +50,16 @@ content.style = 'width: 100%; display: flex; flex: 1; flex-direction: row;';
 
 const contentFooter = document.createElement('div');
 contentFooter.style = "overflow-x: scroll;";
-palette.style = "height: 40px; image-rendering: pixelated; border: 1px solid black;";
+const paletteScale = 2;
+const paletteHeight = font.height * paletteScale;
+palette.style = `height: ${paletteHeight}px; image-rendering: pixelated; border: 1px solid black;`;
+palette.addEventListener('click', (e) => {
+  const x = e.offsetX;
+  const paletteMaxCells = (palette.width / font.width);
+  const pos = Math.floor((x / (paletteScale * palette.width)) * paletteMaxCells);
+  const phox = getPhoxFromPaletteIndex(pos);
+  dp = phox;
+});
 contentFooter.append(palette);
 
 const sidebar = document.createElement('div');
