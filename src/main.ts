@@ -19,7 +19,7 @@ const panzoomConfiguration = {
   startScale: 1,
   excludeClass: 'panzoom-exclude',
 };
-const refImagePanzoomConfig = {...panzoomConfiguration};
+const refImagePanzoomConfig = { ...panzoomConfiguration };
 let refImageScale = refImagePanzoomConfig.startScale;
 
 let scale = panzoomConfiguration.startScale;
@@ -36,11 +36,12 @@ const {
   importPhoxelis,
   exportPhoxelis,
   palette,
-  getPhoxFromPaletteIndex
+  getPhoxFromPaletteIndex,
 } = phoxelis;
 
 const appContainer = document.createElement('div');
-appContainer.style = 'width: 100%; height: 100%; display: flex; flex-direction: column;';
+appContainer.style =
+  'width: 100%; height: 100%; display: flex; flex-direction: column;';
 
 const navBar = document.createElement('div');
 navBar.style = `width: 100%; background: #888888;`;
@@ -49,14 +50,16 @@ const content = document.createElement('div');
 content.style = 'width: 100%; display: flex; flex: 1; flex-direction: row;';
 
 const contentFooter = document.createElement('div');
-contentFooter.style = "overflow-x: scroll;";
+contentFooter.style = 'overflow-x: scroll;';
 const paletteScale = 2;
 const paletteHeight = font.height * paletteScale;
 palette.style = `height: ${paletteHeight}px; image-rendering: pixelated; border: 1px solid black;`;
 palette.addEventListener('click', (e) => {
   const x = e.offsetX;
-  const paletteMaxCells = (palette.width / font.width);
-  const pos = Math.floor((x / (paletteScale * palette.width)) * paletteMaxCells);
+  const paletteMaxCells = palette.width / font.width;
+  const pos = Math.floor(
+    (x / (paletteScale * palette.width)) * paletteMaxCells,
+  );
   const phox = getPhoxFromPaletteIndex(pos);
   dp = phox;
 });
@@ -68,7 +71,7 @@ sidebar.style = `display: flex; flex-direction: column;`;
 // Drawboard
 const drawboard = document.createElement('div');
 drawboard.style =
-'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; flex: 1;';
+  'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; flex: 1;';
 canvas.style = `position: relative; border: 1px solid black; image-rendering: pixelated;`;
 const draftScreen = Phoxelis(rows, cols, font);
 draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black; image-rendering: pixelated;`;
@@ -113,7 +116,7 @@ referenceImageButton.addEventListener('change', (e) => {
 
   if (e.target instanceof HTMLInputElement) {
     const file = e.target.files?.[0]; // Get the selected file
-    console.log('file', e.target.files)
+    console.log('file', e.target.files);
 
     if (file) {
       // Generate a temporary URL representing the local file
@@ -131,21 +134,34 @@ referenceImageButton.addEventListener('change', (e) => {
 });
 navBar.appendChild(referenceImageButton);
 const moveRefImageToggle = document.createElement('input');
-moveRefImageToggle.type = "checkbox";
+moveRefImageToggle.type = 'checkbox';
 navBar.appendChild(moveRefImageToggle);
 
 // Sidebar
 const alphabetCanvas = document.createElement('canvas');
-const alphabetCols = 32;
+const alphabetWidth = 100;
+const alphabetCols = Math.ceil(alphabetWidth / font.width);
 const alphabetRows = Math.ceil(font.length / alphabetCols);
 alphabetCanvas.width = alphabetCols * font.width;
 alphabetCanvas.height = alphabetRows * font.height;
-alphabetCanvas.style.width = `${alphabetCanvas.width}px`;
-alphabetCanvas.style.height = `${alphabetCanvas.height}px`;
+const alphabetViewScale = 2;
+alphabetCanvas.style = `width: ${alphabetCanvas.width * alphabetViewScale}px; image-rendering: pixelated;`;
 const alphabetCtx = alphabetCanvas.getContext('2d')!;
-alphabetCtx.fillStyle = 'red';
-alphabetCtx.fillRect(0, 0, alphabetCanvas.width, alphabetCanvas.height);
-sidebar.append(alphabetCanvas);
+
+const alphabetContainer = document.createElement('div');
+alphabetContainer.style = 'height: 250px; overflow-y: scroll;';
+alphabetContainer.append(alphabetCanvas);
+sidebar.append(alphabetContainer);
+
+alphabetCanvas.addEventListener('click', (e) => {
+  const r = Math.floor(e.offsetY / alphabetViewScale / font.height);
+  const c = Math.floor(e.offsetX / alphabetViewScale / font.width);
+  const index = r * alphabetCols + c;
+  const char = font.charactersList[index];
+  if (!char) throw new Error(`No char found for position y${r},x${c}`);
+  dp.char = String.fromCodePoint(char.codepoint);
+});
+
 const colorPickerContainer = document.createElement('div');
 colorPickerContainer.id = 'colorpicker';
 sidebar.append(colorPickerContainer);
@@ -162,8 +178,6 @@ bgColorButton.addEventListener('click', () => selectColorType('bg'));
 colorPickerContainer.append(fgColorButton);
 colorPickerContainer.append(bgColorButton);
 
-
-
 content.append(drawboard);
 content.append(sidebar);
 appContainer.appendChild(navBar);
@@ -173,7 +187,7 @@ document.body.appendChild(appContainer);
 
 let selectedColorType: 'fg' | 'bg' = 'fg';
 const colorPicker = iro.ColorPicker('#colorpicker', {
-  width: 200,
+  width: 150,
   layout: [
     {
       component: iro.ui.Wheel,
@@ -204,8 +218,8 @@ hammer.on('pinchstart', () => {
   const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
   abortMotion();
 
-  if(moveRefImageToggle.checked) {
-    refImageScale = targetZoom.getScale(); 
+  if (moveRefImageToggle.checked) {
+    refImageScale = targetZoom.getScale();
   } else {
     scale = targetZoom.getScale();
   }
@@ -411,15 +425,6 @@ font.charactersList.forEach((char, i) => {
       alphabetCtx.fillRect(xOffset + x, yOffset + y, 1, 1);
     }
   }
-});
-
-alphabetCanvas.addEventListener('click', (e) => {
-  const r = Math.floor(e.offsetY / font.height);
-  const c = Math.floor(e.offsetX / font.width);
-  const index = r * alphabetCols + c;
-  const char = font.charactersList[index];
-  if (!char) throw new Error(`No char found for position y${r},x${c}`);
-  dp.char = String.fromCodePoint(char.codepoint);
 });
 
 async function savePhoxelis(data: Uint32Array<ArrayBuffer>, name = 'data') {
