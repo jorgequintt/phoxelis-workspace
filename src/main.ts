@@ -68,15 +68,18 @@ contentFooter.append(palette);
 const sidebar = document.createElement('div');
 sidebar.style = `display: flex; flex-direction: column;`;
 
-// ─── Tool Selector ───────────────────────────────────────────────────────────
-const toolBar = document.createElement('div');
-toolBar.style = `
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 4px;
+// ─── Left Sidebar (Tool Selector) ────────────────────────────────────────────
+const leftSidebar = document.createElement('div');
+leftSidebar.style = `
+  width: 48px;
+  flex-shrink: 0;
   background: #333;
   border-right: 1px solid #555;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  gap: 4px;
 `;
 
 type ToolDefinition = {
@@ -112,10 +115,16 @@ const toolDefs: ToolDefinition[] = [
     createTool: () => lineTool,
   },
   {
-    name: 'circle',
-    icon: '○',
-    tooltip: 'Circle',
-    createTool: () => circleTool,
+    name: 'ellipse',
+    icon: '⬭',
+    tooltip: 'Ellipse (outline)',
+    createTool: () => ellipseTool,
+  },
+  {
+    name: 'filledEllipse',
+    icon: '●',
+    tooltip: 'Filled Ellipse',
+    createTool: () => filledEllipseTool,
   },
 ];
 
@@ -145,7 +154,7 @@ function createToolButton(def: ToolDefinition): HTMLButtonElement {
   });
   btn.addEventListener('click', () => {
     // Remove active state from all buttons
-    toolBar.querySelectorAll('button').forEach((b) => {
+    leftSidebar.querySelectorAll('button').forEach((b) => {
       b.style.background = '#444';
       b.style.borderColor = '#555';
     });
@@ -158,10 +167,8 @@ function createToolButton(def: ToolDefinition): HTMLButtonElement {
 }
 
 for (const def of toolDefs) {
-  toolBar.appendChild(createToolButton(def));
+  leftSidebar.appendChild(createToolButton(def));
 }
-
-sidebar.prepend(toolBar);
 
 // Drawboard
 const drawboard = document.createElement('div');
@@ -273,6 +280,7 @@ bgColorButton.addEventListener('click', () => selectColorType('bg'));
 colorPickerContainer.append(fgColorButton);
 colorPickerContainer.append(bgColorButton);
 
+content.append(leftSidebar);
 content.append(drawboard);
 content.append(sidebar);
 appContainer.appendChild(navBar);
@@ -645,9 +653,10 @@ const lineTool: Tool = {
   },
 };
 
-// ─── Circle Tool ─────────────────────────────────────────────────────────────
-const circleTool: Tool = {
-  name: 'circle',
+// ─── Ellipse Tool (outline) ──────────────────────────────────────────────────
+// Uses the midpoint ellipse algorithm, with rx/ry derived from start→current position
+const ellipseTool: Tool = {
+  name: 'ellipse',
   data: { startR: -1, startC: -1, drawing: false },
   onPointerDown(_e: PointerEvent) {
     this.data!.startR = mousePos.y;
@@ -658,35 +667,9 @@ const circleTool: Tool = {
     if (!this.data!.drawing) return;
     draftScreen.reset();
     const { startR, startC } = this.data!;
-    const radius = Math.sqrt(
-      (mousePos.y - startR) ** 2 + (mousePos.x - startC) ** 2,
-    );
-    // Midpoint circle algorithm for outline
-    const r = Math.round(radius);
-    let x = 0;
-    let y = r;
-    let d = 3 - 2 * r;
-    const plotCircle8 = (cr: number, cc: number, dx: number, dy: number) => {
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr + dy, cc + dx);
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr - dy, cc + dx);
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr + dy, cc - dx);
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr - dy, cc - dx);
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr + dx, cc + dy);
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr - dx, cc + dy);
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr + dx, cc - dy);
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr - dx, cc - dy);
-    };
-    plotCircle8(startR, startC, x, y);
-    while (x <= y) {
-      if (d < 0) {
-        d += 4 * x + 6;
-      } else {
-        d += 4 * (x - y) + 10;
-        y--;
-      }
-      x++;
-      plotCircle8(startR, startC, x, y);
-    }
+    const rx = Math.abs(mousePos.x - startC);
+    const ry = Math.abs(mousePos.y - startR);
+    drawEllipseOutline(draftScreen.renderPhoxel, startR, startC, rx, ry);
   },
   onPointerUp() {
     this.data!.drawing = false;
@@ -694,34 +677,9 @@ const circleTool: Tool = {
   },
   onSubmit() {
     const { startR, startC } = this.data!;
-    const radius = Math.sqrt(
-      (mousePos.y - startR) ** 2 + (mousePos.x - startC) ** 2,
-    );
-    const r = Math.round(radius);
-    let x = 0;
-    let y = r;
-    let d = 3 - 2 * r;
-    const plotCircle8 = (cr: number, cc: number, dx: number, dy: number) => {
-      renderPhoxel(dp.char, dp.fg, dp.bg, cr + dy, cc + dx);
-      renderPhoxel(dp.char, dp.fg, dp.bg, cr - dy, cc + dx);
-      renderPhoxel(dp.char, dp.fg, dp.bg, cr + dy, cc - dx);
-      renderPhoxel(dp.char, dp.fg, dp.bg, cr - dy, cc - dx);
-      renderPhoxel(dp.char, dp.fg, dp.bg, cr + dx, cc + dy);
-      renderPhoxel(dp.char, dp.fg, dp.bg, cr - dx, cc + dy);
-      renderPhoxel(dp.char, dp.fg, dp.bg, cr + dx, cc - dy);
-      renderPhoxel(dp.char, dp.fg, dp.bg, cr - dx, cc - dy);
-    };
-    plotCircle8(startR, startC, x, y);
-    while (x <= y) {
-      if (d < 0) {
-        d += 4 * x + 6;
-      } else {
-        d += 4 * (x - y) + 10;
-        y--;
-      }
-      x++;
-      plotCircle8(startR, startC, x, y);
-    }
+    const rx = Math.abs(mousePos.x - startC);
+    const ry = Math.abs(mousePos.y - startR);
+    drawEllipseOutline(renderPhoxel, startR, startC, rx, ry);
     this.data!.startR = -1;
     this.data!.startC = -1;
   },
@@ -731,6 +689,134 @@ const circleTool: Tool = {
     this.data!.startC = -1;
   },
 };
+
+// ─── Filled Ellipse Tool ─────────────────────────────────────────────────────
+const filledEllipseTool: Tool = {
+  name: 'filledEllipse',
+  data: { startR: -1, startC: -1, drawing: false },
+  onPointerDown(_e: PointerEvent) {
+    this.data!.startR = mousePos.y;
+    this.data!.startC = mousePos.x;
+    this.data!.drawing = true;
+  },
+  onPointerMove(_e: PointerEvent) {
+    if (!this.data!.drawing) return;
+    draftScreen.reset();
+    const { startR, startC } = this.data!;
+    const rx = Math.abs(mousePos.x - startC);
+    const ry = Math.abs(mousePos.y - startR);
+    drawEllipseFill(draftScreen.renderPhoxel, startR, startC, rx, ry);
+  },
+  onPointerUp() {
+    this.data!.drawing = false;
+    this.onSubmit!();
+  },
+  onSubmit() {
+    const { startR, startC } = this.data!;
+    const rx = Math.abs(mousePos.x - startC);
+    const ry = Math.abs(mousePos.y - startR);
+    drawEllipseFill(renderPhoxel, startR, startC, rx, ry);
+    this.data!.startR = -1;
+    this.data!.startC = -1;
+  },
+  onAbort() {
+    draftScreen.reset();
+    this.data!.startR = -1;
+    this.data!.startC = -1;
+  },
+};
+
+// ─── Ellipse helper functions ────────────────────────────────────────────────
+type RenderPhoxelFn = (char: string, fg: string, bg: string, r: number, c: number) => void;
+
+/** Draw ellipse outline using midpoint ellipse algorithm */
+function drawEllipseOutline(
+  render: RenderPhoxelFn,
+  centerR: number,
+  centerC: number,
+  rx: number,
+  ry: number,
+) {
+  if (rx === 0 && ry === 0) return;
+  const rx2 = rx * rx;
+  const ry2 = ry * ry;
+  let x = 0;
+  let y = ry;
+  let d1 = ry2 - rx2 * ry + 0.25 * rx2;
+  let dx = 2 * ry2 * x;
+  let dy = 2 * rx2 * y;
+
+  const plot4 = (cr: number, cc: number, dx: number, dy: number) => {
+    render(dp.char, dp.fg, dp.bg, cr + dy, cc + dx);
+    render(dp.char, dp.fg, dp.bg, cr - dy, cc + dx);
+    render(dp.char, dp.fg, dp.bg, cr + dy, cc - dx);
+    render(dp.char, dp.fg, dp.bg, cr - dy, cc - dx);
+  };
+
+  // Region 1: slope > -1
+  while (dx < dy) {
+    plot4(centerR, centerC, x, y);
+    if (d1 < 0) {
+      x++;
+      dx += 2 * ry2;
+      d1 += dx + ry2;
+    } else {
+      x++;
+      y--;
+      dx += 2 * ry2;
+      dy -= 2 * rx2;
+      d1 += dx - dy + ry2;
+    }
+  }
+
+  // Region 2: slope <= -1
+  let d2 = ry2 * (x + 0.5) ** 2 + rx2 * (y - 1) ** 2 - rx2 * ry2;
+  while (y >= 0) {
+    plot4(centerR, centerC, x, y);
+    if (d2 > 0) {
+      y--;
+      dy -= 2 * rx2;
+      d2 += rx2 - dy;
+    } else {
+      y--;
+      x++;
+      dx += 2 * ry2;
+      dy -= 2 * rx2;
+      d2 += dx - dy + rx2;
+    }
+  }
+}
+
+/** Fill ellipse using scanline approach with midpoint ellipse algorithm */
+function drawEllipseFill(
+  render: RenderPhoxelFn,
+  centerR: number,
+  centerC: number,
+  rx: number,
+  ry: number,
+) {
+  if (rx === 0 && ry === 0) return;
+
+  // For each row, find the leftmost and rightmost column that falls inside the ellipse
+  const halfRx = rx + 0.5;
+  const halfRy = ry + 0.5;
+  const rMin = centerR - halfRy;
+  const rMax = centerR + halfRy;
+
+  for (let r = Math.max(0, Math.floor(rMin)); r <= Math.min(rows - 1, Math.ceil(rMax)); r++) {
+    const dy = r - centerR;
+    // ellipse equation: (x-cx)^2/rx^2 + (y-cy)^2/ry^2 <= 1
+    // => |x-cx| <= rx * sqrt(1 - (y-cy)^2/ry^2)
+    const ratio = (dy * dy) / (halfRy * halfRy);
+    if (ratio > 1) continue;
+    const dx = Math.sqrt(Math.max(0, 1 - ratio)) * halfRx;
+    const left = Math.max(0, Math.ceil(centerC - dx));
+    const right = Math.min(cols - 1, Math.floor(centerC + dx));
+    for (let c = left; c <= right; c++) {
+      render(dp.char, dp.fg, dp.bg, r, c);
+    }
+  }
+}
 
 let currTool: {
   tool: Tool;
