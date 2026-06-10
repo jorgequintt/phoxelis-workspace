@@ -339,6 +339,7 @@ hammer.on('pinchmove', (e) => {
   );
 });
 
+
 drawboard.addEventListener('pointermove', (e) => {
   const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
   if (e.ctrlKey) {
@@ -361,52 +362,11 @@ drawboard.addEventListener('pointermove', (event) => {
   const scale = width / (cols * font.width);
   const mouseScreenPosX = event.clientX - left;
   const mouseScreenPosY = event.clientY - top;
-  mousePos.x = Math.floor(mouseScreenPosX / (font.width * scale));
-  mousePos.y = Math.floor(mouseScreenPosY / (font.height * scale));
-});
-
-const mouseButtons = {
-  leftClick: false,
-  rightClick: false,
-  middleClick: false,
-};
-
-drawboard.addEventListener('pointerdown', (e) => {
-  switch (e.button) {
-    case 0:
-      mouseButtons.leftClick = true;
-      break;
-    case 1:
-      mouseButtons.middleClick = true;
-      break;
-    case 0:
-      mouseButtons.rightClick = true;
-      break;
-    default:
-      break;
-  }
-});
-
-drawboard.addEventListener('pointerup', (e: PointerEvent) => {
-  switch (e.button) {
-    case 0:
-      mouseButtons.leftClick = false;
-      break;
-    case 1:
-      mouseButtons.middleClick = false;
-      break;
-    case 0:
-      mouseButtons.rightClick = false;
-      break;
-    default:
-      break;
-  }
+  mousePos.x = Math.min(cols - 1, Math.max(0, Math.floor(mouseScreenPosX / (font.width * scale))));
+  mousePos.y = Math.min(rows - 1, Math.max(0, Math.floor(mouseScreenPosY / (font.height * scale))));
 });
 
 const abortTool = () => {
-  mouseButtons.leftClick = false;
-  mouseButtons.middleClick = false;
-  mouseButtons.rightClick = false;
   currTool?.tool.onAbort?.();
 };
 window.addEventListener('mouseout', (e) => {
