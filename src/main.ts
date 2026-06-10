@@ -68,6 +68,101 @@ contentFooter.append(palette);
 const sidebar = document.createElement('div');
 sidebar.style = `display: flex; flex-direction: column;`;
 
+// ─── Tool Selector ───────────────────────────────────────────────────────────
+const toolBar = document.createElement('div');
+toolBar.style = `
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 4px;
+  background: #333;
+  border-right: 1px solid #555;
+`;
+
+type ToolDefinition = {
+  name: string;
+  icon: string;
+  tooltip: string;
+  createTool: () => Tool;
+};
+
+const toolDefs: ToolDefinition[] = [
+  {
+    name: 'draw',
+    icon: '✏',
+    tooltip: 'Draw (freehand)',
+    createTool: () => drawTool,
+  },
+  {
+    name: 'rect',
+    icon: '□',
+    tooltip: 'Rectangle (outline)',
+    createTool: () => rectTool,
+  },
+  {
+    name: 'filledRect',
+    icon: '■',
+    tooltip: 'Filled Rectangle',
+    createTool: () => filledRectTool,
+  },
+  {
+    name: 'line',
+    icon: '╱',
+    tooltip: 'Line',
+    createTool: () => lineTool,
+  },
+  {
+    name: 'circle',
+    icon: '○',
+    tooltip: 'Circle',
+    createTool: () => circleTool,
+  },
+];
+
+function createToolButton(def: ToolDefinition): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.textContent = def.icon;
+  btn.title = def.tooltip;
+  btn.style.cssText = `
+    background: #444;
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 3px;
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+  `;
+  btn.addEventListener('mouseenter', () => {
+    btn.style.background = '#555';
+  });
+  btn.addEventListener('mouseleave', () => {
+    btn.style.background = currTool?.tool.name === def.name ? '#666' : '#444';
+  });
+  btn.addEventListener('click', () => {
+    // Remove active state from all buttons
+    toolBar.querySelectorAll('button').forEach((b) => {
+      b.style.background = '#444';
+      b.style.borderColor = '#555';
+    });
+    // Set active state
+    btn.style.background = '#666';
+    btn.style.borderColor = '#888';
+    setTool(def.createTool());
+  });
+  return btn;
+}
+
+for (const def of toolDefs) {
+  toolBar.appendChild(createToolButton(def));
+}
+
+sidebar.prepend(toolBar);
+
 // Drawboard
 const drawboard = document.createElement('div');
 drawboard.style =
@@ -374,6 +469,266 @@ const drawTool: DrawTool = {
   },
   onAbort() {
     this.resetTool!();
+  },
+};
+
+// ─── Rectangle (outline) Tool ────────────────────────────────────────────────
+const rectTool: Tool = {
+  name: 'rect',
+  data: { startR: -1, startC: -1, drawing: false },
+  onPointerDown(_e: PointerEvent) {
+    this.data!.startR = mousePos.y;
+    this.data!.startC = mousePos.x;
+    this.data!.drawing = true;
+  },
+  onPointerMove(_e: PointerEvent) {
+    if (!this.data!.drawing) return;
+    // Clear draft and redraw preview rectangle
+    draftScreen.reset();
+    const { startR, startC } = this.data!;
+    const r1 = Math.min(startR, mousePos.y);
+    const r2 = Math.max(startR, mousePos.y);
+    const c1 = Math.min(startC, mousePos.x);
+    const c2 = Math.max(startC, mousePos.x);
+    // Top & bottom edges
+    for (let c = c1; c <= c2; c++) {
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r1, c);
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r2, c);
+    }
+    // Left & right edges
+    for (let r = r1; r <= r2; r++) {
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r, c1);
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r, c2);
+    }
+  },
+  onPointerUp() {
+    this.data!.drawing = false;
+    this.onSubmit!();
+  },
+  onSubmit() {
+    const { startR, startC } = this.data!;
+    const r1 = Math.min(startR, mousePos.y);
+    const r2 = Math.max(startR, mousePos.y);
+    const c1 = Math.min(startC, mousePos.x);
+    const c2 = Math.max(startC, mousePos.x);
+    for (let c = c1; c <= c2; c++) {
+      renderPhoxel(dp.char, dp.fg, dp.bg, r1, c);
+      renderPhoxel(dp.char, dp.fg, dp.bg, r2, c);
+    }
+    for (let r = r1; r <= r2; r++) {
+      renderPhoxel(dp.char, dp.fg, dp.bg, r, c1);
+      renderPhoxel(dp.char, dp.fg, dp.bg, r, c2);
+    }
+    this.data!.startR = -1;
+    this.data!.startC = -1;
+  },
+  onAbort() {
+    draftScreen.reset();
+    this.data!.startR = -1;
+    this.data!.startC = -1;
+  },
+};
+
+// ─── Filled Rectangle Tool ───────────────────────────────────────────────────
+const filledRectTool: Tool = {
+  name: 'filledRect',
+  data: { startR: -1, startC: -1, drawing: false },
+  onPointerDown(_e: PointerEvent) {
+    this.data!.startR = mousePos.y;
+    this.data!.startC = mousePos.x;
+    this.data!.drawing = true;
+  },
+  onPointerMove(_e: PointerEvent) {
+    if (!this.data!.drawing) return;
+    draftScreen.reset();
+    const { startR, startC } = this.data!;
+    const r1 = Math.min(startR, mousePos.y);
+    const r2 = Math.max(startR, mousePos.y);
+    const c1 = Math.min(startC, mousePos.x);
+    const c2 = Math.max(startC, mousePos.x);
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
+      }
+    }
+  },
+  onPointerUp() {
+    this.data!.drawing = false;
+    this.onSubmit!();
+  },
+  onSubmit() {
+    const { startR, startC } = this.data!;
+    const r1 = Math.min(startR, mousePos.y);
+    const r2 = Math.max(startR, mousePos.y);
+    const c1 = Math.min(startC, mousePos.x);
+    const c2 = Math.max(startC, mousePos.x);
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
+      }
+    }
+    this.data!.startR = -1;
+    this.data!.startC = -1;
+  },
+  onAbort() {
+    draftScreen.reset();
+    this.data!.startR = -1;
+    this.data!.startC = -1;
+  },
+};
+
+// ─── Line Tool (Bresenham's algorithm) ──────────────────────────────────────
+function bresenhamCells(
+  r0: number,
+  c0: number,
+  r1: number,
+  c1: number,
+): { r: number; c: number }[] {
+  const cells: { r: number; c: number }[] = [];
+  let dr = Math.abs(r1 - r0);
+  let dc = Math.abs(c1 - c0);
+  const sr = r0 < r1 ? 1 : -1;
+  const sc = c0 < c1 ? 1 : -1;
+  let err = dr - dc;
+  let r = r0;
+  let c = c0;
+  while (true) {
+    cells.push({ r, c });
+    if (r === r1 && c === c1) break;
+    const e2 = 2 * err;
+    if (e2 > -dc) {
+      err -= dc;
+      r += sr;
+    }
+    if (e2 < dr) {
+      err += dr;
+      c += sc;
+    }
+  }
+  return cells;
+}
+
+const lineTool: Tool = {
+  name: 'line',
+  data: { startR: -1, startC: -1, drawing: false },
+  onPointerDown(_e: PointerEvent) {
+    this.data!.startR = mousePos.y;
+    this.data!.startC = mousePos.x;
+    this.data!.drawing = true;
+  },
+  onPointerMove(_e: PointerEvent) {
+    if (!this.data!.drawing) return;
+    draftScreen.reset();
+    const { startR, startC } = this.data!;
+    const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
+    for (const { r, c } of cells) {
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
+    }
+  },
+  onPointerUp() {
+    this.data!.drawing = false;
+    this.onSubmit!();
+  },
+  onSubmit() {
+    const { startR, startC } = this.data!;
+    const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
+    for (const { r, c } of cells) {
+      renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
+    }
+    this.data!.startR = -1;
+    this.data!.startC = -1;
+  },
+  onAbort() {
+    draftScreen.reset();
+    this.data!.startR = -1;
+    this.data!.startC = -1;
+  },
+};
+
+// ─── Circle Tool ─────────────────────────────────────────────────────────────
+const circleTool: Tool = {
+  name: 'circle',
+  data: { startR: -1, startC: -1, drawing: false },
+  onPointerDown(_e: PointerEvent) {
+    this.data!.startR = mousePos.y;
+    this.data!.startC = mousePos.x;
+    this.data!.drawing = true;
+  },
+  onPointerMove(_e: PointerEvent) {
+    if (!this.data!.drawing) return;
+    draftScreen.reset();
+    const { startR, startC } = this.data!;
+    const radius = Math.sqrt(
+      (mousePos.y - startR) ** 2 + (mousePos.x - startC) ** 2,
+    );
+    // Midpoint circle algorithm for outline
+    const r = Math.round(radius);
+    let x = 0;
+    let y = r;
+    let d = 3 - 2 * r;
+    const plotCircle8 = (cr: number, cc: number, dx: number, dy: number) => {
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr + dy, cc + dx);
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr - dy, cc + dx);
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr + dy, cc - dx);
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr - dy, cc - dx);
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr + dx, cc + dy);
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr - dx, cc + dy);
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr + dx, cc - dy);
+      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, cr - dx, cc - dy);
+    };
+    plotCircle8(startR, startC, x, y);
+    while (x <= y) {
+      if (d < 0) {
+        d += 4 * x + 6;
+      } else {
+        d += 4 * (x - y) + 10;
+        y--;
+      }
+      x++;
+      plotCircle8(startR, startC, x, y);
+    }
+  },
+  onPointerUp() {
+    this.data!.drawing = false;
+    this.onSubmit!();
+  },
+  onSubmit() {
+    const { startR, startC } = this.data!;
+    const radius = Math.sqrt(
+      (mousePos.y - startR) ** 2 + (mousePos.x - startC) ** 2,
+    );
+    const r = Math.round(radius);
+    let x = 0;
+    let y = r;
+    let d = 3 - 2 * r;
+    const plotCircle8 = (cr: number, cc: number, dx: number, dy: number) => {
+      renderPhoxel(dp.char, dp.fg, dp.bg, cr + dy, cc + dx);
+      renderPhoxel(dp.char, dp.fg, dp.bg, cr - dy, cc + dx);
+      renderPhoxel(dp.char, dp.fg, dp.bg, cr + dy, cc - dx);
+      renderPhoxel(dp.char, dp.fg, dp.bg, cr - dy, cc - dx);
+      renderPhoxel(dp.char, dp.fg, dp.bg, cr + dx, cc + dy);
+      renderPhoxel(dp.char, dp.fg, dp.bg, cr - dx, cc + dy);
+      renderPhoxel(dp.char, dp.fg, dp.bg, cr + dx, cc - dy);
+      renderPhoxel(dp.char, dp.fg, dp.bg, cr - dx, cc - dy);
+    };
+    plotCircle8(startR, startC, x, y);
+    while (x <= y) {
+      if (d < 0) {
+        d += 4 * x + 6;
+      } else {
+        d += 4 * (x - y) + 10;
+        y--;
+      }
+      x++;
+      plotCircle8(startR, startC, x, y);
+    }
+    this.data!.startR = -1;
+    this.data!.startC = -1;
+  },
+  onAbort() {
+    draftScreen.reset();
+    this.data!.startR = -1;
+    this.data!.startC = -1;
   },
 };
 
