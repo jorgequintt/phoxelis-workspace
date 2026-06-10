@@ -18,7 +18,7 @@
 ```
 phoxelis-workspace/
 ├── src/
-│   ├── main.ts                # Entry point — app setup, event handlers, motion system
+│   ├── main.ts                # Entry point — app setup, event handlers, tool system
 │   ├── style.css              # Global styles
 │   ├── utils.ts               # Utility functions (fullscreen, download)
 │   └── sampleRenderContent.ts # Demo content (animated intro sequence)
@@ -55,17 +55,17 @@ npm run preview # Preview production build
 ```
 ┌─────────────────────────────────────────────┐
 │  Navbar (Save | Fullscreen | Export | Ref Img)│
-├──────────────┬──────────────────────────────┤
-│   Sidebar    │         Drawboard            │
-│              │                              │
-│  Alphabet    │    ┌──────────────────────┐  │
-│  Canvas      │    │      Main Canvas     │  │
-│  (char pick) │    │                      │  │
-│              │    │  [Ref image overlay] │  │
-│  Color Picker│    │  [Draft overlay]     │  │
-│  (fg/bg)     │    │                      │  │
-│              │    └──────────────────────┘  │
-├──────────────┴──────────────────────────────┤
+├───────────────────────────────┬─────────────┤
+│         Drawboard             │  Sidebar    │
+│                               │             │
+│    ┌──────────────────────┐   │ Alphabet    │
+│    │      Main Canvas     │   │ Canvas      │
+│    │                      │   │ (char pick) │
+│    │  [Ref image overlay] │   │             │
+│    │  [Draft overlay]     │   │ Color Picker│
+│    │                      │   │ (fg/bg)     │
+│    └──────────────────────┘   │             │
+├───────────────────────────────┴─────────────┤
 │  Palette Preview (click to select phoxel)   │
 └─────────────────────────────────────────────┘
 ```
@@ -78,23 +78,23 @@ Three canvas layers stacked via absolute positioning:
 2. **Ref image wrapper** — reference image overlay for tracing
 3. **Draft screen** — temporary canvas for stroke preview before commit
 
-### Motion System
+### Tool System
 
-A pluggable motion handler system (`Motion` interface) manages pointer interactions:
+A pluggable tool handler system (`Tool` interface) manages pointer interactions:
 
 ```typescript
-interface Motion {
+interface Tool {
   name: string;
   onPointerDown?: (e: PointerEvent) => void;
   onPointerMove?: (e: PointerEvent) => void;
   onPointerUp?: (e: PointerEvent) => void;
   onSubmit?: () => void;       // Called on stroke completion
-  onAbort?: () => void;        // Called on motion cancellation
-  resetMotion?: () => void;
+  onAbort?: () => void;        // Called on tool cancellation
+  resetTool?: () => void;
 }
 ```
 
-**Default motion: `drawMotion`**
+**Default tool: `drawTool`**
 - On pointer down: starts drawing, places first phoxel
 - On pointer move: continues drawing phoxels onto the draft screen
 - On pointer up: commits all draft phoxels to the main canvas, clears draft
