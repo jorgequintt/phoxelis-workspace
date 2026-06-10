@@ -216,7 +216,7 @@ const hammer = new Hammer(drawboard);
 hammer.get('pinch').set({ enable: true });
 hammer.on('pinchstart', () => {
   const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
-  abortMotion();
+  abortTool();
 
   if (moveRefImageToggle.checked) {
     refImageScale = targetZoom.getScale();
@@ -239,13 +239,13 @@ hammer.on('pinchmove', (e) => {
 drawboard.addEventListener('pointermove', (e) => {
   const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
   if (e.ctrlKey) {
-    abortMotion();
+    abortTool();
     targetZoom.pan(
       e.movementX / targetZoom.getScale(),
       e.movementY / targetZoom.getScale(),
     );
   } else if (e.shiftKey) {
-    abortMotion();
+    abortTool();
     targetZoom.zoom(targetZoom.getScale() + (e.movementY / 35) * -1);
   }
 });
@@ -300,26 +300,26 @@ drawboard.addEventListener('pointerup', (e: PointerEvent) => {
   }
 });
 
-const abortMotion = () => {
+const abortTool = () => {
   mouseButtons.leftClick = false;
   mouseButtons.middleClick = false;
   mouseButtons.rightClick = false;
-  mot?.motion.onAbort?.();
+  currTool?.tool.onAbort?.();
 };
 window.addEventListener('mouseout', (e) => {
   if (e.relatedTarget === null) {
-    abortMotion();
+    abortTool();
   }
 });
 
-interface Motion {
+interface Tool {
   name: string;
   onPointerDown?: (e: PointerEvent) => void;
   onPointerMove?: (e: PointerEvent) => void;
   onPointerUp?: (e: PointerEvent) => void;
   onSubmit?: () => void;
   onAbort?: () => void;
-  resetMotion?: () => void;
+  resetTool?: () => void;
   data?: Record<string, any>;
 }
 
@@ -331,14 +331,14 @@ type Phoxel = {
   c: number;
 };
 
-interface DrawMotion extends Motion {
+interface DrawTool extends Tool {
   data: {
     draftPhoxels: Map<string, Phoxel>;
     drawing: boolean;
   };
   addPhoxelToDraft: (p: Phoxel) => void;
 }
-const drawMotion: DrawMotion = {
+const drawTool: DrawTool = {
   name: 'draw',
   data: {
     draftPhoxels: new Map(),
@@ -365,20 +365,20 @@ const drawMotion: DrawMotion = {
     this.data.draftPhoxels.forEach((p) => {
       renderPhoxel(p.char, p.fg, p.bg, p.r, p.c);
     });
-    this.resetMotion!();
+    this.resetTool!();
   },
-  resetMotion() {
+  resetTool() {
     this.data.draftPhoxels = new Map();
     draftScreen.reset();
     this.data.drawing = false;
   },
   onAbort() {
-    this.resetMotion!();
+    this.resetTool!();
   },
 };
 
-let mot: {
-  motion: Motion;
+let currTool: {
+  tool: Tool;
   handlers: {
     onPointerDown: (e: PointerEvent) => void;
     onPointerUp: (e: PointerEvent) => void;
@@ -386,28 +386,28 @@ let mot: {
   };
 } | null = null;
 
-function setMotion(motion: Motion) {
-  if (mot) {
-    mot.motion.onAbort?.();
-    drawboard.removeEventListener('pointerdown', mot.handlers.onPointerDown);
-    drawboard.removeEventListener('pointermove', mot.handlers.onPointerMove);
-    drawboard.removeEventListener('pointerup', mot.handlers.onPointerUp);
+function setTool(tool: Tool) {
+  if (currTool) {
+    currTool.tool.onAbort?.();
+    drawboard.removeEventListener('pointerdown', currTool.handlers.onPointerDown);
+    drawboard.removeEventListener('pointermove', currTool.handlers.onPointerMove);
+    drawboard.removeEventListener('pointerup', currTool.handlers.onPointerUp);
   }
 
-  mot = {
-    motion,
+  currTool = {
+    tool,
     handlers: {
-      onPointerDown: (e) => motion.onPointerDown!(e),
-      onPointerMove: (e) => motion.onPointerMove!(e),
-      onPointerUp: (e) => motion.onPointerUp!(e),
+      onPointerDown: (e) => tool.onPointerDown!(e),
+      onPointerMove: (e) => tool.onPointerMove!(e),
+      onPointerUp: (e) => tool.onPointerUp!(e),
     },
   };
-  drawboard.addEventListener('pointerdown', mot.handlers.onPointerDown);
-  drawboard.addEventListener('pointermove', mot.handlers.onPointerMove);
-  drawboard.addEventListener('pointerup', mot.handlers.onPointerUp);
+  drawboard.addEventListener('pointerdown', currTool.handlers.onPointerDown);
+  drawboard.addEventListener('pointermove', currTool.handlers.onPointerMove);
+  drawboard.addEventListener('pointerup', currTool.handlers.onPointerUp);
 }
 
-setMotion(drawMotion);
+setTool(drawTool);
 
 function renderDraftScreen() {
   draftScreen.renderFrame();
