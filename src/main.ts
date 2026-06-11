@@ -45,30 +45,23 @@ function renderDpWithMode(
   if (drawMode === 'draw') {
     target.renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
     return;
-  }
-
-  if (drawMode === 'char') {
+  } else if (drawMode === 'char') {
     const underlyingPhoxel = getPhoxInPosition(r, c);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(dp.char, underlyingPhoxel.fg, underlyingPhoxel.bg, r, c);
-  }
-
-  if (drawMode === 'color') {
+  } else if (drawMode === 'color') {
     const underlyingPhoxel = getPhoxInPosition(r, c);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(underlyingPhoxel.char, dp.fg, dp.bg, r, c);
-  }
-  if (drawMode === 'fg') {
+  } else if (drawMode === 'fg') {
     const underlyingPhoxel = getPhoxInPosition(r, c);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(underlyingPhoxel.char, dp.fg, underlyingPhoxel.bg, r, c);
-  }
-  if (drawMode === 'bg') {
+  } else if (drawMode === 'bg') {
     const underlyingPhoxel = getPhoxInPosition(r, c);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(underlyingPhoxel.char, underlyingPhoxel.fg, dp.bg, r, c);
-  }
-  if (drawMode === 'erase') {
+  } else if (drawMode === 'erase') {
     if (options.draftErasure) {
       target.renderPhoxel('D', '#FF0000', '#FF000055', r, c);
     } else {
@@ -81,7 +74,6 @@ const phoxelis = Phoxelis(rows, cols, font, true);
 const {
   canvas,
   renderFrame,
-  renderPhoxel,
   removePhoxel,
   importPhoxelis,
   exportPhoxelis,
