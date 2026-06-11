@@ -4,7 +4,14 @@ import Panzoom from '@panzoom/panzoom';
 import Hammer from 'hammerjs';
 import iro from '@jaames/iro';
 import { downloadArrayBuffer, toggleFullScreen } from './utils';
-import { sampleRenderContent } from './sampleRenderContent';
+import {
+  saveRefImageToStorage,
+  loadRefImageFromStorage,
+  saveRefImagePanzoomConfig,
+  loadRefImagePanzoomConfig,
+  clearRefImageStorage,
+  fileToBase64,
+} from './refImageStorage';
 
 const rows = 37;
 const cols = 152;
@@ -210,7 +217,7 @@ navBar.appendChild(exportButton);
 const referenceImageButton = document.createElement('input');
 referenceImageButton.type = 'file';
 referenceImageButton.accept = 'image/*';
-referenceImageButton.addEventListener('change', (e) => {
+referenceImageButton.addEventListener('change', async (e) => {
   if (!e?.target) {
     console.log('no event');
     return;
@@ -221,16 +228,22 @@ referenceImageButton.addEventListener('change', (e) => {
     console.log('file', e.target.files);
 
     if (file) {
-      // Generate a temporary URL representing the local file
-      const objectURL = URL.createObjectURL(file);
+      // Convert to base64 for storage
+      try {
+        const base64 = await fileToBase64(file);
+        const ok = saveRefImageToStorage(base64);
+        if (!ok) {
+          console.warn('Reference image too large for localStorage');
+        }
+        refImage.src = base64;
+        refImage.style.display = 'block';
 
-      refImage.src = objectURL;
-      refImage.style.display = 'block';
-
-      // Free memory when the image finishes loading
-      refImage.onload = () => {
-        URL.revokeObjectURL(objectURL);
-      };
+        // Reset panzoom config for new image
+        refImageScale = refImagePanzoomConfig.startScale;
+        refImagePanzoom.reset();
+      } catch (err) {
+        console.error('Failed to load reference image:', err);
+      }
     }
   }
 });
@@ -317,6 +330,7 @@ const panzoom = Panzoom(layersWrapper, panzoomConfiguration);
 const refImagePanzoom = Panzoom(refImage, refImagePanzoomConfig);
 const hammer = new Hammer(drawboard);
 let panzooming = false;
+
 hammer.get('pinch').set({ enable: true });
 hammer.on('pinchstart', () => {
   panzooming = true;
@@ -342,6 +356,12 @@ hammer.on('pinchmove', (e) => {
 });
 hammer.on('pinchend', () => {
   panzooming = false;
+  // Save panzoom state when interaction ends
+  saveRefImagePanzoomConfig(
+    refImagePanzoom.getScale(),
+    refImagePanzoom.getPan().x,
+    refImagePanzoom.getPan().y,
+  );
 });
 
 
@@ -362,6 +382,12 @@ drawboard.addEventListener('pointermove', (e) => {
 });
 drawboard.addEventListener('pointerup', () => {
   panzooming = false;
+  // Save panzoom state when interaction ends
+  saveRefImagePanzoomConfig(
+    refImagePanzoom.getScale(),
+    refImagePanzoom.getPan().x,
+    refImagePanzoom.getPan().y,
+  );
 });
 
 type CellPosition = { x: number; y: number };
@@ -860,5 +886,34 @@ async function loadPhoxelis(name = 'data') {
   const fileBuffer = await file.arrayBuffer();
   importPhoxelis(new Uint32Array(fileBuffer));
 }
+
+// ─── Restore reference image & panzoom config on load ────────────────────────
+const savedRefImagePanzoom = loadRefImagePanzoomConfig();
+const savedRefImageBase64 = loadRefImageFromStorage();
+
+if (savedRefImageBase64) {
+  // Restore the reference image
+  refImage.src = savedRefImageBase64;
+  refImage.style.display = 'block';
+
+  // Restore panzoom config if available
+  if (savedRefImagePanzoom) {
+    refImageScale = savedRefImagePanzoom.scale;
+    refImagePanzoom.pan(savedRefImagePanzoom.x, savedRefImagePanzoom.y);
+    refImagePanzoom.zoom(savedRefImagePanzoom.scale);
+  }
+} else if (savedRefImagePanzoom) {
+  // Panzoom config exists but no image — clear stale config
+  clearRefImageStorage();
+}
+
+window.addEventListener('pagehide', () => {
+  // Final save on page unload
+  saveRefImagePanzoomConfig(
+    refImagePanzoom.getScale(),
+    refImagePanzoom.getPan().x,
+    refImagePanzoom.getPan().y,
+  );
+});
 
 loadPhoxelis(filename);
