@@ -367,13 +367,11 @@ referenceImageButton.type = 'file';
 referenceImageButton.accept = 'image/*';
 referenceImageButton.addEventListener('change', async (e) => {
   if (!e?.target) {
-    console.log('no event');
     return;
   }
 
   if (e.target instanceof HTMLInputElement) {
     const file = e.target.files?.[0]; // Get the selected file
-    console.log('file', e.target.files);
 
     if (file) {
       // Convert to base64 for storage
