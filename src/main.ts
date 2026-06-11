@@ -46,19 +46,19 @@ function renderDpWithMode(
     target.renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
     return;
   } else if (drawMode === 'char') {
-    const underlyingPhoxel = getPhoxInPosition(r, c);
+    const underlyingPhoxel = getPhoxFromPosition(r, c);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(dp.char, underlyingPhoxel.fg, underlyingPhoxel.bg, r, c);
   } else if (drawMode === 'color') {
-    const underlyingPhoxel = getPhoxInPosition(r, c);
+    const underlyingPhoxel = getPhoxFromPosition(r, c);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(underlyingPhoxel.char, dp.fg, dp.bg, r, c);
   } else if (drawMode === 'fg') {
-    const underlyingPhoxel = getPhoxInPosition(r, c);
+    const underlyingPhoxel = getPhoxFromPosition(r, c);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(underlyingPhoxel.char, dp.fg, underlyingPhoxel.bg, r, c);
   } else if (drawMode === 'bg') {
-    const underlyingPhoxel = getPhoxInPosition(r, c);
+    const underlyingPhoxel = getPhoxFromPosition(r, c);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(underlyingPhoxel.char, underlyingPhoxel.fg, dp.bg, r, c);
   } else if (drawMode === 'erase') {
@@ -79,7 +79,7 @@ const {
   exportPhoxelis,
   palette,
   getPhoxFromPaletteIndex,
-  getPhoxInPosition,
+  getPhoxFromPosition,
 } = phoxelis;
 
 const appContainer = document.createElement('div');
@@ -113,6 +113,86 @@ contentFooter.append(palette);
 
 const sidebar = document.createElement('div');
 sidebar.style = `display: flex; flex-direction: column;`;
+
+// ─── Left Sidebar (Tool Selector) ────────────────────────────────────────────
+const drawModeButtons: HTMLButtonElement[] = [];
+
+type DrawModeDefinition = {
+  name: 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase';
+  icon: string;
+  tooltip: string;
+};
+
+const drawModeDefs: DrawModeDefinition[] = [
+  { name: 'draw', icon: '✏', tooltip: 'Draw (char + fg + bg)' },
+  { name: 'char', icon: 'A', tooltip: 'Char only' },
+  { name: 'fg', icon: 'F', tooltip: 'Foreground color only' },
+  { name: 'bg', icon: 'B', tooltip: 'Background color only' },
+  { name: 'color', icon: '◉', tooltip: 'Color (fg + bg) only' },
+  { name: 'erase', icon: '✕', tooltip: 'Erase' },
+];
+
+function createDrawModeButton(def: DrawModeDefinition): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.textContent = def.icon;
+  btn.title = def.tooltip;
+  btn.style.cssText = `
+    background: #444;
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 3px;
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+  `;
+  btn.addEventListener('mouseenter', () => {
+    btn.style.background = '#555';
+  });
+  btn.addEventListener('mouseleave', () => {
+    btn.style.background = drawMode === def.name ? '#666' : '#444';
+  });
+  btn.addEventListener('click', () => {
+    drawModeButtons.forEach((b) => {
+      b.style.background = '#444';
+      b.style.borderColor = '#555';
+    });
+    btn.style.background = '#666';
+    btn.style.borderColor = '#888';
+    drawMode = def.name;
+  });
+  return btn;
+}
+
+// ─── Left Sidebar (Draw Mode Selector) ───────────────────────────────────────
+const drawModeSidebar = document.createElement('div');
+drawModeSidebar.style = `
+  width: 40px;
+  flex-shrink: 0;
+  background: #2a2a2a;
+  border-right: 1px solid #444;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  gap: 4px;
+`;
+
+for (const def of drawModeDefs) {
+  const btn = createDrawModeButton(def);
+  drawModeSidebar.appendChild(btn);
+  drawModeButtons.push(btn);
+}
+
+// Set initial active state for 'draw' mode
+if (drawModeButtons.length > 0) {
+  drawModeButtons[0].style.background = '#666';
+  drawModeButtons[0].style.borderColor = '#888';
+}
 
 // ─── Left Sidebar (Tool Selector) ────────────────────────────────────────────
 const leftSidebar = document.createElement('div');
@@ -338,6 +418,7 @@ bgColorButton.addEventListener('click', () => selectColorType('bg'));
 colorPickerContainer.append(fgColorButton);
 colorPickerContainer.append(bgColorButton);
 
+content.append(drawModeSidebar);
 content.append(leftSidebar);
 content.append(drawboard);
 content.append(sidebar);
@@ -455,7 +536,7 @@ drawboard.addEventListener('pointermove', (event) => {
 });
 
 const abortTool = () => {
-  currTool?.tool.onAbort?.();
+  currTool?.tool.abort?.();
 };
 window.addEventListener('mouseout', (e) => {
   if (e.relatedTarget === null) {
@@ -468,8 +549,8 @@ interface Tool {
   onPointerDown?: (e: PointerEvent) => void;
   onPointerMove?: (e: PointerEvent) => void;
   onPointerUp?: (e: PointerEvent) => void;
-  onSubmit?: () => void;
-  onAbort?: () => void;
+  submit?: () => void;
+  abort?: () => void;
   resetTool?: () => void;
   data?: Record<string, any>;
 }
@@ -508,9 +589,9 @@ const drawTool: DrawTool = {
   },
   onPointerUp() {
     this.data.drawing = false;
-    this.onSubmit!();
+    this.submit!();
   },
-  onSubmit() {
+  submit() {
     this.data.draftPhoxels.forEach((p) => {
       renderDpWithMode(phoxelis, p.r, p.c);
     });
@@ -521,7 +602,7 @@ const drawTool: DrawTool = {
     draftScreen.reset();
     this.data.drawing = false;
   },
-  onAbort() {
+  abort() {
     this.resetTool!();
   },
 };
@@ -557,9 +638,9 @@ const rectTool: Tool = {
   },
   onPointerUp() {
     this.data!.drawing = false;
-    this.onSubmit!();
+    this.submit!();
   },
-  onSubmit() {
+  submit() {
     const { startR, startC } = this.data!;
     if (startR === -1 || startC === -1) return;
     const r1 = Math.min(startR, mousePos.y);
@@ -576,14 +657,16 @@ const rectTool: Tool = {
       renderDpWithMode(phoxelis, r, c1);
       renderDpWithMode(phoxelis, r, c2);
     }
-    this.data!.startR = -1;
-    this.data!.startC = -1;
+    this.resetTool!();
   },
-  onAbort() {
+  resetTool() {
     draftScreen.reset();
     this.data!.startR = -1;
     this.data!.startC = -1;
   },
+  abort() {
+    this.resetTool!();
+  }
 };
 
 // ─── Filled Rectangle Tool ───────────────────────────────────────────────────
@@ -611,9 +694,9 @@ const filledRectTool: Tool = {
   },
   onPointerUp() {
     this.data!.drawing = false;
-    this.onSubmit!();
+    this.submit!();
   },
-  onSubmit() {
+  submit() {
     const { startR, startC } = this.data!;
     if (startR === -1 || startC === -1) return;
     const r1 = Math.min(startR, mousePos.y);
@@ -625,14 +708,16 @@ const filledRectTool: Tool = {
         renderDpWithMode(phoxelis, r, c);
       }
     }
-    this.data!.startR = -1;
-    this.data!.startC = -1;
+    this.resetTool!();
   },
-  onAbort() {
+  resetTool() {
     draftScreen.reset();
     this.data!.startR = -1;
     this.data!.startC = -1;
   },
+  abort() {
+    this.resetTool!();
+  }
 };
 
 // ─── Line Tool (Bresenham's algorithm) ──────────────────────────────────────
@@ -685,23 +770,25 @@ const lineTool: Tool = {
   },
   onPointerUp() {
     this.data!.drawing = false;
-    this.onSubmit!();
+    this.submit!();
   },
-  onSubmit() {
+  submit() {
     const { startR, startC } = this.data!;
     if (startR === -1 || startC === -1) return;
     const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
     for (const { r, c } of cells) {
       renderDpWithMode(phoxelis, r, c);
     }
-    this.data!.startR = -1;
-    this.data!.startC = -1;
+    this.resetTool!();
   },
-  onAbort() {
+  resetTool() {
     draftScreen.reset();
     this.data!.startR = -1;
     this.data!.startC = -1;
   },
+  abort() {
+    this.resetTool!();
+  }
 };
 
 // ─── Ellipse Tool (outline) ──────────────────────────────────────────────────
@@ -721,7 +808,7 @@ const ellipseTool: Tool = {
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseOutline(
-      (r, c) => renderDpWithMode(draftScreen, r, c),
+      (r, c) => renderDpWithMode(draftScreen, r, c, {draftErasure: true}),
       startR,
       startC,
       rx,
@@ -730,9 +817,9 @@ const ellipseTool: Tool = {
   },
   onPointerUp() {
     this.data!.drawing = false;
-    this.onSubmit!();
+    this.submit!();
   },
-  onSubmit() {
+  submit() {
     const { startR, startC } = this.data!;
     if (startR === -1 || startC === -1) return;
     const rx = Math.abs(mousePos.x - startC);
@@ -744,14 +831,16 @@ const ellipseTool: Tool = {
       rx,
       ry,
     );
-    this.data!.startR = -1;
-    this.data!.startC = -1;
+    this.resetTool!();
   },
-  onAbort() {
+  resetTool() {
     draftScreen.reset();
     this.data!.startR = -1;
     this.data!.startC = -1;
   },
+  abort() {
+    this.resetTool!();
+  }
 };
 
 // ─── Filled Ellipse Tool ─────────────────────────────────────────────────────
@@ -779,22 +868,24 @@ const filledEllipseTool: Tool = {
   },
   onPointerUp() {
     this.data!.drawing = false;
-    this.onSubmit!();
+    this.submit!();
   },
-  onSubmit() {
+  submit() {
     const { startR, startC } = this.data!;
     if (startR === -1 || startC === -1) return;
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseFill((r, c) => renderDpWithMode(phoxelis, r, c), startR, startC, rx, ry);
-    this.data!.startR = -1;
-    this.data!.startC = -1;
+    this.resetTool!();
   },
-  onAbort() {
+  resetTool() {
     draftScreen.reset();
     this.data!.startR = -1;
     this.data!.startC = -1;
   },
+  abort() {
+    this.resetTool!();
+  }
 };
 
 // ─── Ellipse helper functions ────────────────────────────────────────────────
@@ -903,10 +994,10 @@ let currTool: {
 
 function setTool(tool: Tool) {
   if (currTool) {
-    currTool.tool.onAbort?.();
+    currTool.tool.abort?.();
     drawboard.removeEventListener('pointerdown', currTool.handlers.onPointerDown);
     drawboard.removeEventListener('pointermove', currTool.handlers.onPointerMove);
-    drawboard.removeEventListener('pointerup', currTool.handlers.onPointerUp);
+    window.removeEventListener('pointerup', currTool.handlers.onPointerUp);
   }
 
   currTool = {
@@ -919,7 +1010,7 @@ function setTool(tool: Tool) {
   };
   drawboard.addEventListener('pointerdown', currTool.handlers.onPointerDown);
   drawboard.addEventListener('pointermove', currTool.handlers.onPointerMove);
-  drawboard.addEventListener('pointerup', currTool.handlers.onPointerUp);
+  window.addEventListener('pointerup', currTool.handlers.onPointerUp);
 }
 
 setTool(drawTool);
