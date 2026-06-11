@@ -1,4 +1,4 @@
-import { getFont, Phoxelis, type Phox } from 'phoxelis';
+import { getFont, Phoxelis, type Phox, type CharShape } from 'phoxelis';
 import './style.css';
 import Panzoom from '@panzoom/panzoom';
 import Hammer from 'hammerjs';
@@ -124,6 +124,11 @@ paletteOverlay.addEventListener('click', (e) => {
   }
   dp = phox;
   paletteData.selectedPhox = pos;
+
+  colorPicker.color.hexString = dp[selectedColorType];
+  selectCharInAlphabet(
+    font.charactersList.findIndex((c) => c.codepoint === dp.char.codePointAt(0)),
+  );
 
   const ctx = paletteOverlay.getContext('2d');
   ctx!.reset();
@@ -424,6 +429,27 @@ alphabetContainer.style = 'height: 250px; overflow-y: scroll;';
 alphabetContainer.append(alphabetCanvas);
 sidebar.append(alphabetContainer);
 
+const alphabetData: {
+  selectedChar: number;
+} = {
+  selectedChar: font.charactersList.findIndex(
+    (c) => c.codepoint === dp.char.codePointAt(0),
+  ),
+};
+function selectCharInAlphabet(index: number) {
+  const char = font.charactersList[index];
+
+  drawCharShapeInAlphabet(
+    alphabetData.selectedChar,
+    font.charactersList[alphabetData.selectedChar].shape,
+    '#FFFFFF',
+    '#000000',
+  );
+  dp.char = String.fromCodePoint(char.codepoint);
+  drawCharShapeInAlphabet(index, font.charactersList[index].shape, '#000000', '#00FFFF');
+
+  alphabetData.selectedChar = index;
+}
 alphabetCanvas.addEventListener('click', (e) => {
   const r = Math.floor(e.offsetY / alphabetViewScale / font.height);
   const c = Math.floor(e.offsetX / alphabetViewScale / font.width);
@@ -431,7 +457,7 @@ alphabetCanvas.addEventListener('click', (e) => {
   const char = font.charactersList[index];
   if (!char) throw new Error(`No char found for position y${r},x${c}`);
 
-  dp.char = String.fromCodePoint(char.codepoint);
+  selectCharInAlphabet(index);
 
   if (paletteData.modifyingPhox && paletteData.selectedPhox > 0) {
     const selectedPalettePhox = getPhoxFromPaletteIndex(paletteData.selectedPhox);
@@ -1075,16 +1101,25 @@ function renderDraftScreen() {
 }
 window.requestAnimationFrame(renderDraftScreen);
 
-font.charactersList.forEach((char, i) => {
-  const yOffset = Math.floor(i / alphabetCols) * font.height;
-  const xOffset = (i % alphabetCols) * font.width;
-  for (let y = 0; y < char.shape.length; y++) {
-    for (let x = 0; x < char.shape.length; x++) {
-      const pixelVal = char.shape[y][x];
-      alphabetCtx.fillStyle = pixelVal ? 'white' : 'black';
+function drawCharShapeInAlphabet(
+  index: number,
+  charShape: CharShape,
+  fg: string,
+  bg: string,
+) {
+  const yOffset = Math.floor(index / alphabetCols) * font.height;
+  const xOffset = (index % alphabetCols) * font.width;
+  for (let y = 0; y < charShape.length; y++) {
+    for (let x = 0; x < charShape[0].length; x++) {
+      const pixelVal = charShape[y][x];
+      alphabetCtx.fillStyle = pixelVal ? fg : bg;
       alphabetCtx.fillRect(xOffset + x, yOffset + y, 1, 1);
     }
   }
+}
+
+font.charactersList.forEach((char, i) => {
+  drawCharShapeInAlphabet(i, char.shape, '#FFFFFF', '#000000');
 });
 
 async function savePhoxelis(data: Uint32Array<ArrayBuffer>, name = 'data') {
