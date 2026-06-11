@@ -1,4 +1,4 @@
-import { getFont, Phoxelis } from 'phoxelis';
+import { getFont, Phoxelis, type Phox } from 'phoxelis';
 import './style.css';
 import Panzoom from '@panzoom/panzoom';
 import Hammer from 'hammerjs';
@@ -33,28 +33,72 @@ let scale = panzoomConfiguration.startScale;
 const filename = 'current_work';
 const font = await getFont('1_Trithemius8x16');
 
-let dp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
+let drawMode: 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase' = 'draw';
+let dp: Phox = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
+
+function renderDpWithMode(
+  target: ReturnType<typeof Phoxelis>,
+  r: number,
+  c: number,
+  options: { draftErasure: boolean } = { draftErasure: false },
+) {
+  if (drawMode === 'draw') {
+    target.renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
+    return;
+  }
+
+  if (drawMode === 'char') {
+    const underlyingPhoxel = getPhoxInPosition(r, c);
+    if (!underlyingPhoxel) return;
+    target.renderPhoxel(dp.char, underlyingPhoxel.fg, underlyingPhoxel.bg, r, c);
+  }
+
+  if (drawMode === 'color') {
+    const underlyingPhoxel = getPhoxInPosition(r, c);
+    if (!underlyingPhoxel) return;
+    target.renderPhoxel(underlyingPhoxel.char, dp.fg, dp.bg, r, c);
+  }
+  if (drawMode === 'fg') {
+    const underlyingPhoxel = getPhoxInPosition(r, c);
+    if (!underlyingPhoxel) return;
+    target.renderPhoxel(underlyingPhoxel.char, dp.fg, underlyingPhoxel.bg, r, c);
+  }
+  if (drawMode === 'bg') {
+    const underlyingPhoxel = getPhoxInPosition(r, c);
+    if (!underlyingPhoxel) return;
+    target.renderPhoxel(underlyingPhoxel.char, underlyingPhoxel.fg, dp.bg, r, c);
+  }
+  if (drawMode === 'erase') {
+    if (options.draftErasure) {
+      target.renderPhoxel('D', '#FF0000', '#FF000055', r, c);
+    } else {
+      removePhoxel(r, c);
+    }
+  }
+}
 
 const phoxelis = Phoxelis(rows, cols, font, true);
 const {
   canvas,
   renderFrame,
   renderPhoxel,
+  removePhoxel,
   importPhoxelis,
   exportPhoxelis,
   palette,
   getPhoxFromPaletteIndex,
+  getPhoxInPosition,
 } = phoxelis;
 
 const appContainer = document.createElement('div');
-appContainer.style =
-  'width: 100%; height: 100%; display: flex; flex-direction: column;';
+appContainer.style = 'width: 100%; height: 100%; display: flex; flex-direction: column;';
 
 const navBar = document.createElement('div');
 navBar.style = `width: 100%; background: #888888;`;
 
 const content = document.createElement('div');
-content.style = 'width: 100%; display: flex; flex: 1; flex-direction: row; min-height: 0;';
+content.style =
+  'width: 100%; display: flex; flex: 1; flex-direction: row; min-height: 0;';
 
 const contentFooter = document.createElement('div');
 contentFooter.style = 'overflow-x: scroll;';
@@ -64,10 +108,13 @@ palette.style = `height: ${paletteHeight}px; image-rendering: pixelated; border:
 palette.addEventListener('click', (e) => {
   const x = e.offsetX;
   const paletteMaxCells = palette.width / font.width;
-  const pos = Math.floor(
-    (x / (paletteScale * palette.width)) * paletteMaxCells,
-  );
+  const pos = Math.floor((x / (paletteScale * palette.width)) * paletteMaxCells);
   const phox = getPhoxFromPaletteIndex(pos);
+
+  if (!phox) {
+    console.warn('Null Phox selected. Omitting selection');
+    return;
+  }
   dp = phox;
 });
 contentFooter.append(palette);
@@ -274,7 +321,10 @@ alphabetCanvas.addEventListener('click', (e) => {
   const index = r * alphabetCols + c;
   const char = font.charactersList[index];
   if (!char) throw new Error(`No char found for position y${r},x${c}`);
-  dp.char = String.fromCodePoint(char.codepoint);
+
+  if (dp) {
+    dp.char = String.fromCodePoint(char.codepoint);
+  }
 });
 
 const colorPickerContainer = document.createElement('div');
@@ -284,7 +334,10 @@ const fgColorButton = document.createElement('button');
 fgColorButton.innerHTML = 'Foreground';
 function selectColorType(type: 'fg' | 'bg') {
   selectedColorType = type;
-  colorPicker.color.hexString = dp[type];
+
+  if (dp) {
+    colorPicker.color.hexString = dp[type];
+  }
 }
 fgColorButton.addEventListener('click', () => selectColorType('fg'));
 const bgColorButton = document.createElement('button');
@@ -314,7 +367,9 @@ const colorPicker = iro.ColorPicker('#colorpicker', {
   ],
 });
 colorPicker.on('color:change', (color: any) => {
-  dp[selectedColorType] = color.hexString;
+  if (dp) {
+    dp[selectedColorType] = color.hexString;
+  }
 });
 selectColorType('fg');
 
@@ -364,7 +419,6 @@ hammer.on('pinchend', () => {
   );
 });
 
-
 drawboard.addEventListener('pointermove', (e) => {
   const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
   if (e.ctrlKey) {
@@ -398,8 +452,14 @@ drawboard.addEventListener('pointermove', (event) => {
   const scale = width / (cols * font.width);
   const mouseScreenPosX = event.clientX - left;
   const mouseScreenPosY = event.clientY - top;
-  mousePos.x = Math.min(cols - 1, Math.max(0, Math.floor(mouseScreenPosX / (font.width * scale))));
-  mousePos.y = Math.min(rows - 1, Math.max(0, Math.floor(mouseScreenPosY / (font.height * scale))));
+  mousePos.x = Math.min(
+    cols - 1,
+    Math.max(0, Math.floor(mouseScreenPosX / (font.width * scale))),
+  );
+  mousePos.y = Math.min(
+    rows - 1,
+    Math.max(0, Math.floor(mouseScreenPosY / (font.height * scale))),
+  );
 });
 
 const abortTool = () => {
@@ -423,9 +483,7 @@ interface Tool {
 }
 
 type Phoxel = {
-  char: string;
-  fg: string;
-  bg: string;
+  phox: Phox;
   r: number;
   c: number;
 };
@@ -445,15 +503,15 @@ const drawTool: DrawTool = {
   },
   addPhoxelToDraft(p: Phoxel) {
     this.data!.draftPhoxels.set(`${p.r};${p.c}`, p);
-    draftScreen.renderPhoxel(p.char, p.fg, p.bg, p.r, p.c);
+    renderDpWithMode(draftScreen, p.r, p.c, { draftErasure: true });
   },
   onPointerDown() {
     this.data.drawing = true;
-    this.addPhoxelToDraft({ ...dp, r: mousePos.y, c: mousePos.x });
+    this.addPhoxelToDraft({ phox: dp, r: mousePos.y, c: mousePos.x });
   },
   onPointerMove() {
     if (this.data.drawing) {
-      this.addPhoxelToDraft({ ...dp, r: mousePos.y, c: mousePos.x });
+      this.addPhoxelToDraft({ phox: dp, r: mousePos.y, c: mousePos.x });
     }
   },
   onPointerUp() {
@@ -462,7 +520,7 @@ const drawTool: DrawTool = {
   },
   onSubmit() {
     this.data.draftPhoxels.forEach((p) => {
-      renderPhoxel(p.char, p.fg, p.bg, p.r, p.c);
+      renderDpWithMode(phoxelis, p.r, p.c);
     });
     this.resetTool!();
   },
@@ -496,13 +554,13 @@ const rectTool: Tool = {
     const c2 = Math.max(startC, mousePos.x);
     // Top & bottom edges
     for (let c = c1; c <= c2; c++) {
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r1, c);
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r2, c);
+      renderDpWithMode(draftScreen, r1, c, { draftErasure: true });
+      renderDpWithMode(draftScreen, r2, c, { draftErasure: true });
     }
     // Left & right edges
     for (let r = r1; r <= r2; r++) {
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r, c1);
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r, c2);
+      renderDpWithMode(draftScreen, r, c1, { draftErasure: true });
+      renderDpWithMode(draftScreen, r, c2, { draftErasure: true });
     }
   },
   onPointerUp() {
@@ -516,13 +574,15 @@ const rectTool: Tool = {
     const r2 = Math.max(startR, mousePos.y);
     const c1 = Math.min(startC, mousePos.x);
     const c2 = Math.max(startC, mousePos.x);
+    // Top & bottom edges
     for (let c = c1; c <= c2; c++) {
-      renderPhoxel(dp.char, dp.fg, dp.bg, r1, c);
-      renderPhoxel(dp.char, dp.fg, dp.bg, r2, c);
+      renderDpWithMode(phoxelis, r1, c);
+      renderDpWithMode(phoxelis, r2, c);
     }
+    // Left & right edges
     for (let r = r1; r <= r2; r++) {
-      renderPhoxel(dp.char, dp.fg, dp.bg, r, c1);
-      renderPhoxel(dp.char, dp.fg, dp.bg, r, c2);
+      renderDpWithMode(phoxelis, r, c1);
+      renderDpWithMode(phoxelis, r, c2);
     }
     this.data!.startR = -1;
     this.data!.startC = -1;
@@ -553,7 +613,7 @@ const filledRectTool: Tool = {
     const c2 = Math.max(startC, mousePos.x);
     for (let r = r1; r <= r2; r++) {
       for (let c = c1; c <= c2; c++) {
-        draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
+        renderDpWithMode(draftScreen, r, c, { draftErasure: true });
       }
     }
   },
@@ -570,7 +630,7 @@ const filledRectTool: Tool = {
     const c2 = Math.max(startC, mousePos.x);
     for (let r = r1; r <= r2; r++) {
       for (let c = c1; c <= c2; c++) {
-        renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
+        renderDpWithMode(phoxelis, r, c);
       }
     }
     this.data!.startR = -1;
@@ -628,7 +688,7 @@ const lineTool: Tool = {
     const { startR, startC } = this.data!;
     const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
     for (const { r, c } of cells) {
-      draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
+      renderDpWithMode(draftScreen, r, c, { draftErasure: true });
     }
   },
   onPointerUp() {
@@ -640,7 +700,7 @@ const lineTool: Tool = {
     if (startR === -1 || startC === -1) return;
     const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
     for (const { r, c } of cells) {
-      renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
+      renderDpWithMode(phoxelis, r, c);
     }
     this.data!.startR = -1;
     this.data!.startC = -1;
@@ -668,7 +728,13 @@ const ellipseTool: Tool = {
     const { startR, startC } = this.data!;
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
-    drawEllipseOutline(draftScreen.renderPhoxel, startR, startC, rx, ry);
+    drawEllipseOutline(
+      (r, c) => renderDpWithMode(draftScreen, r, c),
+      startR,
+      startC,
+      rx,
+      ry,
+    );
   },
   onPointerUp() {
     this.data!.drawing = false;
@@ -679,7 +745,13 @@ const ellipseTool: Tool = {
     if (startR === -1 || startC === -1) return;
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
-    drawEllipseOutline(renderPhoxel, startR, startC, rx, ry);
+    drawEllipseOutline(
+      (r, c) => renderDpWithMode(phoxelis, r, c),
+      startR,
+      startC,
+      rx,
+      ry,
+    );
     this.data!.startR = -1;
     this.data!.startC = -1;
   },
@@ -705,7 +777,13 @@ const filledEllipseTool: Tool = {
     const { startR, startC } = this.data!;
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
-    drawEllipseFill(draftScreen.renderPhoxel, startR, startC, rx, ry);
+    drawEllipseFill(
+      (r, c) => renderDpWithMode(draftScreen, r, c, { draftErasure: true }),
+      startR,
+      startC,
+      rx,
+      ry,
+    );
   },
   onPointerUp() {
     this.data!.drawing = false;
@@ -716,7 +794,7 @@ const filledEllipseTool: Tool = {
     if (startR === -1 || startC === -1) return;
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
-    drawEllipseFill(renderPhoxel, startR, startC, rx, ry);
+    drawEllipseFill((r, c) => renderDpWithMode(phoxelis, r, c), startR, startC, rx, ry);
     this.data!.startR = -1;
     this.data!.startC = -1;
   },
@@ -728,11 +806,10 @@ const filledEllipseTool: Tool = {
 };
 
 // ─── Ellipse helper functions ────────────────────────────────────────────────
-type RenderPhoxelFn = (char: string, fg: string, bg: string, r: number, c: number) => void;
 
 /** Draw ellipse outline using midpoint ellipse algorithm */
 function drawEllipseOutline(
-  render: RenderPhoxelFn,
+  renderFn: (r: number, c: number) => void,
   centerR: number,
   centerC: number,
   rx: number,
@@ -748,10 +825,10 @@ function drawEllipseOutline(
   let dy = 2 * rx2 * y;
 
   const plot4 = (cr: number, cc: number, dx: number, dy: number) => {
-    render(dp.char, dp.fg, dp.bg, cr + dy, cc + dx);
-    render(dp.char, dp.fg, dp.bg, cr - dy, cc + dx);
-    render(dp.char, dp.fg, dp.bg, cr + dy, cc - dx);
-    render(dp.char, dp.fg, dp.bg, cr - dy, cc - dx);
+    renderFn(cr + dy, cc + dx);
+    renderFn(cr - dy, cc + dx);
+    renderFn(cr + dy, cc - dx);
+    renderFn(cr - dy, cc - dx);
   };
 
   // Region 1: slope > -1
@@ -790,7 +867,7 @@ function drawEllipseOutline(
 
 /** Fill ellipse using scanline approach with midpoint ellipse algorithm */
 function drawEllipseFill(
-  render: RenderPhoxelFn,
+  renderFn: (r: number, c: number) => void,
   centerR: number,
   centerC: number,
   rx: number,
@@ -804,7 +881,11 @@ function drawEllipseFill(
   const rMin = centerR - halfRy;
   const rMax = centerR + halfRy;
 
-  for (let r = Math.max(0, Math.floor(rMin)); r <= Math.min(rows - 1, Math.ceil(rMax)); r++) {
+  for (
+    let r = Math.max(0, Math.floor(rMin));
+    r <= Math.min(rows - 1, Math.ceil(rMax));
+    r++
+  ) {
     const dy = r - centerR;
     // ellipse equation: (x-cx)^2/rx^2 + (y-cy)^2/ry^2 <= 1
     // => |x-cx| <= rx * sqrt(1 - (y-cy)^2/ry^2)
@@ -814,7 +895,7 @@ function drawEllipseFill(
     const left = Math.max(0, Math.ceil(centerC - dx));
     const right = Math.min(cols - 1, Math.floor(centerC + dx));
     for (let c = left; c <= right; c++) {
-      render(dp.char, dp.fg, dp.bg, r, c);
+      renderFn(r, c);
     }
   }
 }
