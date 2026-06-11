@@ -80,6 +80,7 @@ const {
   palette,
   getPhoxFromPaletteIndex,
   getPhoxFromPosition,
+  storePhoxInPalette,
 } = phoxelis;
 
 const appContainer = document.createElement('div');
@@ -94,10 +95,24 @@ content.style =
 
 const contentFooter = document.createElement('div');
 contentFooter.style = 'overflow-x: scroll;';
+
+let paletteData: {
+  selectedPhox: number;
+  modifyingPhox: boolean;
+} = {
+  selectedPhox: -1,
+  modifyingPhox: false,
+};
+const paletteWrapper = document.createElement('div');
+paletteWrapper.style = 'position: relative;';
+const paletteOverlay = document.createElement('canvas');
+paletteOverlay.width = palette.width;
+paletteOverlay.height = palette.height;
 const paletteScale = 2;
-const paletteHeight = font.height * paletteScale;
-palette.style = `height: ${paletteHeight}px; image-rendering: pixelated; border: 1px solid black;`;
-palette.addEventListener('click', (e) => {
+const paletteScaledHeight = font.height * paletteScale;
+palette.style = `height: ${paletteScaledHeight}px; image-rendering: pixelated; border: 1px solid black;`;
+paletteOverlay.style = `height: ${paletteScaledHeight}px; border: 1px solid black; position: absolute; top: 0; left: 0; image-rendering: pixelated;`;
+paletteOverlay.addEventListener('click', (e) => {
   const x = e.offsetX;
   const paletteMaxCells = palette.width / font.width;
   const pos = Math.floor((x / (paletteScale * palette.width)) * paletteMaxCells);
@@ -108,8 +123,17 @@ palette.addEventListener('click', (e) => {
     return;
   }
   dp = phox;
+  paletteData.selectedPhox = pos;
+
+  const ctx = paletteOverlay.getContext('2d');
+  ctx!.reset();
+  ctx!.strokeStyle = 'green';
+  ctx!.lineWidth = 2;
+  ctx!.strokeRect(pos * font.width, 0, font.width, font.height);
 });
-contentFooter.append(palette);
+paletteWrapper.append(palette);
+paletteWrapper.append(paletteOverlay);
+contentFooter.append(paletteWrapper);
 
 const sidebar = document.createElement('div');
 sidebar.style = `display: flex; flex-direction: column;`;
@@ -371,6 +395,19 @@ const moveRefImageToggle = document.createElement('input');
 moveRefImageToggle.type = 'checkbox';
 navBar.appendChild(moveRefImageToggle);
 
+const modifyPalettePhoxButton = document.createElement('button');
+modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
+modifyPalettePhoxButton.onclick = () => {
+  if (!paletteData.modifyingPhox) {
+    paletteData.modifyingPhox = true;
+    modifyPalettePhoxButton.innerHTML = 'UPDATING PALETTE PHOX';
+  } else {
+    paletteData.modifyingPhox = false;
+    modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
+  }
+};
+navBar.appendChild(modifyPalettePhoxButton);
+
 // Sidebar
 const alphabetCanvas = document.createElement('canvas');
 const alphabetWidth = 100;
@@ -394,8 +431,17 @@ alphabetCanvas.addEventListener('click', (e) => {
   const char = font.charactersList[index];
   if (!char) throw new Error(`No char found for position y${r},x${c}`);
 
-  if (dp) {
-    dp.char = String.fromCodePoint(char.codepoint);
+  dp.char = String.fromCodePoint(char.codepoint);
+
+  if (paletteData.modifyingPhox && paletteData.selectedPhox > 0) {
+    const selectedPalettePhox = getPhoxFromPaletteIndex(paletteData.selectedPhox);
+    if (selectedPalettePhox) {
+      storePhoxInPalette(paletteData.selectedPhox, {
+        char: dp.char,
+        fg: selectedPalettePhox.fg,
+        bg: selectedPalettePhox.bg,
+      });
+    }
   }
 });
 
@@ -407,10 +453,9 @@ fgColorButton.innerHTML = 'Foreground';
 function selectColorType(type: 'fg' | 'bg') {
   selectedColorType = type;
 
-  if (dp) {
-    colorPicker.color.hexString = dp[type];
-  }
+  colorPicker.color.hexString = dp[type];
 }
+
 fgColorButton.addEventListener('click', () => selectColorType('fg'));
 const bgColorButton = document.createElement('button');
 bgColorButton.innerHTML = 'Background';
@@ -440,8 +485,17 @@ const colorPicker = iro.ColorPicker('#colorpicker', {
   ],
 });
 colorPicker.on('color:change', (color: any) => {
-  if (dp) {
-    dp[selectedColorType] = color.hexString;
+  dp[selectedColorType] = color.hexString;
+
+  if (paletteData.modifyingPhox && paletteData.selectedPhox > 0) {
+    const selectedPalettePhox = getPhoxFromPaletteIndex(paletteData.selectedPhox);
+    if (selectedPalettePhox) {
+      storePhoxInPalette(paletteData.selectedPhox, {
+        char: selectedPalettePhox.char,
+        fg: selectedColorType === 'fg' ? dp[selectedColorType] : selectedPalettePhox.fg,
+        bg: selectedColorType === 'bg' ? dp[selectedColorType] : selectedPalettePhox.bg,
+      });
+    }
   }
 });
 selectColorType('fg');
@@ -666,7 +720,7 @@ const rectTool: Tool = {
   },
   abort() {
     this.resetTool!();
-  }
+  },
 };
 
 // ─── Filled Rectangle Tool ───────────────────────────────────────────────────
@@ -717,7 +771,7 @@ const filledRectTool: Tool = {
   },
   abort() {
     this.resetTool!();
-  }
+  },
 };
 
 // ─── Line Tool (Bresenham's algorithm) ──────────────────────────────────────
@@ -788,7 +842,7 @@ const lineTool: Tool = {
   },
   abort() {
     this.resetTool!();
-  }
+  },
 };
 
 // ─── Ellipse Tool (outline) ──────────────────────────────────────────────────
@@ -808,7 +862,7 @@ const ellipseTool: Tool = {
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseOutline(
-      (r, c) => renderDpWithMode(draftScreen, r, c, {draftErasure: true}),
+      (r, c) => renderDpWithMode(draftScreen, r, c, { draftErasure: true }),
       startR,
       startC,
       rx,
@@ -840,7 +894,7 @@ const ellipseTool: Tool = {
   },
   abort() {
     this.resetTool!();
-  }
+  },
 };
 
 // ─── Filled Ellipse Tool ─────────────────────────────────────────────────────
@@ -885,7 +939,7 @@ const filledEllipseTool: Tool = {
   },
   abort() {
     this.resetTool!();
-  }
+  },
 };
 
 // ─── Ellipse helper functions ────────────────────────────────────────────────
