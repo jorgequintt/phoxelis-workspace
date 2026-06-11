@@ -316,8 +316,10 @@ window.requestAnimationFrame(renderLoop);
 const panzoom = Panzoom(layersWrapper, panzoomConfiguration);
 const refImagePanzoom = Panzoom(refImage, refImagePanzoomConfig);
 const hammer = new Hammer(drawboard);
+let panzooming = false;
 hammer.get('pinch').set({ enable: true });
 hammer.on('pinchstart', () => {
+  panzooming = true;
   const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
   abortTool();
 
@@ -338,20 +340,28 @@ hammer.on('pinchmove', (e) => {
     (e.velocityY * 11) / targetZoom.getScale(),
   );
 });
+hammer.on('pinchend', () => {
+  panzooming = false;
+});
 
 
 drawboard.addEventListener('pointermove', (e) => {
   const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
   if (e.ctrlKey) {
+    panzooming = true;
     abortTool();
     targetZoom.pan(
       e.movementX / targetZoom.getScale(),
       e.movementY / targetZoom.getScale(),
     );
   } else if (e.shiftKey) {
+    panzooming = true;
     abortTool();
     targetZoom.zoom(targetZoom.getScale() + (e.movementY / 35) * -1);
   }
+});
+drawboard.addEventListener('pointerup', () => {
+  panzooming = false;
 });
 
 type CellPosition = { x: number; y: number };
@@ -475,6 +485,7 @@ const rectTool: Tool = {
   },
   onSubmit() {
     const { startR, startC } = this.data!;
+    if (startR === -1 || startC === -1) return;
     const r1 = Math.min(startR, mousePos.y);
     const r2 = Math.max(startR, mousePos.y);
     const c1 = Math.min(startC, mousePos.x);
@@ -526,6 +537,7 @@ const filledRectTool: Tool = {
   },
   onSubmit() {
     const { startR, startC } = this.data!;
+    if (startR === -1 || startC === -1) return;
     const r1 = Math.min(startR, mousePos.y);
     const r2 = Math.max(startR, mousePos.y);
     const c1 = Math.min(startC, mousePos.x);
@@ -599,6 +611,7 @@ const lineTool: Tool = {
   },
   onSubmit() {
     const { startR, startC } = this.data!;
+    if (startR === -1 || startC === -1) return;
     const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
     for (const { r, c } of cells) {
       renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
@@ -637,6 +650,7 @@ const ellipseTool: Tool = {
   },
   onSubmit() {
     const { startR, startC } = this.data!;
+    if (startR === -1 || startC === -1) return;
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseOutline(renderPhoxel, startR, startC, rx, ry);
@@ -673,6 +687,7 @@ const filledEllipseTool: Tool = {
   },
   onSubmit() {
     const { startR, startC } = this.data!;
+    if (startR === -1 || startC === -1) return;
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseFill(renderPhoxel, startR, startC, rx, ry);
@@ -798,9 +813,9 @@ function setTool(tool: Tool) {
   currTool = {
     tool,
     handlers: {
-      onPointerDown: (e) => tool.onPointerDown!(e),
-      onPointerMove: (e) => tool.onPointerMove!(e),
-      onPointerUp: (e) => tool.onPointerUp!(e),
+      onPointerDown: (e) => !panzooming && tool.onPointerDown!(e),
+      onPointerMove: (e) => !panzooming && tool.onPointerMove!(e),
+      onPointerUp: (e) => !panzooming && tool.onPointerUp!(e),
     },
   };
   drawboard.addEventListener('pointerdown', currTool.handlers.onPointerDown);
