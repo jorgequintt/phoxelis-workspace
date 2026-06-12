@@ -13,6 +13,11 @@ import {
   fileToBase64,
 } from './refImageStorage';
 
+type Phoxel = {
+  phox: Phox;
+  r: number;
+  c: number;
+};
 type PhoxelPosition = [r: number, c: number];
 
 const rows = 37;
@@ -97,7 +102,7 @@ function commitPhoxels(phoxelPositions: Array<PhoxelPosition>) {
       changes.push(() => renderPhoxel(newPhox.char, newPhox.fg, newPhox.bg, r, c));
     }
   });
-  
+
   if (changesHistory.length === maxChangesHistory) changesHistory.shift();
   changesHistory.push({ changes, undoChanges });
   redoHistory = [];
@@ -600,73 +605,119 @@ window.requestAnimationFrame(renderLoop);
 
 // sampleRenderContent(phoxelis, rows, cols);
 
+interface Hotkey {
+  ctrl?: boolean;
+  alt?: boolean;
+  shift?: boolean;
+  key?: string;
+  mouse?: number;
+  onHotkeyStart?: (e: KeyboardEvent | PointerEvent) => void;
+  onHotkeyEnd?: (e: KeyboardEvent | PointerEvent) => void;
+}
+
+const hotkeys: Hotkey[] = [
+  { ctrl: true, key: 'z', onHotkeyEnd: () => undoLastChange() },
+  { ctrl: true, key: 'y', onHotkeyEnd: () => redoLastChange() },
+  {
+    ctrl: true,
+    mouse: 1,
+    onHotkeyStart(e) {
+      setTool(panzoomTool);
+      currTool?.handlers.onPointerDown(e as PointerEvent);
+    }
+  },
+  {
+    shift: true,
+    mouse: 1,
+    onHotkeyStart(e) {
+      setTool(panzoomTool);
+      currTool?.handlers.onPointerDown(e as PointerEvent);
+    }
+  },
+];
+const downHotkeys: Hotkey[] = [];
+
+window.addEventListener('keydown', (e) => {
+  const matchingHotkey = hotkeys.find(
+    (h) =>
+      !!h.ctrl === e.ctrlKey &&
+      !!h.alt === e.altKey &&
+      !!h.shift === e.shiftKey &&
+      e.key.toLocaleLowerCase() === h.key,
+  );
+  if (matchingHotkey) {
+    matchingHotkey.onHotkeyStart?.(e);
+    downHotkeys.push(matchingHotkey);
+  }
+});
+window.addEventListener('keyup', (e) => {
+  const matchinDownHotkey = downHotkeys.find((h) => e.key.toLocaleLowerCase() === h.key);
+  if (matchinDownHotkey) {
+    matchinDownHotkey.onHotkeyEnd?.(e);
+    downHotkeys.splice(downHotkeys.indexOf(matchinDownHotkey), 1);
+  }
+
+  const matchingHotkey = hotkeys.find(
+    (h) =>
+      !!h.ctrl === e.ctrlKey &&
+      !!h.alt === e.altKey &&
+      !!h.shift === e.shiftKey &&
+      e.key.toLocaleLowerCase() === h.key,
+  );
+  if (matchingHotkey == matchinDownHotkey) {
+    // do nothing as we already ended the hotkey
+  } else if (matchingHotkey) {
+    matchingHotkey.onHotkeyEnd?.(e);
+  }
+});
+drawboard.addEventListener('pointerdown', (e) => {
+  const matchingHotkey = hotkeys.find(
+    (h) =>
+      !!h.ctrl === e.ctrlKey &&
+      !!h.alt === e.altKey &&
+      !!h.shift === e.shiftKey &&
+      e.button === h.mouse,
+  );
+  if (matchingHotkey) {
+    matchingHotkey.onHotkeyStart?.(e);
+    downHotkeys.push(matchingHotkey);
+  }
+});
+drawboard.addEventListener('pointerup', (e) => {
+  const matchinDownHotkey = downHotkeys.find((h) => e.button === h.mouse);
+  if (matchinDownHotkey) {
+    matchinDownHotkey.onHotkeyEnd?.(e);
+    downHotkeys.splice(downHotkeys.indexOf(matchinDownHotkey), 1);
+  }
+
+  const matchingHotkey = hotkeys.find(
+    (h) =>
+      !!h.ctrl === e.ctrlKey &&
+      !!h.alt === e.altKey &&
+      !!h.shift === e.shiftKey &&
+      e.button === h.mouse,
+  );
+  if (matchingHotkey == matchinDownHotkey) {
+    // do nothing as we already ended the hotkey
+  } else if (matchingHotkey) {
+    matchingHotkey.onHotkeyEnd?.(e);
+  }
+});
+
 const panzoom = Panzoom(layersWrapper, panzoomConfiguration);
 const refImagePanzoom = Panzoom(refImage, refImagePanzoomConfig);
 const hammer = new Hammer(drawboard);
-let panzooming = false;
 
 hammer.get('pinch').set({ enable: true });
-hammer.on('pinchstart', () => {
-  panzooming = true;
-  const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
-  abortActiveTool();
-
-  if (moveRefImageToggle.checked) {
-    refImageScale = targetZoom.getScale();
-  } else {
-    scale = targetZoom.getScale();
-  }
-});
-hammer.on('pinchmove', (e) => {
-  const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
-
-  const s = moveRefImageToggle.checked ? refImageScale : scale;
-  const newZoomVal = s * e.scale;
-  targetZoom.zoom(newZoomVal);
-  targetZoom.pan(
-    (e.velocityX * 11) / targetZoom.getScale(),
-    (e.velocityY * 11) / targetZoom.getScale(),
-  );
-});
-hammer.on('pinchend', () => {
-  panzooming = false;
-  // Save panzoom state when interaction ends
-  saveRefImagePanzoomConfig(
-    refImagePanzoom.getScale(),
-    refImagePanzoom.getPan().x,
-    refImagePanzoom.getPan().y,
-  );
-});
-
-drawboard.addEventListener('pointermove', (e) => {
-  const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
-  if (e.ctrlKey) {
-    panzooming = true;
-    abortActiveTool();
-    targetZoom.pan(
-      e.movementX / targetZoom.getScale(),
-      e.movementY / targetZoom.getScale(),
-    );
-  } else if (e.shiftKey) {
-    panzooming = true;
-    abortActiveTool();
-    targetZoom.zoom(targetZoom.getScale() + (e.movementY / 35) * -1);
-  }
-});
-drawboard.addEventListener('pointerup', () => {
-  panzooming = false;
-  // Save panzoom state when interaction ends
-  saveRefImagePanzoomConfig(
-    refImagePanzoom.getScale(),
-    refImagePanzoom.getPan().x,
-    refImagePanzoom.getPan().y,
-  );
+hammer.on('pinchstart', (e) => {
+  setTool(panzoomTool);
+  currTool?.handlers.onPinchStart(e);
 });
 
 type CellPosition = { x: number; y: number };
 const mousePos: CellPosition = { x: -1, y: -1 };
 
-drawboard.addEventListener('pointermove', (event) => {
+function setMousePos(event: PointerEvent) {
   const { width, top, left } = canvas.getBoundingClientRect();
   const scale = width / (cols * font.width);
   const mouseScreenPosX = event.clientX - left;
@@ -679,7 +730,10 @@ drawboard.addEventListener('pointermove', (event) => {
     rows - 1,
     Math.max(0, Math.floor(mouseScreenPosY / (font.height * scale))),
   );
-});
+}
+drawboard.addEventListener('pointerdown', setMousePos);
+drawboard.addEventListener('pointermove', setMousePos);
+drawboard.addEventListener('pointerup', setMousePos);
 
 const abortActiveTool = () => {
   currTool?.tool.abort?.();
@@ -695,16 +749,96 @@ interface Tool {
   onPointerDown?: (e: PointerEvent) => void;
   onPointerMove?: (e: PointerEvent) => void;
   onPointerUp?: (e: PointerEvent) => void;
+  onPinchStart?: (e: HammerInput) => void;
+  onPinchMove?: (e: HammerInput) => void;
+  onPinchEnd?: (e: HammerInput) => void;
   submit?: () => void;
   abort?: () => void;
   resetTool?: () => void;
   data?: Record<string, any>;
 }
 
-type Phoxel = {
-  phox: Phox;
-  r: number;
-  c: number;
+interface PanzoomTool extends Tool {
+  data: {
+    panzooming: boolean;
+    zooming: boolean,
+    panning: boolean
+  };
+}
+const panzoomTool: PanzoomTool = {
+  name: 'panzoom',
+  data: {
+    panzooming: false,
+    zooming: false,
+    panning: false
+  },
+  onPointerDown(e) {
+    this.data.panzooming = true;
+    this.data.panning = e.ctrlKey;
+    this.data.zooming = e.shiftKey;
+  },
+  onPointerMove(e) {
+    if(!this.data.panzooming) return;
+    const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
+    if (this.data.panning) {
+      targetZoom.pan(
+        e.movementX / targetZoom.getScale(),
+        e.movementY / targetZoom.getScale(),
+      );
+    } else if (this.data.zooming) {
+      targetZoom.zoom(targetZoom.getScale() + (e.movementY / 35) * -1);
+    }
+  },
+  onPointerUp() {
+    if(!this.data.panzooming) return;
+    this.resetTool!();
+    this.submit!();
+    setPreviousTool();
+  },
+  onPinchStart() {
+    this.data.panzooming = true;
+    const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
+
+    if (moveRefImageToggle.checked) {
+      refImageScale = targetZoom.getScale();
+    } else {
+      scale = targetZoom.getScale();
+    }
+  },
+  onPinchMove(e) {
+    if (this.data.panzooming) {
+      const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
+
+      const s = moveRefImageToggle.checked ? refImageScale : scale;
+      const newZoomVal = s * e.scale;
+      targetZoom.zoom(newZoomVal);
+      targetZoom.pan(
+        (e.velocityX * 11) / targetZoom.getScale(),
+        (e.velocityY * 11) / targetZoom.getScale(),
+      );
+    }
+  },
+  onPinchEnd() {
+    if (!this.data!.panzooming) return;
+    this.resetTool!();
+    this.submit!();
+    setPreviousTool();
+  },
+  submit() {
+    saveRefImagePanzoomConfig(
+      refImagePanzoom.getScale(),
+      refImagePanzoom.getPan().x,
+      refImagePanzoom.getPan().y,
+    );
+  },
+  resetTool() {
+    this.data.panzooming = false;
+    this.data.panning = false;
+    this.data.zooming = false;
+  },
+  abort() {
+    this.resetTool!();
+  },
 };
 
 interface DrawTool extends Tool {
@@ -734,7 +868,7 @@ const drawTool: DrawTool = {
     }
   },
   onPointerUp() {
-    if(!this.data!.drawing) return;
+    if (!this.data!.drawing) return;
     this.data.drawing = false;
     this.submit!();
   },
@@ -786,7 +920,7 @@ const rectTool: Tool = {
     }
   },
   onPointerUp() {
-    if(!this.data!.drawing) return;
+    if (!this.data!.drawing) return;
     this.data!.drawing = false;
     this.submit!();
   },
@@ -818,6 +952,7 @@ const rectTool: Tool = {
     draftScreen.reset();
     this.data!.startR = -1;
     this.data!.startC = -1;
+    this.data!.drawing = false;
   },
   abort() {
     this.resetTool!();
@@ -848,7 +983,7 @@ const filledRectTool: Tool = {
     }
   },
   onPointerUp() {
-    if(!this.data!.drawing) return;
+    if (!this.data!.drawing) return;
     this.data!.drawing = false;
     this.submit!();
   },
@@ -873,6 +1008,7 @@ const filledRectTool: Tool = {
     draftScreen.reset();
     this.data!.startR = -1;
     this.data!.startC = -1;
+    this.data!.drawing = false;
   },
   abort() {
     this.resetTool!();
@@ -928,7 +1064,7 @@ const lineTool: Tool = {
     }
   },
   onPointerUp() {
-    if(!this.data!.drawing) return;
+    if (!this.data!.drawing) return;
     this.data!.drawing = false;
     this.submit!();
   },
@@ -947,6 +1083,7 @@ const lineTool: Tool = {
     draftScreen.reset();
     this.data!.startR = -1;
     this.data!.startC = -1;
+    this.data!.drawing = false;
   },
   abort() {
     this.resetTool!();
@@ -978,7 +1115,7 @@ const ellipseTool: Tool = {
     );
   },
   onPointerUp() {
-    if(!this.data!.drawing) return;
+    if (!this.data!.drawing) return;
     this.data!.drawing = false;
     this.submit!();
   },
@@ -996,6 +1133,7 @@ const ellipseTool: Tool = {
     draftScreen.reset();
     this.data!.startR = -1;
     this.data!.startC = -1;
+    this.data!.drawing = false;
   },
   abort() {
     this.resetTool!();
@@ -1026,7 +1164,7 @@ const filledEllipseTool: Tool = {
     );
   },
   onPointerUp() {
-    if(!this.data!.drawing) return;
+    if (!this.data!.drawing) return;
     this.data!.drawing = false;
     this.submit!();
   },
@@ -1151,28 +1289,45 @@ let currTool: {
     onPointerDown: (e: PointerEvent) => void;
     onPointerUp: (e: PointerEvent) => void;
     onPointerMove: (e: PointerEvent) => void;
+    onPinchStart: (e: HammerInput) => void;
+    onPinchMove: (e: HammerInput) => void;
+    onPinchEnd: (e: HammerInput) => void;
   };
 } | null = null;
 
+let previousTool: Tool | null = null;
 function setTool(tool: Tool) {
   if (currTool) {
     currTool.tool.abort?.();
     drawboard.removeEventListener('pointerdown', currTool.handlers.onPointerDown);
     drawboard.removeEventListener('pointermove', currTool.handlers.onPointerMove);
     window.removeEventListener('pointerup', currTool.handlers.onPointerUp);
+    hammer.off('pinchstart', currTool.handlers.onPinchStart);
+    hammer.off('pinchmove', currTool.handlers.onPinchMove);
+    hammer.off('pinchend', currTool.handlers.onPinchEnd);
+    previousTool = currTool.tool;
   }
 
   currTool = {
     tool,
     handlers: {
-      onPointerDown: (e) => !panzooming && tool.onPointerDown!(e),
-      onPointerMove: (e) => !panzooming && tool.onPointerMove!(e),
-      onPointerUp: (e) => !panzooming && tool.onPointerUp!(e),
+      onPointerDown: (e) => tool.onPointerDown!(e),
+      onPointerMove: (e) => tool.onPointerMove!(e),
+      onPointerUp: (e) => tool.onPointerUp!(e),
+      onPinchStart: (e) => tool.onPinchStart!(e),
+      onPinchMove: (e) => tool.onPinchMove!(e),
+      onPinchEnd: (e) => tool.onPinchEnd!(e),
     },
   };
   drawboard.addEventListener('pointerdown', currTool.handlers.onPointerDown);
-  window.addEventListener('pointermove', currTool.handlers.onPointerMove);
+  drawboard.addEventListener('pointermove', currTool.handlers.onPointerMove);
   window.addEventListener('pointerup', currTool.handlers.onPointerUp);
+  hammer.on('pinchstart', currTool.handlers.onPinchStart);
+  hammer.on('pinchmove', currTool.handlers.onPinchMove);
+  hammer.on('pinchend', currTool.handlers.onPinchEnd);
+}
+function setPreviousTool() {
+  if (previousTool) setTool(previousTool);
 }
 
 setTool(drawTool);
