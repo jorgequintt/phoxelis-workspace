@@ -13,6 +13,8 @@ import {
   fileToBase64,
 } from './refImageStorage';
 
+type PhoxelPosition = [r: number, c: number];
+
 const rows = 37;
 const cols = 152;
 const panzoomConfiguration = {
@@ -70,9 +72,65 @@ function renderDpWithMode(
   }
 }
 
+type ChangesStack = Array<() => void>;
+let changesHistory: Array<{ changes: ChangesStack; undoChanges: ChangesStack }> = [];
+let redoHistory: Array<{ changes: ChangesStack; undoChanges: ChangesStack }> = [];
+const maxChangesHistory = 50;
+function commitPhoxels(phoxelPositions: Array<PhoxelPosition>) {
+  const undoChanges: ChangesStack = [];
+  const changes: ChangesStack = [];
+
+  phoxelPositions.forEach(([r, c]) => {
+    const origPhox = getPhoxFromPosition(r, c);
+    if (!origPhox) {
+      undoChanges.push(() => removePhoxel(r, c));
+    } else {
+      undoChanges.push(() => renderPhoxel(origPhox.char, origPhox.fg, origPhox.bg, r, c));
+    }
+
+    renderDpWithMode(phoxelis, r, c);
+
+    const newPhox = getPhoxFromPosition(r, c);
+    if (!newPhox) {
+      changes.push(() => removePhoxel(r, c));
+    } else {
+      changes.push(() => renderPhoxel(newPhox.char, newPhox.fg, newPhox.bg, r, c));
+    }
+  });
+  
+  if (changesHistory.length === maxChangesHistory) changesHistory.shift();
+  changesHistory.push({ changes, undoChanges });
+  redoHistory = [];
+}
+
+function undoLastChange() {
+  const lastChange = changesHistory.pop();
+
+  if (!lastChange) {
+    console.warn('Nothing to undo');
+    return;
+  }
+
+  lastChange.undoChanges.forEach((fn) => fn());
+  redoHistory.push(lastChange);
+}
+
+function redoLastChange() {
+  const lastChange = redoHistory.pop();
+
+  if (!lastChange) {
+    console.warn('Nothing to redo');
+    return;
+  }
+
+  lastChange.changes.forEach((fn) => fn());
+  changesHistory.push(lastChange);
+}
+
 const phoxelis = Phoxelis(rows, cols, font, true);
 const {
   canvas,
+  renderPhoxel,
   renderFrame,
   removePhoxel,
   importPhoxelis,
@@ -411,6 +469,16 @@ modifyPalettePhoxButton.onclick = () => {
 };
 navBar.appendChild(modifyPalettePhoxButton);
 
+const undoButton = document.createElement('button');
+undoButton.innerHTML = 'Undo';
+undoButton.onclick = () => undoLastChange();
+navBar.appendChild(undoButton);
+
+const redoButton = document.createElement('button');
+redoButton.innerHTML = 'Redo';
+redoButton.onclick = () => redoLastChange();
+navBar.appendChild(redoButton);
+
 // Sidebar
 const alphabetCanvas = document.createElement('canvas');
 const alphabetWidth = 100;
@@ -541,7 +609,7 @@ hammer.get('pinch').set({ enable: true });
 hammer.on('pinchstart', () => {
   panzooming = true;
   const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
-  abortTool();
+  abortActiveTool();
 
   if (moveRefImageToggle.checked) {
     refImageScale = targetZoom.getScale();
@@ -574,14 +642,14 @@ drawboard.addEventListener('pointermove', (e) => {
   const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
   if (e.ctrlKey) {
     panzooming = true;
-    abortTool();
+    abortActiveTool();
     targetZoom.pan(
       e.movementX / targetZoom.getScale(),
       e.movementY / targetZoom.getScale(),
     );
   } else if (e.shiftKey) {
     panzooming = true;
-    abortTool();
+    abortActiveTool();
     targetZoom.zoom(targetZoom.getScale() + (e.movementY / 35) * -1);
   }
 });
@@ -613,12 +681,12 @@ drawboard.addEventListener('pointermove', (event) => {
   );
 });
 
-const abortTool = () => {
+const abortActiveTool = () => {
   currTool?.tool.abort?.();
 };
 window.addEventListener('mouseout', (e) => {
   if (e.relatedTarget === null) {
-    abortTool();
+    abortActiveTool();
   }
 });
 
@@ -666,13 +734,16 @@ const drawTool: DrawTool = {
     }
   },
   onPointerUp() {
+    if(!this.data!.drawing) return;
     this.data.drawing = false;
     this.submit!();
   },
   submit() {
+    const phoxelsPositions: Array<PhoxelPosition> = [];
     this.data.draftPhoxels.forEach((p) => {
-      renderDpWithMode(phoxelis, p.r, p.c);
+      phoxelsPositions.push([p.r, p.c]);
     });
+    commitPhoxels(phoxelsPositions);
     this.resetTool!();
   },
   resetTool() {
@@ -715,6 +786,7 @@ const rectTool: Tool = {
     }
   },
   onPointerUp() {
+    if(!this.data!.drawing) return;
     this.data!.drawing = false;
     this.submit!();
   },
@@ -725,16 +797,21 @@ const rectTool: Tool = {
     const r2 = Math.max(startR, mousePos.y);
     const c1 = Math.min(startC, mousePos.x);
     const c2 = Math.max(startC, mousePos.x);
+
+    const phoxelsPositions: Array<PhoxelPosition> = [];
+
     // Top & bottom edges
     for (let c = c1; c <= c2; c++) {
-      renderDpWithMode(phoxelis, r1, c);
-      renderDpWithMode(phoxelis, r2, c);
+      phoxelsPositions.push([r1, c]);
+      phoxelsPositions.push([r2, c]);
     }
     // Left & right edges
     for (let r = r1; r <= r2; r++) {
-      renderDpWithMode(phoxelis, r, c1);
-      renderDpWithMode(phoxelis, r, c2);
+      phoxelsPositions.push([r, c1]);
+      phoxelsPositions.push([r, c2]);
     }
+
+    commitPhoxels(phoxelsPositions);
     this.resetTool!();
   },
   resetTool() {
@@ -771,6 +848,7 @@ const filledRectTool: Tool = {
     }
   },
   onPointerUp() {
+    if(!this.data!.drawing) return;
     this.data!.drawing = false;
     this.submit!();
   },
@@ -781,11 +859,14 @@ const filledRectTool: Tool = {
     const r2 = Math.max(startR, mousePos.y);
     const c1 = Math.min(startC, mousePos.x);
     const c2 = Math.max(startC, mousePos.x);
+
+    const phoxelsPositions: Array<PhoxelPosition> = [];
     for (let r = r1; r <= r2; r++) {
       for (let c = c1; c <= c2; c++) {
-        renderDpWithMode(phoxelis, r, c);
+        phoxelsPositions.push([r, c]);
       }
     }
+    commitPhoxels(phoxelsPositions);
     this.resetTool!();
   },
   resetTool() {
@@ -847,6 +928,7 @@ const lineTool: Tool = {
     }
   },
   onPointerUp() {
+    if(!this.data!.drawing) return;
     this.data!.drawing = false;
     this.submit!();
   },
@@ -854,9 +936,11 @@ const lineTool: Tool = {
     const { startR, startC } = this.data!;
     if (startR === -1 || startC === -1) return;
     const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
+    const phoxelsPositions: Array<PhoxelPosition> = [];
     for (const { r, c } of cells) {
-      renderDpWithMode(phoxelis, r, c);
+      phoxelsPositions.push([r, c]);
     }
+    commitPhoxels(phoxelsPositions);
     this.resetTool!();
   },
   resetTool() {
@@ -894,6 +978,7 @@ const ellipseTool: Tool = {
     );
   },
   onPointerUp() {
+    if(!this.data!.drawing) return;
     this.data!.drawing = false;
     this.submit!();
   },
@@ -902,13 +987,9 @@ const ellipseTool: Tool = {
     if (startR === -1 || startC === -1) return;
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
-    drawEllipseOutline(
-      (r, c) => renderDpWithMode(phoxelis, r, c),
-      startR,
-      startC,
-      rx,
-      ry,
-    );
+    const phoxelsPositions: Array<PhoxelPosition> = [];
+    drawEllipseOutline((r, c) => phoxelsPositions.push([r, c]), startR, startC, rx, ry);
+    commitPhoxels(phoxelsPositions);
     this.resetTool!();
   },
   resetTool() {
@@ -945,6 +1026,7 @@ const filledEllipseTool: Tool = {
     );
   },
   onPointerUp() {
+    if(!this.data!.drawing) return;
     this.data!.drawing = false;
     this.submit!();
   },
@@ -953,7 +1035,9 @@ const filledEllipseTool: Tool = {
     if (startR === -1 || startC === -1) return;
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
-    drawEllipseFill((r, c) => renderDpWithMode(phoxelis, r, c), startR, startC, rx, ry);
+    const phoxelsPositions: Array<PhoxelPosition> = [];
+    drawEllipseFill((r, c) => phoxelsPositions.push([r, c]), startR, startC, rx, ry);
+    commitPhoxels(phoxelsPositions);
     this.resetTool!();
   },
   resetTool() {
@@ -1087,7 +1171,7 @@ function setTool(tool: Tool) {
     },
   };
   drawboard.addEventListener('pointerdown', currTool.handlers.onPointerDown);
-  drawboard.addEventListener('pointermove', currTool.handlers.onPointerMove);
+  window.addEventListener('pointermove', currTool.handlers.onPointerMove);
   window.addEventListener('pointerup', currTool.handlers.onPointerUp);
 }
 
