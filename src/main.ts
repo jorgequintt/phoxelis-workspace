@@ -1397,13 +1397,4 @@ if (savedRefImageBase64) {
   clearRefImageStorage();
 }
 
-window.addEventListener('pagehide', () => {
-  // Final save on page unload
-  saveRefImagePanzoomConfig(
-    refImagePanzoom.getScale(),
-    refImagePanzoom.getPan().x,
-    refImagePanzoom.getPan().y,
-  );
-});
-
 loadPhoxelis(filename);
