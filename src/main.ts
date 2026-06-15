@@ -576,6 +576,283 @@ alphabetCanvas.addEventListener('click', (e) => {
   }
 });
 
+// ─── Layer Management Panel ──────────────────────────────────────────────────
+const layerPanel = document.createElement('div');
+layerPanel.style.cssText = `
+  padding: 8px;
+  border-top: 1px solid #444;
+  background: #1e1e1e;
+`;
+
+const layerPanelTitle = document.createElement('div');
+layerPanelTitle.textContent = 'Layers';
+layerPanelTitle.style.cssText = `
+  font-size: 12px;
+  font-weight: bold;
+  color: #aaa;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+layerPanel.appendChild(layerPanelTitle);
+
+const layerActions = document.createElement('div');
+layerActions.style.cssText = `
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+`;
+
+const addLayerBtn = document.createElement('button');
+addLayerBtn.textContent = '+ Add';
+addLayerBtn.style.cssText = `
+  flex: 1;
+  padding: 4px 8px;
+  background: #444;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 3px;
+  font-size: 11px;
+  cursor: pointer;
+`;
+layerActions.appendChild(addLayerBtn);
+
+const removeLayerBtn = document.createElement('button');
+removeLayerBtn.textContent = '− Remove';
+removeLayerBtn.style.cssText = `
+  flex: 1;
+  padding: 4px 8px;
+  background: #444;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 3px;
+  font-size: 11px;
+  cursor: pointer;
+`;
+layerActions.appendChild(removeLayerBtn);
+
+layerPanel.appendChild(layerActions);
+
+const layerList = document.createElement('div');
+layerList.style.cssText = `
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+`;
+
+// Shared drag state across all layer rows
+let draggedRow: HTMLElement | null = null;
+
+// Example layers
+const exampleLayers = [
+  { name: 'Background', opacity: 100, visible: true },
+  { name: 'Line Art', opacity: 90, visible: true },
+  { name: 'Shading', opacity: 70, visible: true },
+  { name: 'Highlights', opacity: 100, visible: false },
+  { name: 'Effects', opacity: 50, visible: true },
+];
+
+for (const ex of exampleLayers) {
+  const layerRow = document.createElement('div');
+  layerRow.setAttribute('draggable', 'true');
+  layerRow.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    cursor: grab;
+    user-select: none;
+    transition: background 0.1s;
+  `;
+
+  // Drag handle (grip icon)
+  const dragHandle = document.createElement('div');
+  dragHandle.style.cssText = `
+    width: 16px;
+    height: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    flex-shrink: 0;
+    cursor: grab;
+  `;
+  dragHandle.innerHTML = `
+    <span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
+    <span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
+  `;
+  layerRow.appendChild(dragHandle);
+
+  // Preview container
+  const previewContainer = document.createElement('div');
+  previewContainer.style.cssText = `
+    width: 28px;
+    height: 28px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 2px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `;
+  previewContainer.innerHTML = `<span style="font-size: 10px; color: #555;">◫</span>`;
+  layerRow.appendChild(previewContainer);
+
+  // Name input
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.value = ex.name;
+  nameInput.style.cssText = `
+    flex: 1;
+    min-width: 0;
+    padding: 2px 4px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 2px;
+    color: #ccc;
+    font-size: 11px;
+    outline: none;
+  `;
+  layerRow.appendChild(nameInput);
+
+  // Opacity slider
+  const opacitySlider = document.createElement('input');
+  opacitySlider.type = 'range';
+  opacitySlider.min = '0';
+  opacitySlider.max = '100';
+  opacitySlider.value = String(ex.opacity);
+  opacitySlider.style.cssText = `
+    width: 50px;
+    height: 4px;
+    accent-color: #666;
+    flex-shrink: 0;
+  `;
+  layerRow.appendChild(opacitySlider);
+
+  // Eye button
+  const eyeBtn = document.createElement('button');
+  eyeBtn.textContent = ex.visible ? '👁' : '👁‍🗨';
+  eyeBtn.style.cssText = `
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: 1px solid #444;
+    border-radius: 2px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    opacity: ex.visible ? 1 : 0.4;
+  `;
+  layerRow.appendChild(eyeBtn);
+
+  // ── Drag-and-drop reordering ──
+  // Visual drop indicator: a colored border on the row where the dragged item will land
+  const dropIndicator = document.createElement('div');
+  dropIndicator.style.cssText = `
+    position: absolute;
+    left: -4px;
+    right: -4px;
+    height: 3px;
+    background: #4a9eff;
+    border-radius: 2px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+  `;
+  layerRow.style.position = 'relative';
+  layerRow.appendChild(dropIndicator);
+
+  layerRow.addEventListener('dragstart', (e: DragEvent) => {
+    draggedRow = layerRow;
+    layerRow.style.opacity = '0.4';
+    layerRow.style.zIndex = '100';
+    e.dataTransfer!.setData('text/plain', '');
+    e.dataTransfer!.setDragImage(new Image(), 0, 0);
+  });
+
+  layerRow.addEventListener('dragend', () => {
+    layerRow.style.opacity = '1';
+    layerRow.style.zIndex = '';
+    dropIndicator.style.opacity = '0';
+    draggedRow = null;
+  });
+
+  layerRow.addEventListener('dragover', (e: DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = 'move';
+
+    if (draggedRow === layerRow) return;
+
+    const rect = layerRow.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const insertAbove = e.clientY < midY;
+
+    // Position the indicator line
+    if (insertAbove) {
+      dropIndicator.style.top = '0';
+    } else {
+      dropIndicator.style.top = 'auto';
+      dropIndicator.style.bottom = '0';
+    }
+    dropIndicator.style.opacity = '1';
+  });
+
+  layerRow.addEventListener('dragleave', () => {
+    dropIndicator.style.opacity = '0';
+  });
+
+  layerRow.addEventListener('drop', (e: DragEvent) => {
+    e.preventDefault();
+    if (!draggedRow || draggedRow === layerRow) return;
+
+    const rect = layerRow.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const insertAbove = e.clientY < midY;
+
+    // Use swap-based approach for reliable reordering
+    const rows = Array.from(layerList.children) as HTMLElement[];
+    const dragIdx = rows.indexOf(draggedRow);
+    const targetIdx = rows.indexOf(layerRow);
+
+    if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) return;
+
+    // Build the new order
+    const newOrder = [...rows];
+    const [moved] = newOrder.splice(dragIdx, 1);
+
+    // Adjust target index since we removed the dragged row
+    const adjustedTarget = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
+    const insertIdx = insertAbove ? adjustedTarget : adjustedTarget + 1;
+    newOrder.splice(insertIdx, 0, moved);
+
+    // Re-render in new order
+    newOrder.forEach((row) => layerList.appendChild(row));
+
+    dropIndicator.style.opacity = '0';
+  });
+
+  // Prevent drag from starting on interactive elements
+  layerRow.querySelectorAll('input, button').forEach((el) => {
+    el.addEventListener('dragstart', (e) => e.stopPropagation());
+  });
+
+  layerList.appendChild(layerRow);
+}
+
+layerPanel.appendChild(layerList);
+sidebar.append(layerPanel);
+
+// ─── Color Picker ────────────────────────────────────────────────────────────
 const colorPickerContainer = document.createElement('div');
 colorPickerContainer.id = 'colorpicker';
 sidebar.append(colorPickerContainer);
