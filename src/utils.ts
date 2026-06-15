@@ -10,12 +10,12 @@ export function toggleFullScreen(el: HTMLElement) {
 }
 
 export function downloadArrayBuffer(
-  arrayBuffer: ArrayBuffer,
+  data: string,
   fileName: string,
-  mimeType = 'application/octet-stream',
+  mimeType = 'text/plain;charset=utf-8',
 ) {
   // 1. Convert the ArrayBuffer into a Blob
-  const blob = new Blob([arrayBuffer], { type: mimeType });
+  const blob = new Blob([data], { type: mimeType });
 
   // 2. Create a temporary object URL pointing to the Blob
   const url = window.URL.createObjectURL(blob);

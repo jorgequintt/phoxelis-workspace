@@ -3,7 +3,7 @@ import './style.css';
 import Panzoom from '@panzoom/panzoom';
 import Hammer from 'hammerjs';
 import iro from '@jaames/iro';
-import { downloadArrayBuffer, toggleFullScreen } from './utils';
+import { downloadArrayBuffer as downloadAsFile, toggleFullScreen } from './utils';
 import {
   saveRefImageToStorage,
   loadRefImageFromStorage,
@@ -22,6 +22,28 @@ type PhoxelPosition = [r: number, c: number];
 
 const rows = 37;
 const cols = 152;
+const font = await getFont('1_Trithemius8x16');
+const phoxelis = Phoxelis(rows, cols, font, true);
+const {
+  canvas,
+  renderPhoxel,
+  renderFrame,
+  removePhoxel,
+  importPhoxelis,
+  exportPhoxelis,
+  palette,
+  getPhoxFromPaletteIndex,
+  getPhoxFromPosition,
+  storePhoxInPalette,
+  addLayer,
+  getLayer,
+  layers,
+  layerPositions,
+  moveLayer,
+  removeLayer,
+  setLayerOptions,
+} = phoxelis;
+
 const panzoomConfiguration = {
   minScale: 0.15,
   maxScale: 10,
@@ -38,41 +60,63 @@ let refImageScale = refImagePanzoomConfig.startScale;
 
 let scale = panzoomConfiguration.startScale;
 const filename = 'current_work';
-const font = await getFont('1_Trithemius8x16');
 
 let drawMode: 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase' = 'draw';
 let dp: Phox = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
+let activeLayer = layers[0].id;
 
 function renderDpWithMode(
   target: ReturnType<typeof Phoxelis>,
   r: number,
   c: number,
+  layerId: string,
   options: { draftErasure: boolean } = { draftErasure: false },
 ) {
   if (drawMode === 'draw') {
-    target.renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
+    target.renderPhoxel(dp.char, dp.fg, dp.bg, r, c, layerId);
     return;
   } else if (drawMode === 'char') {
-    const underlyingPhoxel = getPhoxFromPosition(r, c);
+    const underlyingPhoxel = getPhoxFromPosition(r, c, layerId);
     if (!underlyingPhoxel) return;
-    target.renderPhoxel(dp.char, underlyingPhoxel.fg, underlyingPhoxel.bg, r, c);
+    target.renderPhoxel(
+      dp.char,
+      underlyingPhoxel.fg,
+      underlyingPhoxel.bg,
+      r,
+      c,
+      layerId,
+    );
   } else if (drawMode === 'color') {
-    const underlyingPhoxel = getPhoxFromPosition(r, c);
+    const underlyingPhoxel = getPhoxFromPosition(r, c, layerId);
     if (!underlyingPhoxel) return;
-    target.renderPhoxel(underlyingPhoxel.char, dp.fg, dp.bg, r, c);
+    target.renderPhoxel(underlyingPhoxel.char, dp.fg, dp.bg, r, c, layerId);
   } else if (drawMode === 'fg') {
-    const underlyingPhoxel = getPhoxFromPosition(r, c);
+    const underlyingPhoxel = getPhoxFromPosition(r, c, layerId);
     if (!underlyingPhoxel) return;
-    target.renderPhoxel(underlyingPhoxel.char, dp.fg, underlyingPhoxel.bg, r, c);
+    target.renderPhoxel(
+      underlyingPhoxel.char,
+      dp.fg,
+      underlyingPhoxel.bg,
+      r,
+      c,
+      layerId,
+    );
   } else if (drawMode === 'bg') {
-    const underlyingPhoxel = getPhoxFromPosition(r, c);
+    const underlyingPhoxel = getPhoxFromPosition(r, c, layerId);
     if (!underlyingPhoxel) return;
-    target.renderPhoxel(underlyingPhoxel.char, underlyingPhoxel.fg, dp.bg, r, c);
+    target.renderPhoxel(
+      underlyingPhoxel.char,
+      underlyingPhoxel.fg,
+      dp.bg,
+      r,
+      c,
+      layerId,
+    );
   } else if (drawMode === 'erase') {
     if (options.draftErasure) {
-      target.renderPhoxel('D', '#FF0000', '#FF000055', r, c);
+      target.renderPhoxel('D', '#FF0000', '#FF000055', r, c, layerId);
     } else {
-      removePhoxel(r, c);
+      removePhoxel(r, c, layerId);
     }
   }
 }
@@ -86,20 +130,24 @@ function commitPhoxels(phoxelPositions: Array<PhoxelPosition>) {
   const changes: ChangesStack = [];
 
   phoxelPositions.forEach(([r, c]) => {
-    const origPhox = getPhoxFromPosition(r, c);
+    const origPhox = getPhoxFromPosition(r, c, activeLayer);
     if (!origPhox) {
-      undoChanges.push(() => removePhoxel(r, c));
+      undoChanges.push(() => removePhoxel(r, c, activeLayer));
     } else {
-      undoChanges.push(() => renderPhoxel(origPhox.char, origPhox.fg, origPhox.bg, r, c));
+      undoChanges.push(() =>
+        renderPhoxel(origPhox.char, origPhox.fg, origPhox.bg, r, c, activeLayer),
+      );
     }
 
-    renderDpWithMode(phoxelis, r, c);
+    renderDpWithMode(phoxelis, r, c, activeLayer);
 
-    const newPhox = getPhoxFromPosition(r, c);
+    const newPhox = getPhoxFromPosition(r, c, activeLayer);
     if (!newPhox) {
-      changes.push(() => removePhoxel(r, c));
+      changes.push(() => removePhoxel(r, c, activeLayer));
     } else {
-      changes.push(() => renderPhoxel(newPhox.char, newPhox.fg, newPhox.bg, r, c));
+      changes.push(() =>
+        renderPhoxel(newPhox.char, newPhox.fg, newPhox.bg, r, c, activeLayer),
+      );
     }
   });
 
@@ -131,20 +179,6 @@ function redoLastChange() {
   lastChange.changes.forEach((fn) => fn());
   changesHistory.push(lastChange);
 }
-
-const phoxelis = Phoxelis(rows, cols, font, true);
-const {
-  canvas,
-  renderPhoxel,
-  renderFrame,
-  removePhoxel,
-  importPhoxelis,
-  exportPhoxelis,
-  palette,
-  getPhoxFromPaletteIndex,
-  getPhoxFromPosition,
-  storePhoxInPalette,
-} = phoxelis;
 
 const appContainer = document.createElement('div');
 appContainer.style = 'width: 100%; height: 100%; display: flex; flex-direction: column;';
@@ -410,7 +444,7 @@ drawboard.appendChild(layersWrapper);
 const saveButton = document.createElement('button');
 saveButton.innerHTML = 'Save';
 saveButton.onclick = async () => {
-  await savePhoxelis(exportPhoxelis(filename), filename);
+  await savePhoxelis(JSON.stringify(exportPhoxelis(filename)), filename);
 };
 navBar.appendChild(saveButton);
 
@@ -422,7 +456,7 @@ navBar.appendChild(fullscreenButton);
 const exportButton = document.createElement('button');
 exportButton.innerHTML = 'Export';
 exportButton.onclick = () =>
-  downloadArrayBuffer(exportPhoxelis(filename).buffer, `${filename}.phoxelis`);
+  downloadAsFile(JSON.stringify(exportPhoxelis(filename)), `${filename}.phoxelis`);
 navBar.appendChild(exportButton);
 
 const referenceImageButton = document.createElement('input');
@@ -624,7 +658,7 @@ const hotkeys: Hotkey[] = [
     onHotkeyStart(e) {
       setTool(panzoomTool);
       currTool?.handlers.onPointerDown(e as PointerEvent);
-    }
+    },
   },
   {
     shift: true,
@@ -632,7 +666,7 @@ const hotkeys: Hotkey[] = [
     onHotkeyStart(e) {
       setTool(panzoomTool);
       currTool?.handlers.onPointerDown(e as PointerEvent);
-    }
+    },
   },
 ];
 const downHotkeys: Hotkey[] = [];
@@ -761,8 +795,8 @@ interface Tool {
 interface PanzoomTool extends Tool {
   data: {
     panzooming: boolean;
-    zooming: boolean,
-    panning: boolean
+    zooming: boolean;
+    panning: boolean;
   };
 }
 const panzoomTool: PanzoomTool = {
@@ -770,7 +804,7 @@ const panzoomTool: PanzoomTool = {
   data: {
     panzooming: false,
     zooming: false,
-    panning: false
+    panning: false,
   },
   onPointerDown(e) {
     this.data.panzooming = true;
@@ -778,7 +812,7 @@ const panzoomTool: PanzoomTool = {
     this.data.zooming = e.shiftKey;
   },
   onPointerMove(e) {
-    if(!this.data.panzooming) return;
+    if (!this.data.panzooming) return;
     const targetZoom = moveRefImageToggle.checked ? refImagePanzoom : panzoom;
     if (this.data.panning) {
       targetZoom.pan(
@@ -790,7 +824,7 @@ const panzoomTool: PanzoomTool = {
     }
   },
   onPointerUp() {
-    if(!this.data.panzooming) return;
+    if (!this.data.panzooming) return;
     this.resetTool!();
     this.submit!();
     setPreviousTool();
@@ -856,7 +890,7 @@ const drawTool: DrawTool = {
   },
   addPhoxelToDraft(p: Phoxel) {
     this.data!.draftPhoxels.set(`${p.r};${p.c}`, p);
-    renderDpWithMode(draftScreen, p.r, p.c, { draftErasure: true });
+    renderDpWithMode(draftScreen, p.r, p.c, draftScreen.layers[0].id, { draftErasure: true });
   },
   onPointerDown() {
     this.data.drawing = true;
@@ -910,13 +944,13 @@ const rectTool: Tool = {
     const c2 = Math.max(startC, mousePos.x);
     // Top & bottom edges
     for (let c = c1; c <= c2; c++) {
-      renderDpWithMode(draftScreen, r1, c, { draftErasure: true });
-      renderDpWithMode(draftScreen, r2, c, { draftErasure: true });
+      renderDpWithMode(draftScreen, r1, c, draftScreen.layers[0].id, { draftErasure: true });
+      renderDpWithMode(draftScreen, r2, c, draftScreen.layers[0].id, { draftErasure: true });
     }
     // Left & right edges
     for (let r = r1; r <= r2; r++) {
-      renderDpWithMode(draftScreen, r, c1, { draftErasure: true });
-      renderDpWithMode(draftScreen, r, c2, { draftErasure: true });
+      renderDpWithMode(draftScreen, r, c1, draftScreen.layers[0].id, { draftErasure: true });
+      renderDpWithMode(draftScreen, r, c2, draftScreen.layers[0].id, { draftErasure: true });
     }
   },
   onPointerUp() {
@@ -978,7 +1012,7 @@ const filledRectTool: Tool = {
     const c2 = Math.max(startC, mousePos.x);
     for (let r = r1; r <= r2; r++) {
       for (let c = c1; c <= c2; c++) {
-        renderDpWithMode(draftScreen, r, c, { draftErasure: true });
+        renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, { draftErasure: true });
       }
     }
   },
@@ -1060,7 +1094,7 @@ const lineTool: Tool = {
     const { startR, startC } = this.data!;
     const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
     for (const { r, c } of cells) {
-      renderDpWithMode(draftScreen, r, c, { draftErasure: true });
+      renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, { draftErasure: true });
     }
   },
   onPointerUp() {
@@ -1107,7 +1141,7 @@ const ellipseTool: Tool = {
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseOutline(
-      (r, c) => renderDpWithMode(draftScreen, r, c, { draftErasure: true }),
+      (r, c) => renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, { draftErasure: true }),
       startR,
       startC,
       rx,
@@ -1156,7 +1190,7 @@ const filledEllipseTool: Tool = {
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseFill(
-      (r, c) => renderDpWithMode(draftScreen, r, c, { draftErasure: true }),
+      (r, c) => renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, { draftErasure: true }),
       startR,
       startC,
       rx,
@@ -1359,22 +1393,26 @@ font.charactersList.forEach((char, i) => {
   drawCharShapeInAlphabet(i, char.shape, '#FFFFFF', '#000000');
 });
 
-async function savePhoxelis(data: Uint32Array<ArrayBuffer>, name = 'data') {
+async function savePhoxelis(data: string, name = 'data') {
   const root = await navigator.storage.getDirectory();
-  const fileHandle = await root.getFileHandle(`${name}.bin`, { create: true });
+  const fileHandle = await root.getFileHandle(`${name}.pho`, { create: true });
   const accessHandle = await fileHandle.createWritable();
 
-  accessHandle.write(data.buffer);
+  accessHandle.write(data);
   accessHandle.close();
 }
 
 async function loadPhoxelis(name = 'data') {
   const root = await navigator.storage.getDirectory();
-  const fileHandle = await root.getFileHandle(`${name}.bin`);
-  if (!fileHandle) throw new Error(`No file "${name}" found in OPFS`);
-  const file = await fileHandle.getFile();
-  const fileBuffer = await file.arrayBuffer();
-  importPhoxelis(new Uint32Array(fileBuffer));
+  try {
+    const fileHandle = await root.getFileHandle(`${name}.pho`);
+    const file = await fileHandle.getFile();
+    const fileDataString = await file.text();
+    const fileData = JSON.parse(fileDataString);
+    importPhoxelis(fileData);
+  } catch (error) {
+    console.log('Error', error);
+  }
 }
 
 // ─── Restore reference image & panzoom config on load ────────────────────────
