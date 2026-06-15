@@ -642,9 +642,6 @@ layerList.style.cssText = `
   overflow-y: auto;
 `;
 
-// Shared drag state across all layer rows
-let draggedRow: HTMLElement | null = null;
-
 // Example layers
 const exampleLayers = [
   { name: 'Background', opacity: 100, visible: true },
@@ -656,7 +653,7 @@ const exampleLayers = [
 
 for (const ex of exampleLayers) {
   const layerRow = document.createElement('div');
-  layerRow.setAttribute('draggable', 'true');
+  layerRow.classList.add('layer-row');
   layerRow.style.cssText = `
     display: flex;
     align-items: center;
@@ -682,6 +679,8 @@ for (const ex of exampleLayers) {
     gap: 2px;
     flex-shrink: 0;
     cursor: grab;
+    touch-action: none;
+    user-select: none;
   `;
   dragHandle.innerHTML = `
     <span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
@@ -755,9 +754,9 @@ for (const ex of exampleLayers) {
   `;
   layerRow.appendChild(eyeBtn);
 
-  // ── Drag-and-drop reordering ──
-  // Visual drop indicator: a colored border on the row where the dragged item will land
+  // ── Unified pointer-event drag-and-drop ──
   const dropIndicator = document.createElement('div');
+  dropIndicator.setAttribute('data-drop-indicator', 'line');
   dropIndicator.style.cssText = `
     position: absolute;
     left: -4px;
@@ -772,85 +771,168 @@ for (const ex of exampleLayers) {
   layerRow.style.position = 'relative';
   layerRow.appendChild(dropIndicator);
 
-  layerRow.addEventListener('dragstart', (e: DragEvent) => {
-    draggedRow = layerRow;
-    layerRow.style.opacity = '0.4';
-    layerRow.style.zIndex = '100';
-    e.dataTransfer!.setData('text/plain', '');
-    e.dataTransfer!.setDragImage(new Image(), 0, 0);
-  });
+  let ghost: HTMLElement | null = null;
+  let pointerDownRow: HTMLElement | null = null;
+  let pointerTargetRow: HTMLElement | null = null;
+  let pointerStartX = 0;
+  let pointerStartY = 0;
+  let isDragging = false;
 
-  layerRow.addEventListener('dragend', () => {
-    layerRow.style.opacity = '1';
-    layerRow.style.zIndex = '';
-    dropIndicator.style.opacity = '0';
-    draggedRow = null;
-  });
-
-  layerRow.addEventListener('dragover', (e: DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer!.dropEffect = 'move';
-
-    if (draggedRow === layerRow) return;
-
-    const rect = layerRow.getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    const insertAbove = e.clientY < midY;
-
-    // Position the indicator line
-    if (insertAbove) {
-      dropIndicator.style.top = '0';
-    } else {
-      dropIndicator.style.top = 'auto';
-      dropIndicator.style.bottom = '0';
-    }
-    dropIndicator.style.opacity = '1';
-  });
-
-  layerRow.addEventListener('dragleave', () => {
-    dropIndicator.style.opacity = '0';
-  });
-
-  layerRow.addEventListener('drop', (e: DragEvent) => {
-    e.preventDefault();
-    if (!draggedRow || draggedRow === layerRow) return;
-
-    const rect = layerRow.getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    const insertAbove = e.clientY < midY;
-
-    // Use swap-based approach for reliable reordering
+  // Shared reorder logic
+  function reorderRows(source: HTMLElement, target: HTMLElement, insertAbove: boolean) {
     const rows = Array.from(layerList.children) as HTMLElement[];
-    const dragIdx = rows.indexOf(draggedRow);
-    const targetIdx = rows.indexOf(layerRow);
-
+    const dragIdx = rows.indexOf(source);
+    const targetIdx = rows.indexOf(target);
     if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) return;
 
-    // Build the new order
     const newOrder = [...rows];
     const [moved] = newOrder.splice(dragIdx, 1);
-
-    // Adjust target index since we removed the dragged row
     const adjustedTarget = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
     const insertIdx = insertAbove ? adjustedTarget : adjustedTarget + 1;
     newOrder.splice(insertIdx, 0, moved);
-
-    // Re-render in new order
     newOrder.forEach((row) => layerList.appendChild(row));
+  }
 
-    dropIndicator.style.opacity = '0';
+  // Show drop indicator on a target row
+  function showIndicator(row: HTMLElement, clientY: number) {
+    // Hide any existing indicator
+    if (pointerTargetRow && pointerTargetRow !== row) {
+      const prev = pointerTargetRow.querySelector('[data-drop-indicator]') as HTMLElement;
+      if (prev) prev.style.opacity = '0';
+    }
+
+    const indicator = row.querySelector('[data-drop-indicator]') as HTMLElement;
+    if (!indicator) return;
+
+    const rect = row.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const above = clientY < midY;
+    indicator.style.top = above ? '0' : 'auto';
+    indicator.style.bottom = above ? 'auto' : '0';
+    indicator.style.opacity = '1';
+    pointerTargetRow = row;
+  }
+
+  // Update ghost position
+  function updateGhost(clientX: number, clientY: number) {
+    if (!ghost) return;
+    const rowRect = pointerDownRow!.getBoundingClientRect();
+    ghost.style.transform = `translate(${clientX - rowRect.left - 8}px, ${clientY - rowRect.top - 14}px)`;
+  }
+
+  // Find target row under pointer
+  function findTarget(clientX: number, clientY: number): HTMLElement | null {
+    if (!ghost) return null;
+    ghost.style.display = 'none';
+    const el = document.elementFromPoint(clientX, clientY);
+    ghost.style.display = '';
+    return el?.closest('.layer-row') ?? null;
+  }
+
+  // Cleanup all drag state
+  function cleanupDrag() {
+    if (ghost) {
+      ghost.remove();
+      ghost = null;
+    }
+    if (pointerDownRow) {
+      pointerDownRow.style.opacity = '1';
+      pointerDownRow.style.zIndex = '';
+    }
+    if (pointerTargetRow) {
+      const indicator = pointerTargetRow.querySelector('[data-drop-indicator]') as HTMLElement;
+      if (indicator) indicator.style.opacity = '0';
+    }
+    pointerDownRow = null;
+    pointerTargetRow = null;
+    isDragging = false;
+  }
+
+  // Pointer down — start tracking
+  dragHandle.addEventListener('pointerdown', (e: PointerEvent) => {
+    // Only respond to left-click (mouse) or any touch/pen
+    if (e.button !== 0 && e.pointerType !== 'touch') return;
+    pointerStartX = e.clientX;
+    pointerStartY = e.clientY;
+    pointerDownRow = layerRow;
+
+    // Set pointer capture so we keep receiving events even if pointer leaves the element
+    dragHandle.setPointerCapture(e.pointerId);
   });
 
-  // Prevent drag from starting on interactive elements
-  layerRow.querySelectorAll('input, button').forEach((el) => {
-    el.addEventListener('dragstart', (e) => e.stopPropagation());
+  // Pointer move — handle both the "threshold check" and active dragging
+  dragHandle.addEventListener('pointermove', (e: PointerEvent) => {
+    if (!pointerDownRow) return;
+
+    // If we haven't started dragging yet, check the threshold
+    if (!isDragging) {
+      const dx = Math.abs(e.clientX - pointerStartX);
+      const dy = Math.abs(e.clientY - pointerStartY);
+      // Start dragging only after moving past the threshold
+      if (dx < 5 && dy < 5) return; // Still within threshold, do nothing
+
+      isDragging = true;
+
+      // Create ghost clone
+      ghost = pointerDownRow.cloneNode(true) as HTMLElement;
+      ghost.style.position = 'fixed';
+      ghost.style.width = `${pointerDownRow.offsetWidth}px`;
+      ghost.style.zIndex = '9999';
+      ghost.style.opacity = '0.85';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.transition = 'none';
+      ghost.style.transform = `translate(${e.clientX - pointerDownRow.getBoundingClientRect().left - 8}px, ${e.clientY - pointerDownRow.getBoundingClientRect().top - 14}px)`;
+      document.body.appendChild(ghost);
+
+      // Hide original row
+      pointerDownRow.style.opacity = '0.3';
+      pointerDownRow.style.zIndex = '100';
+    }
+
+    // Active dragging — update ghost and find target
+    if (isDragging) {
+      e.preventDefault();
+      updateGhost(e.clientX, e.clientY);
+
+      const target = findTarget(e.clientX, e.clientY);
+      if (target && target !== pointerDownRow && target !== pointerTargetRow) {
+        showIndicator(target, e.clientY);
+      } else if (target === pointerDownRow && pointerTargetRow) {
+        // Pointer is back on the source row, clear indicator
+        const indicator = pointerTargetRow.querySelector('[data-drop-indicator]') as HTMLElement;
+        if (indicator) indicator.style.opacity = '0';
+        pointerTargetRow = null;
+      }
+    }
+  });
+
+  // Pointer up — finalize the drag
+  dragHandle.addEventListener('pointerup', (e: PointerEvent) => {
+    if (!pointerDownRow) return;
+
+    if (isDragging) {
+      // Perform reorder
+      if (pointerTargetRow) {
+        reorderRows(pointerDownRow, pointerTargetRow, e.clientY < pointerTargetRow.getBoundingClientRect().top + pointerTargetRow.getBoundingClientRect().height / 2);
+      }
+      cleanupDrag();
+    }
+
+    // Release pointer capture
+    try { dragHandle.releasePointerCapture(e.pointerId); } catch {}
+    pointerDownRow = null;
+  });
+
+  // Pointer cancel (e.g. system interrupt) — cleanup
+  dragHandle.addEventListener('pointercancel', () => {
+    cleanupDrag();
+    try { dragHandle.releasePointerCapture(0); } catch {}
   });
 
   layerList.appendChild(layerRow);
 }
 
 layerPanel.appendChild(layerList);
-sidebar.append(layerPanel);
 
 // ─── Color Picker ────────────────────────────────────────────────────────────
 const colorPickerContainer = document.createElement('div');
@@ -870,6 +952,8 @@ bgColorButton.innerHTML = 'Background';
 bgColorButton.addEventListener('click', () => selectColorType('bg'));
 colorPickerContainer.append(fgColorButton);
 colorPickerContainer.append(bgColorButton);
+
+sidebar.append(layerPanel);
 
 content.append(drawModeSidebar);
 content.append(leftSidebar);
