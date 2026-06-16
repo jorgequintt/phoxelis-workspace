@@ -490,6 +490,7 @@ drawboard.style =
   'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
 canvas.style = `position: relative; border: 1px solid black; image-rendering: pixelated;`;
 const draftScreen = Phoxelis(rows, cols, font);
+const draftMainLayer = draftScreen.layers[0].id;
 draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black; image-rendering: pixelated;`;
 const refImage = document.createElement('img');
 const refImageWrapper = document.createElement('div');
@@ -1346,7 +1347,7 @@ const drawTool: DrawTool = {
   },
   addPhoxelToDraft(p: Phoxel) {
     this.data!.draftPhoxels.set(`${p.r};${p.c}`, p);
-    renderDpWithMode(draftScreen, p.r, p.c, draftScreen.layers[0].id, {
+    renderDpWithMode(draftScreen, p.r, p.c, draftMainLayer, {
       draftErasure: true,
     });
   },
@@ -1402,19 +1403,19 @@ const rectTool: Tool = {
     const c2 = Math.max(startC, mousePos.x);
     // Top & bottom edges
     for (let c = c1; c <= c2; c++) {
-      renderDpWithMode(draftScreen, r1, c, draftScreen.layers[0].id, {
+      renderDpWithMode(draftScreen, r1, c, draftMainLayer, {
         draftErasure: true,
       });
-      renderDpWithMode(draftScreen, r2, c, draftScreen.layers[0].id, {
+      renderDpWithMode(draftScreen, r2, c, draftMainLayer, {
         draftErasure: true,
       });
     }
     // Left & right edges
     for (let r = r1; r <= r2; r++) {
-      renderDpWithMode(draftScreen, r, c1, draftScreen.layers[0].id, {
+      renderDpWithMode(draftScreen, r, c1, draftMainLayer, {
         draftErasure: true,
       });
-      renderDpWithMode(draftScreen, r, c2, draftScreen.layers[0].id, {
+      renderDpWithMode(draftScreen, r, c2, draftMainLayer, {
         draftErasure: true,
       });
     }
@@ -1478,7 +1479,7 @@ const filledRectTool: Tool = {
     const c2 = Math.max(startC, mousePos.x);
     for (let r = r1; r <= r2; r++) {
       for (let c = c1; c <= c2; c++) {
-        renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, {
+        renderDpWithMode(draftScreen, r, c, draftMainLayer, {
           draftErasure: true,
         });
       }
@@ -1562,7 +1563,7 @@ const lineTool: Tool = {
     const { startR, startC } = this.data!;
     const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
     for (const { r, c } of cells) {
-      renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, {
+      renderDpWithMode(draftScreen, r, c, draftMainLayer, {
         draftErasure: true,
       });
     }
@@ -1612,7 +1613,7 @@ const ellipseTool: Tool = {
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseOutline(
       (r, c) =>
-        renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, {
+        renderDpWithMode(draftScreen, r, c, draftMainLayer, {
           draftErasure: true,
         }),
       startR,
@@ -1664,7 +1665,7 @@ const filledEllipseTool: Tool = {
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseFill(
       (r, c) =>
-        renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, {
+        renderDpWithMode(draftScreen, r, c, draftMainLayer, {
           draftErasure: true,
         }),
       startR,
