@@ -14,6 +14,16 @@ import {
   fileToBase64,
 } from './refImageStorage';
 
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { App } from './react/App';
+
+ReactDOM.createRoot(document.querySelector('#app')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+)
+
 type Phoxel = {
   phox: Phox;
   r: number;

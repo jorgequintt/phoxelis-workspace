@@ -10,6 +10,9 @@
   },
   "devDependencies": {
     "@types/hammerjs": "^2.0.46",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react-swc": "^4.3.1",
     "typescript": "~6.0.2",
     "vite": "^8.0.12"
   },
@@ -19,6 +22,8 @@
     "@types/lodash": "^4.17.24",
     "hammerjs": "^2.0.8",
     "lodash": "^4.18.1",
-    "phoxelis": "file:.yalc/phoxelis"
+    "phoxelis": "file:.yalc/phoxelis",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }
