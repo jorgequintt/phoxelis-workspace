@@ -2,6 +2,7 @@ import { getFont, Phoxelis, type Phox, type CharShape } from 'phoxelis';
 import './style.css';
 import Panzoom from '@panzoom/panzoom';
 import Hammer from 'hammerjs';
+import _ from 'lodash';
 import iro from '@jaames/iro';
 import { downloadArrayBuffer as downloadAsFile, toggleFullScreen } from './utils';
 import {
@@ -42,6 +43,7 @@ const {
   removeLayer,
 } = phoxelis;
 
+const layerPreviewStyle = `height: 100%; width: 100%; object-fit: contain;`;
 const layerList = document.createElement('div');
 layerList.style.cssText = `
   display: flex;
@@ -53,12 +55,9 @@ layerList.style.cssText = `
 
 function renderLayerList() {
   layers.toReversed().forEach((l) => {
-    const layerEl = layerList.querySelector(`#layer-${l.id}`);
+    let layerEl = layerList.querySelector(`#layer-${l.id}`);
     if (!layerEl) {
-      console.warn(
-        `renderLayerList error: Could not find layer element by id ${l.id}. Unexpected behavior will occur.`,
-      );
-      return;
+      layerEl = createLayerElement(documentLayers[l.id]);
     }
     layerList.appendChild(layerEl);
   });
@@ -81,7 +80,7 @@ function createDocumentLayer(layerId?: string) {
   const target = document.createElement('canvas');
   target.width = font.width * cols;
   target.height = font.height * rows;
-  target.style = `height: 100%; width: 100%; object-fit: contain;`;
+  target.style = layerPreviewStyle;
 
   const lid = layerId ?? addLayer();
 
@@ -94,6 +93,7 @@ function createDocumentLayer(layerId?: string) {
   };
 
   createLayerElement(documentLayers[lid]);
+  renderLayerList();
   selectLayer(lid);
 }
 
@@ -143,7 +143,7 @@ const refImagePanzoomConfig = { ...panzoomConfiguration };
 let refImageScale = refImagePanzoomConfig.startScale;
 
 let scale = panzoomConfiguration.startScale;
-const filename = 'current_work';
+const filename = 'test_file';
 
 let drawMode: 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase' = 'draw';
 let dp: Phox = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
@@ -506,7 +506,7 @@ drawboard.appendChild(layersWrapper);
 const saveButton = document.createElement('button');
 saveButton.innerHTML = 'Save';
 saveButton.onclick = async () => {
-  await savePhoxelis(JSON.stringify(exportPhoxelis(filename)), filename);
+  await saveDocument(filename);
 };
 navBar.appendChild(saveButton);
 
@@ -1009,7 +1009,7 @@ function createLayerElement(layer: DocumentLayer) {
   });
 
   layerList.appendChild(layerRow);
-  renderLayerList();
+  return layerRow;
 }
 
 layerPanel.appendChild(layerList);
@@ -1096,6 +1096,16 @@ interface Hotkey {
 }
 
 const hotkeys: Hotkey[] = [
+  {
+    ctrl: true,
+    key: 's',
+    onHotkeyStart: (e) => {
+      e.preventDefault();
+    },
+    onHotkeyEnd() {
+      saveDocument(filename);
+    },
+  },
   { ctrl: true, key: 'z', onHotkeyEnd: () => undoLastChange() },
   { ctrl: true, key: 'y', onHotkeyEnd: () => redoLastChange() },
   {
@@ -1869,26 +1879,73 @@ font.charactersList.forEach((char, i) => {
   drawCharShapeInAlphabet(i, char.shape, '#FFFFFF', '#000000');
 });
 
-async function savePhoxelis(data: string, name = 'data') {
+async function saveFile(data: string, filename: string) {
   const root = await navigator.storage.getDirectory();
-  const fileHandle = await root.getFileHandle(`${name}.pho`, { create: true });
+  const fileHandle = await root.getFileHandle(filename, { create: true });
   const accessHandle = await fileHandle.createWritable();
 
   accessHandle.write(data);
   accessHandle.close();
 }
 
-async function loadPhoxelis(name = 'data') {
+async function loadFile(filename: string) {
   const root = await navigator.storage.getDirectory();
   try {
-    const fileHandle = await root.getFileHandle(`${name}.pho`);
+    const fileHandle = await root.getFileHandle(filename);
     const file = await fileHandle.getFile();
     const fileDataString = await file.text();
-    const fileData = JSON.parse(fileDataString);
-    importPhoxelis(fileData);
+    return fileDataString;
   } catch (error) {
-    console.log('Error', error);
+    console.error('loadFile Error:', error);
   }
+}
+
+function resetWorkspace() {
+  layerList.replaceChildren(); // removes all nodes
+}
+
+async function saveDocument(filename: string) {
+  const phoxelisData = exportPhoxelis(filename);
+  const documentData = {
+    phoxelis: phoxelisData,
+    documentLayers: _.mapValues(documentLayers, (e) => ({
+      ...e,
+      target: undefined,
+    })),
+  };
+
+  const dataStr = JSON.stringify(documentData);
+  saveFile(dataStr, filename);
+  return documentData;
+}
+
+async function loadDocument(filename: string) {
+  const fileDataString = await loadFile(filename);
+  if (!fileDataString) {
+    console.error(`loadPhoxelis error: Could not load file "${filename}"`);
+    return;
+  }
+
+  resetWorkspace();
+
+  const fileData = JSON.parse(fileDataString) as Awaited<ReturnType<typeof saveDocument>>;
+  importPhoxelis(fileData.phoxelis);
+  documentLayers = _.mapValues(fileData.documentLayers, (l) => {
+    const target = document.createElement('canvas');
+    target.width = font.width * cols;
+    target.height = font.height * rows;
+    target.style = layerPreviewStyle;
+
+    return {
+      ...l,
+      target,
+    };
+  });
+
+  activeLayer = layers[0].id;
+  renderLayerList();
+
+  console.log(`${filename} imported.`);
 }
 
 // ─── Restore reference image & panzoom config on load ────────────────────────
@@ -1911,4 +1968,4 @@ if (savedRefImageBase64) {
   clearRefImageStorage();
 }
 
-loadPhoxelis(filename);
+loadDocument(filename);
