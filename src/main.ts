@@ -35,14 +35,98 @@ const {
   getPhoxFromPaletteIndex,
   getPhoxFromPosition,
   storePhoxInPalette,
-  addLayer,
-  getLayer,
   layers,
   layerPositions,
+  addLayer,
   moveLayer,
   removeLayer,
-  setLayerOptions,
 } = phoxelis;
+
+const layerList = document.createElement('div');
+layerList.style.cssText = `
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+`;
+
+function renderLayerList() {
+  layers.toReversed().forEach((l) => {
+    const layerEl = layerList.querySelector(`#layer-${l.id}`);
+    if (!layerEl) {
+      console.warn(
+        `renderLayerList error: Could not find layer element by id ${l.id}. Unexpected behavior will occur.`,
+      );
+      return;
+    }
+    layerList.appendChild(layerEl);
+  });
+}
+
+let activeLayer = layers[0].id;
+let documentLayers: Record<string, DocumentLayer> = {};
+createDocumentLayer(layers[0].id);
+selectLayer(layers[0].id);
+
+type DocumentLayer = {
+  layerId: string;
+  name: string;
+  target: HTMLCanvasElement;
+  opacity: number;
+  visible: boolean;
+};
+
+function createDocumentLayer(layerId?: string) {
+  const target = document.createElement('canvas');
+  target.width = font.width * cols;
+  target.height = font.height * rows;
+  target.style = `height: 100%; width: 100%; object-fit: contain;`;
+
+  const lid = layerId ?? addLayer();
+
+  documentLayers[lid] = {
+    layerId: lid,
+    name: `Layer #${layers.length}`,
+    target,
+    opacity: 100,
+    visible: true,
+  };
+
+  createLayerElement(documentLayers[lid]);
+  selectLayer(lid);
+}
+
+function removeDocumentLayer(layerId: string) {
+  if (layers.length === 1) {
+    console.warn("removeDocumentLayer error: You can't remove the base layer.");
+    return;
+  }
+
+  const layerPosition = layerPositions[layerId];
+  removeLayer(layerId);
+  layerList.removeChild(layerList.querySelector(`#layer-${layerId}`)!);
+  delete documentLayers[layerId];
+  renderLayerList();
+
+  const newSelectPos = Math.max(0, Math.min(layers.length - 1, layerPosition));
+  console.log('newSelectPos', newSelectPos);
+  const layerBeforeId = layers[newSelectPos].id;
+  selectLayer(layerBeforeId);
+}
+
+function selectLayer(layerId: string) {
+  const layerRow = layerList.querySelector(`#layer-${layerId}`);
+  if (!layerRow) {
+    console.error(`selectLayer error: Could not find layer by id ${layerId}`);
+    return;
+  }
+  layerList
+    .querySelectorAll('.layer-row')
+    .forEach((el) => ((el as HTMLDivElement).style.background = '#2a2a2a'));
+  activeLayer = layerId;
+  (layerRow as HTMLDivElement).style.background = '#7a7a7a';
+}
 
 const panzoomConfiguration = {
   minScale: 0.15,
@@ -63,7 +147,6 @@ const filename = 'current_work';
 
 let drawMode: 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase' = 'draw';
 let dp: Phox = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
-let activeLayer = layers[0].id;
 
 function renderDpWithMode(
   target: ReturnType<typeof Phoxelis>,
@@ -594,6 +677,7 @@ addLayerBtn.style.cssText = `
   font-size: 11px;
   cursor: pointer;
 `;
+addLayerBtn.addEventListener('click', () => createDocumentLayer());
 layerActions.appendChild(addLayerBtn);
 
 const removeLayerBtn = document.createElement('button');
@@ -608,30 +692,14 @@ removeLayerBtn.style.cssText = `
   font-size: 11px;
   cursor: pointer;
 `;
+removeLayerBtn.addEventListener('click', () => removeDocumentLayer(activeLayer));
 layerActions.appendChild(removeLayerBtn);
 
 layerPanel.appendChild(layerActions);
 
-const layerList = document.createElement('div');
-layerList.style.cssText = `
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 300px;
-  overflow-y: auto;
-`;
-
-// Example layers
-const exampleLayers = [
-  { name: 'Background', opacity: 100, visible: true },
-  { name: 'Line Art', opacity: 90, visible: true },
-  { name: 'Shading', opacity: 70, visible: true },
-  { name: 'Highlights', opacity: 100, visible: false },
-  { name: 'Effects', opacity: 50, visible: true },
-];
-
-for (const ex of exampleLayers) {
+function createLayerElement(layer: DocumentLayer) {
   const layerRow = document.createElement('div');
+  layerRow.id = `layer-${layer.layerId}`;
   layerRow.classList.add('layer-row');
   layerRow.style.cssText = `
     display: flex;
@@ -645,6 +713,9 @@ for (const ex of exampleLayers) {
     user-select: none;
     transition: background 0.1s;
   `;
+  layerRow.addEventListener('click', () => {
+    selectLayer(layer.layerId);
+  });
 
   // Drag handle (grip icon)
   const dragHandle = document.createElement('div');
@@ -680,13 +751,13 @@ for (const ex of exampleLayers) {
     align-items: center;
     justify-content: center;
   `;
-  previewContainer.innerHTML = `<span style="font-size: 10px; color: #555;">◫</span>`;
+  previewContainer.appendChild(layer.target);
   layerRow.appendChild(previewContainer);
 
   // Name input
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
-  nameInput.value = ex.name;
+  nameInput.value = layer.name;
   nameInput.style.cssText = `
     flex: 1;
     min-width: 0;
@@ -698,6 +769,11 @@ for (const ex of exampleLayers) {
     font-size: 11px;
     outline: none;
   `;
+  nameInput.addEventListener('change', (e) => {
+    if (e.target instanceof HTMLInputElement) {
+      layer.name = e.target.value;
+    }
+  });
   layerRow.appendChild(nameInput);
 
   // Opacity slider
@@ -705,18 +781,23 @@ for (const ex of exampleLayers) {
   opacitySlider.type = 'range';
   opacitySlider.min = '0';
   opacitySlider.max = '100';
-  opacitySlider.value = String(ex.opacity);
+  opacitySlider.value = String(layer.opacity);
   opacitySlider.style.cssText = `
     width: 50px;
     height: 4px;
     accent-color: #666;
     flex-shrink: 0;
   `;
+  opacitySlider.addEventListener('change', (e) => {
+    if (e.target instanceof HTMLInputElement) {
+      layer.opacity = parseInt(e.target.value);
+    }
+  });
   layerRow.appendChild(opacitySlider);
 
   // Eye button
   const eyeBtn = document.createElement('button');
-  eyeBtn.textContent = ex.visible ? '👁' : '👁‍🗨';
+  eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
   eyeBtn.style.cssText = `
     width: 24px;
     height: 24px;
@@ -729,8 +810,13 @@ for (const ex of exampleLayers) {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    opacity: ex.visible ? 1 : 0.4;
+    opacity: layer.visible ? 1 : 0.4;
   `;
+  eyeBtn.addEventListener('click', (e) => {
+    layer.visible = !layer.visible;
+    eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
+    e.stopImmediatePropagation();
+  });
   layerRow.appendChild(eyeBtn);
 
   // ── Unified pointer-event drag-and-drop ──
@@ -759,19 +845,17 @@ for (const ex of exampleLayers) {
 
   // Shared reorder logic
   function reorderRows(source: HTMLElement, target: HTMLElement, insertAbove: boolean) {
-    const rows = Array.from(layerList.children) as HTMLElement[];
+    const rows = (Array.from(layerList.children) as HTMLElement[]).toReversed();
     const dragIdx = rows.indexOf(source);
     const targetIdx = rows.indexOf(target);
     if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) return;
 
-    const newOrder = [...rows];
-    const [moved] = newOrder.splice(dragIdx, 1);
     const adjustedTarget = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
     const insertIdx = insertAbove ? adjustedTarget : adjustedTarget + 1;
-    newOrder.splice(insertIdx, 0, moved);
 
-    // TODO move layer here
-    newOrder.forEach((row) => layerList.appendChild(row));
+    moveLayer(layers[dragIdx].id, insertIdx);
+
+    renderLayerList();
   }
 
   // Show drop indicator on a target row
@@ -901,7 +985,7 @@ for (const ex of exampleLayers) {
         reorderRows(
           pointerDownRow,
           pointerTargetRow,
-          e.clientY <
+          e.clientY >
             pointerTargetRow.getBoundingClientRect().top +
               pointerTargetRow.getBoundingClientRect().height / 2,
         );
@@ -925,6 +1009,7 @@ for (const ex of exampleLayers) {
   });
 
   layerList.appendChild(layerRow);
+  renderLayerList();
 }
 
 layerPanel.appendChild(layerList);
@@ -988,7 +1073,12 @@ colorPicker.on('color:change', (color: any) => {
 selectColorType('fg');
 
 const renderLoop = () => {
-  renderFrame();
+  renderFrame(
+    layers.map((l) => ({
+      additionalTarget: documentLayers[l.id].target,
+      opacity: documentLayers[l.id].visible ? documentLayers[l.id].opacity / 100 : 0,
+    })),
+  );
   window.requestAnimationFrame(renderLoop);
 };
 window.requestAnimationFrame(renderLoop);

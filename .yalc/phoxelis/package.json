@@ -1,7 +1,7 @@
 {
   "name": "phoxelis",
   "private": true,
-  "version": "1.20.2",
+  "version": "1.21.0",
   "type": "module",
   "files": [
     "dist"
@@ -21,5 +21,5 @@
     "fetchline": "^1.0.1",
     "lodash": "^4.18.1"
   },
-  "yalcSig": "af492c2eb4fbefb5f899912c1c95152b"
+  "yalcSig": "ee03996a0bdaa3723afb593c3f187522"
 }
