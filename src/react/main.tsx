@@ -18,6 +18,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
 
+// TODO documentLayers as proxy. Decouple react from what exists rn
+import { proxy } from 'valtio';
+
+
 ReactDOM.createRoot(document.querySelector('#app')!).render(
   <React.StrictMode>
     <App />
@@ -52,6 +56,332 @@ const {
   moveLayer,
   removeLayer,
 } = phoxelis;
+
+function LayerList(){
+  return <div style={{
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    maxHeight: '300px',
+    overflowY: 'auto'
+  }}>
+
+  </div>
+}
+
+function LayerItemRow(props: DocumentLayer){
+ const id = `layer-${props.layerId}`;
+  layerRow.classList.add('layer-row');
+  layerRow.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    cursor: grab;
+    user-select: none;
+    transition: background 0.1s;
+  `;
+  layerRow.addEventListener('click', () => {
+    selectLayer(props.layerId);
+  });
+
+  // Drag handle (grip icon)
+  const dragHandle = document.createElement('div');
+  dragHandle.style.cssText = `
+    width: 16px;
+    height: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    flex-shrink: 0;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  `;
+  dragHandle.innerHTML = `
+    <span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
+    <span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
+  `;
+  layerRow.appendChild(dragHandle);
+
+  // Preview container
+  const previewContainer = document.createElement('div');
+  previewContainer.style.cssText = `
+    width: 28px;
+    height: 28px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 2px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `;
+  previewContainer.appendChild(layer.target);
+  layerRow.appendChild(previewContainer);
+
+  // Name input
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.value = layer.name;
+  nameInput.style.cssText = `
+    flex: 1;
+    min-width: 0;
+    padding: 2px 4px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 2px;
+    color: #ccc;
+    font-size: 11px;
+    outline: none;
+  `;
+  nameInput.addEventListener('change', (e) => {
+    if (e.target instanceof HTMLInputElement) {
+      layer.name = e.target.value;
+    }
+  });
+  layerRow.appendChild(nameInput);
+
+  // Opacity slider
+  const opacitySlider = document.createElement('input');
+  opacitySlider.type = 'range';
+  opacitySlider.min = '0';
+  opacitySlider.max = '100';
+  opacitySlider.value = String(layer.opacity);
+  opacitySlider.style.cssText = `
+    width: 50px;
+    height: 4px;
+    accent-color: #666;
+    flex-shrink: 0;
+  `;
+  opacitySlider.addEventListener('change', (e) => {
+    if (e.target instanceof HTMLInputElement) {
+      layer.opacity = parseInt(e.target.value);
+    }
+  });
+  layerRow.appendChild(opacitySlider);
+
+  // Eye button
+  const eyeBtn = document.createElement('button');
+  eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
+  eyeBtn.style.cssText = `
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: 1px solid #444;
+    border-radius: 2px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    opacity: layer.visible ? 1 : 0.4;
+  `;
+  eyeBtn.addEventListener('click', (e) => {
+    layer.visible = !layer.visible;
+    eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
+    e.stopImmediatePropagation();
+  });
+  layerRow.appendChild(eyeBtn);
+
+  // ── Unified pointer-event drag-and-drop ──
+  const dropIndicator = document.createElement('div');
+  dropIndicator.setAttribute('data-drop-indicator', 'line');
+  dropIndicator.style.cssText = `
+    position: absolute;
+    left: -4px;
+    right: -4px;
+    height: 3px;
+    background: #4a9eff;
+    border-radius: 2px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+  `;
+  layerRow.style.position = 'relative';
+  layerRow.appendChild(dropIndicator);
+
+  let ghost: HTMLElement | null = null;
+  let pointerDownRow: HTMLElement | null = null;
+  let pointerTargetRow: HTMLElement | null = null;
+  let pointerStartX = 0;
+  let pointerStartY = 0;
+  let isDragging = false;
+
+  // Shared reorder logic
+  function reorderRows(source: HTMLElement, target: HTMLElement, insertAbove: boolean) {
+    const rows = (Array.from(layerList.children) as HTMLElement[]).toReversed();
+    const dragIdx = rows.indexOf(source);
+    const targetIdx = rows.indexOf(target);
+    if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) return;
+
+    const adjustedTarget = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
+    const insertIdx = insertAbove ? adjustedTarget : adjustedTarget + 1;
+
+    moveLayer(layers[dragIdx].id, insertIdx);
+
+    renderLayerList();
+  }
+
+  // Show drop indicator on a target row
+  function showIndicator(row: HTMLElement, clientY: number) {
+    // Hide any existing indicator
+    if (pointerTargetRow && pointerTargetRow !== row) {
+      const prev = pointerTargetRow.querySelector('[data-drop-indicator]') as HTMLElement;
+      if (prev) prev.style.opacity = '0';
+    }
+
+    const indicator = row.querySelector('[data-drop-indicator]') as HTMLElement;
+    if (!indicator) return;
+
+    const rect = row.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const above = clientY < midY;
+    indicator.style.top = above ? '0' : 'auto';
+    indicator.style.bottom = above ? 'auto' : '0';
+    indicator.style.opacity = '1';
+    pointerTargetRow = row;
+  }
+
+  // Update ghost position
+  function updateGhost(clientX: number, clientY: number) {
+    if (!ghost) return;
+    const rowRect = pointerDownRow!.getBoundingClientRect();
+    ghost.style.transform = `translate(${clientX - rowRect.left - 8}px, ${clientY - rowRect.top - 14}px)`;
+  }
+
+  // Find target row under pointer
+  function findTarget(clientX: number, clientY: number): HTMLElement | null {
+    if (!ghost) return null;
+    ghost.style.display = 'none';
+    const el = document.elementFromPoint(clientX, clientY);
+    ghost.style.display = '';
+    return el?.closest('.layer-row') ?? null;
+  }
+
+  // Cleanup all drag state
+  function cleanupDrag() {
+    if (ghost) {
+      ghost.remove();
+      ghost = null;
+    }
+    if (pointerDownRow) {
+      pointerDownRow.style.opacity = '1';
+      pointerDownRow.style.zIndex = '';
+    }
+    if (pointerTargetRow) {
+      const indicator = pointerTargetRow.querySelector(
+        '[data-drop-indicator]',
+      ) as HTMLElement;
+      if (indicator) indicator.style.opacity = '0';
+    }
+    pointerDownRow = null;
+    pointerTargetRow = null;
+    isDragging = false;
+  }
+
+  // Pointer down — start tracking
+  dragHandle.addEventListener('pointerdown', (e: PointerEvent) => {
+    // Only respond to left-click (mouse) or any touch/pen
+    if (e.button !== 0 && e.pointerType !== 'touch') return;
+    pointerStartX = e.clientX;
+    pointerStartY = e.clientY;
+    pointerDownRow = layerRow;
+
+    // Set pointer capture so we keep receiving events even if pointer leaves the element
+    dragHandle.setPointerCapture(e.pointerId);
+  });
+
+  // Pointer move — handle both the "threshold check" and active dragging
+  dragHandle.addEventListener('pointermove', (e: PointerEvent) => {
+    if (!pointerDownRow) return;
+
+    // If we haven't started dragging yet, check the threshold
+    if (!isDragging) {
+      const dx = Math.abs(e.clientX - pointerStartX);
+      const dy = Math.abs(e.clientY - pointerStartY);
+      // Start dragging only after moving past the threshold
+      if (dx < 5 && dy < 5) return; // Still within threshold, do nothing
+
+      isDragging = true;
+
+      // Create ghost clone
+      ghost = pointerDownRow.cloneNode(true) as HTMLElement;
+      ghost.style.position = 'fixed';
+      ghost.style.width = `${pointerDownRow.offsetWidth}px`;
+      ghost.style.zIndex = '9999';
+      ghost.style.opacity = '0.85';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.transition = 'none';
+      ghost.style.transform = `translate(${e.clientX - pointerDownRow.getBoundingClientRect().left - 8}px, ${e.clientY - pointerDownRow.getBoundingClientRect().top - 14}px)`;
+      document.body.appendChild(ghost);
+
+      // Hide original row
+      pointerDownRow.style.opacity = '0.3';
+      pointerDownRow.style.zIndex = '100';
+    }
+
+    // Active dragging — update ghost and find target
+    if (isDragging) {
+      e.preventDefault();
+      updateGhost(e.clientX, e.clientY);
+
+      const target = findTarget(e.clientX, e.clientY);
+      if (target && target !== pointerDownRow && target !== pointerTargetRow) {
+        showIndicator(target, e.clientY);
+      } else if (target === pointerDownRow && pointerTargetRow) {
+        // Pointer is back on the source row, clear indicator
+        const indicator = pointerTargetRow.querySelector(
+          '[data-drop-indicator]',
+        ) as HTMLElement;
+        if (indicator) indicator.style.opacity = '0';
+        pointerTargetRow = null;
+      }
+    }
+  });
+
+  // Pointer up — finalize the drag
+  dragHandle.addEventListener('pointerup', (e: PointerEvent) => {
+    if (!pointerDownRow) return;
+
+    if (isDragging) {
+      // Perform reorder
+      if (pointerTargetRow) {
+        reorderRows(
+          pointerDownRow,
+          pointerTargetRow,
+          e.clientY >
+            pointerTargetRow.getBoundingClientRect().top +
+              pointerTargetRow.getBoundingClientRect().height / 2,
+        );
+      }
+      cleanupDrag();
+    }
+
+    // Release pointer capture
+    try {
+      dragHandle.releasePointerCapture(e.pointerId);
+    } catch {}
+    pointerDownRow = null;
+  });
+
+  // Pointer cancel (e.g. system interrupt) — cleanup
+  dragHandle.addEventListener('pointercancel', () => {
+    cleanupDrag();
+    try {
+      dragHandle.releasePointerCapture(0);
+    } catch {}
+  });
+
+  layerList.appendChild(layerRow);
+  return layerRow;
+}
 
 const layerPreviewStyle = `height: 100%; width: 100%; object-fit: contain;`;
 const layerList = document.createElement('div');

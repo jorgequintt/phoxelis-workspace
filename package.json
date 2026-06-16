@@ -24,6 +24,7 @@
     "lodash": "^4.18.1",
     "phoxelis": "file:.yalc/phoxelis",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "valtio": "^2.3.2"
   }
 }
