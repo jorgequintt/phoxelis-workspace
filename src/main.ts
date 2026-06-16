@@ -1726,11 +1726,12 @@ function setTool(tool: Tool) {
         tool.onPointerDown!(e);
       },
       onPointerMove: (e) => {
-        drawboard.setPointerCapture(e.pointerId);
         tool.onPointerMove!(e);
       },
       onPointerUp: (e) => {
-        drawboard.setPointerCapture(e.pointerId);
+        try {
+          drawboard.releasePointerCapture(e.pointerId);
+        } catch {}
         tool.onPointerUp!(e);
       },
       onPinchStart: (e) => tool.onPinchStart!(e),
