@@ -78,14 +78,7 @@ function renderDpWithMode(
   } else if (drawMode === 'char') {
     const underlyingPhoxel = getPhoxFromPosition(r, c, layerId);
     if (!underlyingPhoxel) return;
-    target.renderPhoxel(
-      dp.char,
-      underlyingPhoxel.fg,
-      underlyingPhoxel.bg,
-      r,
-      c,
-      layerId,
-    );
+    target.renderPhoxel(dp.char, underlyingPhoxel.fg, underlyingPhoxel.bg, r, c, layerId);
   } else if (drawMode === 'color') {
     const underlyingPhoxel = getPhoxFromPosition(r, c, layerId);
     if (!underlyingPhoxel) return;
@@ -93,25 +86,11 @@ function renderDpWithMode(
   } else if (drawMode === 'fg') {
     const underlyingPhoxel = getPhoxFromPosition(r, c, layerId);
     if (!underlyingPhoxel) return;
-    target.renderPhoxel(
-      underlyingPhoxel.char,
-      dp.fg,
-      underlyingPhoxel.bg,
-      r,
-      c,
-      layerId,
-    );
+    target.renderPhoxel(underlyingPhoxel.char, dp.fg, underlyingPhoxel.bg, r, c, layerId);
   } else if (drawMode === 'bg') {
     const underlyingPhoxel = getPhoxFromPosition(r, c, layerId);
     if (!underlyingPhoxel) return;
-    target.renderPhoxel(
-      underlyingPhoxel.char,
-      underlyingPhoxel.fg,
-      dp.bg,
-      r,
-      c,
-      layerId,
-    );
+    target.renderPhoxel(underlyingPhoxel.char, underlyingPhoxel.fg, dp.bg, r, c, layerId);
   } else if (drawMode === 'erase') {
     if (options.draftErasure) {
       target.renderPhoxel('D', '#FF0000', '#FF000055', r, c, layerId);
@@ -790,6 +769,8 @@ for (const ex of exampleLayers) {
     const adjustedTarget = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
     const insertIdx = insertAbove ? adjustedTarget : adjustedTarget + 1;
     newOrder.splice(insertIdx, 0, moved);
+
+    // TODO move layer here
     newOrder.forEach((row) => layerList.appendChild(row));
   }
 
@@ -840,7 +821,9 @@ for (const ex of exampleLayers) {
       pointerDownRow.style.zIndex = '';
     }
     if (pointerTargetRow) {
-      const indicator = pointerTargetRow.querySelector('[data-drop-indicator]') as HTMLElement;
+      const indicator = pointerTargetRow.querySelector(
+        '[data-drop-indicator]',
+      ) as HTMLElement;
       if (indicator) indicator.style.opacity = '0';
     }
     pointerDownRow = null;
@@ -899,7 +882,9 @@ for (const ex of exampleLayers) {
         showIndicator(target, e.clientY);
       } else if (target === pointerDownRow && pointerTargetRow) {
         // Pointer is back on the source row, clear indicator
-        const indicator = pointerTargetRow.querySelector('[data-drop-indicator]') as HTMLElement;
+        const indicator = pointerTargetRow.querySelector(
+          '[data-drop-indicator]',
+        ) as HTMLElement;
         if (indicator) indicator.style.opacity = '0';
         pointerTargetRow = null;
       }
@@ -913,20 +898,30 @@ for (const ex of exampleLayers) {
     if (isDragging) {
       // Perform reorder
       if (pointerTargetRow) {
-        reorderRows(pointerDownRow, pointerTargetRow, e.clientY < pointerTargetRow.getBoundingClientRect().top + pointerTargetRow.getBoundingClientRect().height / 2);
+        reorderRows(
+          pointerDownRow,
+          pointerTargetRow,
+          e.clientY <
+            pointerTargetRow.getBoundingClientRect().top +
+              pointerTargetRow.getBoundingClientRect().height / 2,
+        );
       }
       cleanupDrag();
     }
 
     // Release pointer capture
-    try { dragHandle.releasePointerCapture(e.pointerId); } catch {}
+    try {
+      dragHandle.releasePointerCapture(e.pointerId);
+    } catch {}
     pointerDownRow = null;
   });
 
   // Pointer cancel (e.g. system interrupt) — cleanup
   dragHandle.addEventListener('pointercancel', () => {
     cleanupDrag();
-    try { dragHandle.releasePointerCapture(0); } catch {}
+    try {
+      dragHandle.releasePointerCapture(0);
+    } catch {}
   });
 
   layerList.appendChild(layerRow);
@@ -1251,7 +1246,9 @@ const drawTool: DrawTool = {
   },
   addPhoxelToDraft(p: Phoxel) {
     this.data!.draftPhoxels.set(`${p.r};${p.c}`, p);
-    renderDpWithMode(draftScreen, p.r, p.c, draftScreen.layers[0].id, { draftErasure: true });
+    renderDpWithMode(draftScreen, p.r, p.c, draftScreen.layers[0].id, {
+      draftErasure: true,
+    });
   },
   onPointerDown() {
     this.data.drawing = true;
@@ -1305,13 +1302,21 @@ const rectTool: Tool = {
     const c2 = Math.max(startC, mousePos.x);
     // Top & bottom edges
     for (let c = c1; c <= c2; c++) {
-      renderDpWithMode(draftScreen, r1, c, draftScreen.layers[0].id, { draftErasure: true });
-      renderDpWithMode(draftScreen, r2, c, draftScreen.layers[0].id, { draftErasure: true });
+      renderDpWithMode(draftScreen, r1, c, draftScreen.layers[0].id, {
+        draftErasure: true,
+      });
+      renderDpWithMode(draftScreen, r2, c, draftScreen.layers[0].id, {
+        draftErasure: true,
+      });
     }
     // Left & right edges
     for (let r = r1; r <= r2; r++) {
-      renderDpWithMode(draftScreen, r, c1, draftScreen.layers[0].id, { draftErasure: true });
-      renderDpWithMode(draftScreen, r, c2, draftScreen.layers[0].id, { draftErasure: true });
+      renderDpWithMode(draftScreen, r, c1, draftScreen.layers[0].id, {
+        draftErasure: true,
+      });
+      renderDpWithMode(draftScreen, r, c2, draftScreen.layers[0].id, {
+        draftErasure: true,
+      });
     }
   },
   onPointerUp() {
@@ -1373,7 +1378,9 @@ const filledRectTool: Tool = {
     const c2 = Math.max(startC, mousePos.x);
     for (let r = r1; r <= r2; r++) {
       for (let c = c1; c <= c2; c++) {
-        renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, { draftErasure: true });
+        renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, {
+          draftErasure: true,
+        });
       }
     }
   },
@@ -1455,7 +1462,9 @@ const lineTool: Tool = {
     const { startR, startC } = this.data!;
     const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
     for (const { r, c } of cells) {
-      renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, { draftErasure: true });
+      renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, {
+        draftErasure: true,
+      });
     }
   },
   onPointerUp() {
@@ -1502,7 +1511,10 @@ const ellipseTool: Tool = {
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseOutline(
-      (r, c) => renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, { draftErasure: true }),
+      (r, c) =>
+        renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, {
+          draftErasure: true,
+        }),
       startR,
       startC,
       rx,
@@ -1551,7 +1563,10 @@ const filledEllipseTool: Tool = {
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseFill(
-      (r, c) => renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, { draftErasure: true }),
+      (r, c) =>
+        renderDpWithMode(draftScreen, r, c, draftScreen.layers[0].id, {
+          draftErasure: true,
+        }),
       startR,
       startC,
       rx,
@@ -1696,7 +1711,7 @@ function setTool(tool: Tool) {
     currTool.tool.abort?.();
     drawboard.removeEventListener('pointerdown', currTool.handlers.onPointerDown);
     drawboard.removeEventListener('pointermove', currTool.handlers.onPointerMove);
-    window.removeEventListener('pointerup', currTool.handlers.onPointerUp);
+    drawboard.removeEventListener('pointerup', currTool.handlers.onPointerUp);
     hammer.off('pinchstart', currTool.handlers.onPinchStart);
     hammer.off('pinchmove', currTool.handlers.onPinchMove);
     hammer.off('pinchend', currTool.handlers.onPinchEnd);
@@ -1706,9 +1721,18 @@ function setTool(tool: Tool) {
   currTool = {
     tool,
     handlers: {
-      onPointerDown: (e) => tool.onPointerDown!(e),
-      onPointerMove: (e) => tool.onPointerMove!(e),
-      onPointerUp: (e) => tool.onPointerUp!(e),
+      onPointerDown: (e) => {
+        drawboard.setPointerCapture(e.pointerId);
+        tool.onPointerDown!(e);
+      },
+      onPointerMove: (e) => {
+        drawboard.setPointerCapture(e.pointerId);
+        tool.onPointerMove!(e);
+      },
+      onPointerUp: (e) => {
+        drawboard.setPointerCapture(e.pointerId);
+        tool.onPointerUp!(e);
+      },
       onPinchStart: (e) => tool.onPinchStart!(e),
       onPinchMove: (e) => tool.onPinchMove!(e),
       onPinchEnd: (e) => tool.onPinchEnd!(e),
