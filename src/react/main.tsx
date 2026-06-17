@@ -18,15 +18,14 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
 
-// TODO documentLayers as proxy. Decouple react from what exists rn
+// TODO doc.layers as proxy. Decouple react from what exists rn
 import { proxy } from 'valtio';
-
 
 ReactDOM.createRoot(document.querySelector('#app')!).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
-)
+  </React.StrictMode>,
+);
 
 type Phoxel = {
   phox: Phox;
@@ -35,353 +34,57 @@ type Phoxel = {
 };
 type PhoxelPosition = [r: number, c: number];
 
-const rows = 37;
-const cols = 152;
-const font = await getFont('1_Trithemius8x16');
-const phoxelis = Phoxelis(rows, cols, font, true);
-const {
-  canvas,
-  renderPhoxel,
-  renderFrame,
-  removePhoxel,
-  importPhoxelis,
-  exportPhoxelis,
-  palette,
-  getPhoxFromPaletteIndex,
-  getPhoxFromPosition,
-  storePhoxInPalette,
-  layers,
-  layerPositions,
-  addLayer,
-  moveLayer,
-  removeLayer,
-} = phoxelis;
+const size = {
+  rows: 37,
+  cols: 152,
+};
+const fontObj = await getFont('1_Trithemius8x16');
+const phoxelisCanvas = Phoxelis(size.rows, size.cols, fontObj, true);
 
-function LayerList(){
-  return <div style={{
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-    maxHeight: '300px',
-    overflowY: 'auto'
-  }}>
-
-  </div>
+interface WorkspaceDocument {
+  phoxelis: ReturnType<typeof Phoxelis>;
+  font: Awaited<ReturnType<typeof getFont>>;
+  layers: Record<string, DocumentLayer>;
+  size: { rows: number; cols: number };
 }
 
-function LayerItemRow(props: DocumentLayer){
- const id = `layer-${props.layerId}`;
-  layerRow.classList.add('layer-row');
-  layerRow.style.cssText = `
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px;
-    background: #2a2a2a;
-    border: 1px solid #3a3a3a;
-    border-radius: 3px;
-    cursor: grab;
-    user-select: none;
-    transition: background 0.1s;
-  `;
-  layerRow.addEventListener('click', () => {
-    selectLayer(props.layerId);
-  });
+let doc: WorkspaceDocument = {
+  phoxelis: phoxelisCanvas,
+  font: fontObj,
+  size,
+  layers: {},
+};
 
-  // Drag handle (grip icon)
-  const dragHandle = document.createElement('div');
-  dragHandle.style.cssText = `
-    width: 16px;
-    height: 28px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    flex-shrink: 0;
-    cursor: grab;
-    touch-action: none;
-    user-select: none;
-  `;
-  dragHandle.innerHTML = `
-    <span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
-    <span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
-  `;
-  layerRow.appendChild(dragHandle);
-
-  // Preview container
-  const previewContainer = document.createElement('div');
-  previewContainer.style.cssText = `
-    width: 28px;
-    height: 28px;
-    background: #1a1a1a;
-    border: 1px solid #444;
-    border-radius: 2px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  `;
-  previewContainer.appendChild(layer.target);
-  layerRow.appendChild(previewContainer);
-
-  // Name input
-  const nameInput = document.createElement('input');
-  nameInput.type = 'text';
-  nameInput.value = layer.name;
-  nameInput.style.cssText = `
-    flex: 1;
-    min-width: 0;
-    padding: 2px 4px;
-    background: #1a1a1a;
-    border: 1px solid #444;
-    border-radius: 2px;
-    color: #ccc;
-    font-size: 11px;
-    outline: none;
-  `;
-  nameInput.addEventListener('change', (e) => {
-    if (e.target instanceof HTMLInputElement) {
-      layer.name = e.target.value;
-    }
-  });
-  layerRow.appendChild(nameInput);
-
-  // Opacity slider
-  const opacitySlider = document.createElement('input');
-  opacitySlider.type = 'range';
-  opacitySlider.min = '0';
-  opacitySlider.max = '100';
-  opacitySlider.value = String(layer.opacity);
-  opacitySlider.style.cssText = `
-    width: 50px;
-    height: 4px;
-    accent-color: #666;
-    flex-shrink: 0;
-  `;
-  opacitySlider.addEventListener('change', (e) => {
-    if (e.target instanceof HTMLInputElement) {
-      layer.opacity = parseInt(e.target.value);
-    }
-  });
-  layerRow.appendChild(opacitySlider);
-
-  // Eye button
-  const eyeBtn = document.createElement('button');
-  eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
-  eyeBtn.style.cssText = `
-    width: 24px;
-    height: 24px;
-    background: transparent;
-    border: 1px solid #444;
-    border-radius: 2px;
-    font-size: 14px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    opacity: layer.visible ? 1 : 0.4;
-  `;
-  eyeBtn.addEventListener('click', (e) => {
-    layer.visible = !layer.visible;
-    eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
-    e.stopImmediatePropagation();
-  });
-  layerRow.appendChild(eyeBtn);
-
-  // ── Unified pointer-event drag-and-drop ──
-  const dropIndicator = document.createElement('div');
-  dropIndicator.setAttribute('data-drop-indicator', 'line');
-  dropIndicator.style.cssText = `
-    position: absolute;
-    left: -4px;
-    right: -4px;
-    height: 3px;
-    background: #4a9eff;
-    border-radius: 2px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.1s;
-  `;
-  layerRow.style.position = 'relative';
-  layerRow.appendChild(dropIndicator);
-
-  let ghost: HTMLElement | null = null;
-  let pointerDownRow: HTMLElement | null = null;
-  let pointerTargetRow: HTMLElement | null = null;
-  let pointerStartX = 0;
-  let pointerStartY = 0;
-  let isDragging = false;
-
-  // Shared reorder logic
-  function reorderRows(source: HTMLElement, target: HTMLElement, insertAbove: boolean) {
-    const rows = (Array.from(layerList.children) as HTMLElement[]).toReversed();
-    const dragIdx = rows.indexOf(source);
-    const targetIdx = rows.indexOf(target);
-    if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) return;
-
-    const adjustedTarget = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
-    const insertIdx = insertAbove ? adjustedTarget : adjustedTarget + 1;
-
-    moveLayer(layers[dragIdx].id, insertIdx);
-
-    renderLayerList();
-  }
-
-  // Show drop indicator on a target row
-  function showIndicator(row: HTMLElement, clientY: number) {
-    // Hide any existing indicator
-    if (pointerTargetRow && pointerTargetRow !== row) {
-      const prev = pointerTargetRow.querySelector('[data-drop-indicator]') as HTMLElement;
-      if (prev) prev.style.opacity = '0';
-    }
-
-    const indicator = row.querySelector('[data-drop-indicator]') as HTMLElement;
-    if (!indicator) return;
-
-    const rect = row.getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    const above = clientY < midY;
-    indicator.style.top = above ? '0' : 'auto';
-    indicator.style.bottom = above ? 'auto' : '0';
-    indicator.style.opacity = '1';
-    pointerTargetRow = row;
-  }
-
-  // Update ghost position
-  function updateGhost(clientX: number, clientY: number) {
-    if (!ghost) return;
-    const rowRect = pointerDownRow!.getBoundingClientRect();
-    ghost.style.transform = `translate(${clientX - rowRect.left - 8}px, ${clientY - rowRect.top - 14}px)`;
-  }
-
-  // Find target row under pointer
-  function findTarget(clientX: number, clientY: number): HTMLElement | null {
-    if (!ghost) return null;
-    ghost.style.display = 'none';
-    const el = document.elementFromPoint(clientX, clientY);
-    ghost.style.display = '';
-    return el?.closest('.layer-row') ?? null;
-  }
-
-  // Cleanup all drag state
-  function cleanupDrag() {
-    if (ghost) {
-      ghost.remove();
-      ghost = null;
-    }
-    if (pointerDownRow) {
-      pointerDownRow.style.opacity = '1';
-      pointerDownRow.style.zIndex = '';
-    }
-    if (pointerTargetRow) {
-      const indicator = pointerTargetRow.querySelector(
-        '[data-drop-indicator]',
-      ) as HTMLElement;
-      if (indicator) indicator.style.opacity = '0';
-    }
-    pointerDownRow = null;
-    pointerTargetRow = null;
-    isDragging = false;
-  }
-
-  // Pointer down — start tracking
-  dragHandle.addEventListener('pointerdown', (e: PointerEvent) => {
-    // Only respond to left-click (mouse) or any touch/pen
-    if (e.button !== 0 && e.pointerType !== 'touch') return;
-    pointerStartX = e.clientX;
-    pointerStartY = e.clientY;
-    pointerDownRow = layerRow;
-
-    // Set pointer capture so we keep receiving events even if pointer leaves the element
-    dragHandle.setPointerCapture(e.pointerId);
-  });
-
-  // Pointer move — handle both the "threshold check" and active dragging
-  dragHandle.addEventListener('pointermove', (e: PointerEvent) => {
-    if (!pointerDownRow) return;
-
-    // If we haven't started dragging yet, check the threshold
-    if (!isDragging) {
-      const dx = Math.abs(e.clientX - pointerStartX);
-      const dy = Math.abs(e.clientY - pointerStartY);
-      // Start dragging only after moving past the threshold
-      if (dx < 5 && dy < 5) return; // Still within threshold, do nothing
-
-      isDragging = true;
-
-      // Create ghost clone
-      ghost = pointerDownRow.cloneNode(true) as HTMLElement;
-      ghost.style.position = 'fixed';
-      ghost.style.width = `${pointerDownRow.offsetWidth}px`;
-      ghost.style.zIndex = '9999';
-      ghost.style.opacity = '0.85';
-      ghost.style.pointerEvents = 'none';
-      ghost.style.transition = 'none';
-      ghost.style.transform = `translate(${e.clientX - pointerDownRow.getBoundingClientRect().left - 8}px, ${e.clientY - pointerDownRow.getBoundingClientRect().top - 14}px)`;
-      document.body.appendChild(ghost);
-
-      // Hide original row
-      pointerDownRow.style.opacity = '0.3';
-      pointerDownRow.style.zIndex = '100';
-    }
-
-    // Active dragging — update ghost and find target
-    if (isDragging) {
-      e.preventDefault();
-      updateGhost(e.clientX, e.clientY);
-
-      const target = findTarget(e.clientX, e.clientY);
-      if (target && target !== pointerDownRow && target !== pointerTargetRow) {
-        showIndicator(target, e.clientY);
-      } else if (target === pointerDownRow && pointerTargetRow) {
-        // Pointer is back on the source row, clear indicator
-        const indicator = pointerTargetRow.querySelector(
-          '[data-drop-indicator]',
-        ) as HTMLElement;
-        if (indicator) indicator.style.opacity = '0';
-        pointerTargetRow = null;
-      }
-    }
-  });
-
-  // Pointer up — finalize the drag
-  dragHandle.addEventListener('pointerup', (e: PointerEvent) => {
-    if (!pointerDownRow) return;
-
-    if (isDragging) {
-      // Perform reorder
-      if (pointerTargetRow) {
-        reorderRows(
-          pointerDownRow,
-          pointerTargetRow,
-          e.clientY >
-            pointerTargetRow.getBoundingClientRect().top +
-              pointerTargetRow.getBoundingClientRect().height / 2,
-        );
-      }
-      cleanupDrag();
-    }
-
-    // Release pointer capture
-    try {
-      dragHandle.releasePointerCapture(e.pointerId);
-    } catch {}
-    pointerDownRow = null;
-  });
-
-  // Pointer cancel (e.g. system interrupt) — cleanup
-  dragHandle.addEventListener('pointercancel', () => {
-    cleanupDrag();
-    try {
-      dragHandle.releasePointerCapture(0);
-    } catch {}
-  });
-
-  layerList.appendChild(layerRow);
-  return layerRow;
+interface Session {
+  dp: Phox;
+  drawMode: 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase';
+  activeLayer: string;
+  paletteData: {
+    selectedPhox: number;
+    modifyingPhox: boolean;
+  };
+  alphabetData: {
+    selectedChar: number;
+  };
+  selectedColorType: 'fg' | 'bg';
 }
+
+const startDp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
+let session: Session = {
+  dp: { char: 'D', fg: '#00FF00', bg: '#FF00FF' },
+  drawMode: 'draw',
+  activeLayer: doc.phoxelis.layers[0].id,
+  paletteData: {
+    selectedPhox: -1,
+    modifyingPhox: false,
+  },
+  alphabetData: {
+    selectedChar: doc.font.charactersList.findIndex(
+      (c) => c.codepoint === startDp.char.codePointAt(0),
+    ),
+  },
+  selectedColorType: 'fg',
+};
 
 const layerPreviewStyle = `height: 100%; width: 100%; object-fit: contain;`;
 const layerList = document.createElement('div');
@@ -394,19 +97,17 @@ layerList.style.cssText = `
 `;
 
 function renderLayerList() {
-  layers.toReversed().forEach((l) => {
+  doc.phoxelis.layers.toReversed().forEach((l) => {
     let layerEl = layerList.querySelector(`#layer-${l.id}`);
     if (!layerEl) {
-      layerEl = createLayerElement(documentLayers[l.id]);
+      layerEl = createLayerElement(doc.layers[l.id]);
     }
     layerList.appendChild(layerEl);
   });
 }
 
-let activeLayer = layers[0].id;
-let documentLayers: Record<string, DocumentLayer> = {};
-createDocumentLayer(layers[0].id);
-selectLayer(layers[0].id);
+createDocumentLayer(doc.phoxelis.layers[0].id);
+selectLayer(doc.phoxelis.layers[0].id);
 
 type DocumentLayer = {
   layerId: string;
@@ -418,40 +119,42 @@ type DocumentLayer = {
 
 function createDocumentLayer(layerId?: string) {
   const target = document.createElement('canvas');
-  target.width = font.width * cols;
-  target.height = font.height * rows;
+  target.width = doc.font.width * doc.size.cols;
+  target.height = doc.font.height * doc.size.rows;
   target.style = layerPreviewStyle;
 
-  const lid = layerId ?? addLayer();
+  const lid = layerId ?? doc.phoxelis.addLayer();
 
-  documentLayers[lid] = {
+  doc.layers[lid] = {
     layerId: lid,
-    name: `Layer #${layers.length}`,
+    name: `Layer #${doc.phoxelis.layers.length}`,
     target,
     opacity: 100,
     visible: true,
   };
 
-  createLayerElement(documentLayers[lid]);
+  createLayerElement(doc.layers[lid]);
   renderLayerList();
   selectLayer(lid);
 }
 
 function removeDocumentLayer(layerId: string) {
-  if (layers.length === 1) {
+  if (doc.phoxelis.layers.length === 1) {
     console.warn("removeDocumentLayer error: You can't remove the base layer.");
     return;
   }
 
-  const layerPosition = layerPositions[layerId];
-  removeLayer(layerId);
+  const layerPosition = doc.phoxelis.layerPositions[layerId];
+  doc.phoxelis.removeLayer(layerId);
   layerList.removeChild(layerList.querySelector(`#layer-${layerId}`)!);
-  delete documentLayers[layerId];
+  delete doc.layers[layerId];
   renderLayerList();
 
-  const newSelectPos = Math.max(0, Math.min(layers.length - 1, layerPosition));
-  console.log('newSelectPos', newSelectPos);
-  const layerBeforeId = layers[newSelectPos].id;
+  const newSelectPos = Math.max(
+    0,
+    Math.min(doc.phoxelis.layers.length - 1, layerPosition),
+  );
+  const layerBeforeId = doc.phoxelis.layers[newSelectPos].id;
   selectLayer(layerBeforeId);
 }
 
@@ -464,7 +167,7 @@ function selectLayer(layerId: string) {
   layerList
     .querySelectorAll('.layer-row')
     .forEach((el) => ((el as HTMLDivElement).style.background = '#2a2a2a'));
-  activeLayer = layerId;
+  session.activeLayer = layerId;
   (layerRow as HTMLDivElement).style.background = '#7a7a7a';
 }
 
@@ -485,9 +188,6 @@ let refImageScale = refImagePanzoomConfig.startScale;
 let scale = panzoomConfiguration.startScale;
 const filename = 'test_file';
 
-let drawMode: 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase' = 'draw';
-let dp: Phox = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
-
 function renderDpWithMode(
   target: ReturnType<typeof Phoxelis>,
   r: number,
@@ -495,30 +195,58 @@ function renderDpWithMode(
   layerId: string,
   options: { draftErasure: boolean } = { draftErasure: false },
 ) {
-  if (drawMode === 'draw') {
-    target.renderPhoxel(dp.char, dp.fg, dp.bg, r, c, layerId);
+  if (session.drawMode === 'draw') {
+    target.renderPhoxel(session.dp.char, session.dp.fg, session.dp.bg, r, c, layerId);
     return;
-  } else if (drawMode === 'char') {
-    const underlyingPhoxel = getPhoxFromPosition(r, c, layerId);
+  } else if (session.drawMode === 'char') {
+    const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, layerId);
     if (!underlyingPhoxel) return;
-    target.renderPhoxel(dp.char, underlyingPhoxel.fg, underlyingPhoxel.bg, r, c, layerId);
-  } else if (drawMode === 'color') {
-    const underlyingPhoxel = getPhoxFromPosition(r, c, layerId);
+    target.renderPhoxel(
+      session.dp.char,
+      underlyingPhoxel.fg,
+      underlyingPhoxel.bg,
+      r,
+      c,
+      layerId,
+    );
+  } else if (session.drawMode === 'color') {
+    const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, layerId);
     if (!underlyingPhoxel) return;
-    target.renderPhoxel(underlyingPhoxel.char, dp.fg, dp.bg, r, c, layerId);
-  } else if (drawMode === 'fg') {
-    const underlyingPhoxel = getPhoxFromPosition(r, c, layerId);
+    target.renderPhoxel(
+      underlyingPhoxel.char,
+      session.dp.fg,
+      session.dp.bg,
+      r,
+      c,
+      layerId,
+    );
+  } else if (session.drawMode === 'fg') {
+    const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, layerId);
     if (!underlyingPhoxel) return;
-    target.renderPhoxel(underlyingPhoxel.char, dp.fg, underlyingPhoxel.bg, r, c, layerId);
-  } else if (drawMode === 'bg') {
-    const underlyingPhoxel = getPhoxFromPosition(r, c, layerId);
+    target.renderPhoxel(
+      underlyingPhoxel.char,
+      session.dp.fg,
+      underlyingPhoxel.bg,
+      r,
+      c,
+      layerId,
+    );
+  } else if (session.drawMode === 'bg') {
+    const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, layerId);
     if (!underlyingPhoxel) return;
-    target.renderPhoxel(underlyingPhoxel.char, underlyingPhoxel.fg, dp.bg, r, c, layerId);
-  } else if (drawMode === 'erase') {
+    target.renderPhoxel(
+      underlyingPhoxel.char,
+      underlyingPhoxel.fg,
+      session.dp.bg,
+      r,
+      c,
+      layerId,
+    );
+  } else if (session.drawMode === 'erase') {
     if (options.draftErasure) {
       target.renderPhoxel('D', '#FF0000', '#FF000055', r, c, layerId);
     } else {
-      removePhoxel(r, c, layerId);
+      target.removePhoxel(r, c, layerId);
     }
   }
 }
@@ -532,23 +260,37 @@ function commitPhoxels(phoxelPositions: Array<PhoxelPosition>) {
   const changes: ChangesStack = [];
 
   phoxelPositions.forEach(([r, c]) => {
-    const origPhox = getPhoxFromPosition(r, c, activeLayer);
+    const origPhox = doc.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
     if (!origPhox) {
-      undoChanges.push(() => removePhoxel(r, c, activeLayer));
+      undoChanges.push(() => doc.phoxelis.removePhoxel(r, c, session.activeLayer));
     } else {
       undoChanges.push(() =>
-        renderPhoxel(origPhox.char, origPhox.fg, origPhox.bg, r, c, activeLayer),
+        doc.phoxelis.renderPhoxel(
+          origPhox.char,
+          origPhox.fg,
+          origPhox.bg,
+          r,
+          c,
+          session.activeLayer,
+        ),
       );
     }
 
-    renderDpWithMode(phoxelis, r, c, activeLayer);
+    renderDpWithMode(doc.phoxelis, r, c, session.activeLayer);
 
-    const newPhox = getPhoxFromPosition(r, c, activeLayer);
+    const newPhox = doc.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
     if (!newPhox) {
-      changes.push(() => removePhoxel(r, c, activeLayer));
+      changes.push(() => doc.phoxelis.removePhoxel(r, c, session.activeLayer));
     } else {
       changes.push(() =>
-        renderPhoxel(newPhox.char, newPhox.fg, newPhox.bg, r, c, activeLayer),
+        doc.phoxelis.renderPhoxel(
+          newPhox.char,
+          newPhox.fg,
+          newPhox.bg,
+          r,
+          c,
+          session.activeLayer,
+        ),
       );
     }
   });
@@ -595,47 +337,42 @@ content.style =
 const contentFooter = document.createElement('div');
 contentFooter.style = 'overflow-x: scroll;';
 
-let paletteData: {
-  selectedPhox: number;
-  modifyingPhox: boolean;
-} = {
-  selectedPhox: -1,
-  modifyingPhox: false,
-};
 const paletteWrapper = document.createElement('div');
 paletteWrapper.style = 'position: relative;';
 const paletteOverlay = document.createElement('canvas');
-paletteOverlay.width = palette.width;
-paletteOverlay.height = palette.height;
+paletteOverlay.width = doc.phoxelis.palette.width;
+paletteOverlay.height = doc.phoxelis.palette.height;
 const paletteScale = 2;
-const paletteScaledHeight = font.height * paletteScale;
-palette.style = `height: ${paletteScaledHeight}px; image-rendering: pixelated; border: 1px solid black;`;
+const paletteScaledHeight = doc.font.height * paletteScale;
+doc.phoxelis.palette.style = `height: ${paletteScaledHeight}px; image-rendering: pixelated; border: 1px solid black;`;
 paletteOverlay.style = `height: ${paletteScaledHeight}px; border: 1px solid black; position: absolute; top: 0; left: 0; image-rendering: pixelated;`;
 paletteOverlay.addEventListener('click', (e) => {
   const x = e.offsetX;
-  const paletteMaxCells = palette.width / font.width;
-  const pos = Math.floor((x / (paletteScale * palette.width)) * paletteMaxCells);
-  const phox = getPhoxFromPaletteIndex(pos);
+  const paletteMaxCells = doc.phoxelis.palette.width / doc.font.width;
+  const pos = Math.floor(
+    (x / (paletteScale * doc.phoxelis.palette.width)) * paletteMaxCells,
+  );
+  const phox = doc.phoxelis.getPhoxFromPaletteIndex(pos);
 
   if (!phox) {
     console.warn('Null Phox selected. Omitting selection');
     return;
   }
-  dp = phox;
-  paletteData.selectedPhox = pos;
+  session.dp = phox;
+  session.paletteData.selectedPhox = pos;
 
-  colorPicker.color.hexString = dp[selectedColorType];
+  colorPicker.color.hexString = session.dp[session.selectedColorType];
   selectCharInAlphabet(
-    font.charactersList.findIndex((c) => c.codepoint === dp.char.codePointAt(0)),
+    doc.font.charactersList.findIndex((c) => c.codepoint === session.dp.char.codePointAt(0)),
   );
 
   const ctx = paletteOverlay.getContext('2d');
   ctx!.reset();
   ctx!.strokeStyle = 'green';
   ctx!.lineWidth = 2;
-  ctx!.strokeRect(pos * font.width, 0, font.width, font.height);
+  ctx!.strokeRect(pos * doc.font.width, 0, doc.font.width, doc.font.height);
 });
-paletteWrapper.append(palette);
+paletteWrapper.append(doc.phoxelis.palette);
 paletteWrapper.append(paletteOverlay);
 contentFooter.append(paletteWrapper);
 
@@ -682,7 +419,7 @@ function createDrawModeButton(def: DrawModeDefinition): HTMLButtonElement {
     btn.style.background = '#555';
   });
   btn.addEventListener('mouseleave', () => {
-    btn.style.background = drawMode === def.name ? '#666' : '#444';
+    btn.style.background = session.drawMode === def.name ? '#666' : '#444';
   });
   btn.addEventListener('click', () => {
     drawModeButtons.forEach((b) => {
@@ -691,7 +428,7 @@ function createDrawModeButton(def: DrawModeDefinition): HTMLButtonElement {
     });
     btn.style.background = '#666';
     btn.style.borderColor = '#888';
-    drawMode = def.name;
+    session.drawMode = def.name;
   });
   return btn;
 }
@@ -828,9 +565,9 @@ for (const def of toolDefs) {
 const drawboard = document.createElement('div');
 drawboard.style =
   'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
-canvas.style = `position: relative; border: 1px solid black; image-rendering: pixelated;`;
-const draftScreen = Phoxelis(rows, cols, font);
-const draftMainLayer = draftScreen.layers[0].id;
+doc.phoxelis.canvas.style = `position: relative; border: 1px solid black; image-rendering: pixelated;`;
+const draftScreen = Phoxelis(doc.size.rows, doc.size.cols, doc.font);
+const getDraftBaseLayer = () => draftScreen.layers[0].id;
 draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black; image-rendering: pixelated;`;
 const refImage = document.createElement('img');
 const refImageWrapper = document.createElement('div');
@@ -838,7 +575,7 @@ refImageWrapper.append(refImage);
 refImageWrapper.style = `position: absolute; top: 0px; right: 0px; z-index: -999; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;`;
 
 const layersWrapper = document.createElement('div');
-layersWrapper.appendChild(canvas);
+layersWrapper.appendChild(doc.phoxelis.canvas);
 layersWrapper.appendChild(refImageWrapper);
 layersWrapper.appendChild(draftScreen.canvas);
 drawboard.appendChild(layersWrapper);
@@ -859,7 +596,10 @@ navBar.appendChild(fullscreenButton);
 const exportButton = document.createElement('button');
 exportButton.innerHTML = 'Export';
 exportButton.onclick = () =>
-  downloadAsFile(JSON.stringify(exportPhoxelis(filename)), `${filename}.phoxelis`);
+  downloadAsFile(
+    JSON.stringify(doc.phoxelis.exportPhoxelis(filename)),
+    `${filename}.phoxelis`,
+  );
 navBar.appendChild(exportButton);
 
 const referenceImageButton = document.createElement('input');
@@ -901,11 +641,11 @@ navBar.appendChild(moveRefImageToggle);
 const modifyPalettePhoxButton = document.createElement('button');
 modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
 modifyPalettePhoxButton.onclick = () => {
-  if (!paletteData.modifyingPhox) {
-    paletteData.modifyingPhox = true;
+  if (!session.paletteData.modifyingPhox) {
+    session.paletteData.modifyingPhox = true;
     modifyPalettePhoxButton.innerHTML = 'UPDATING PALETTE PHOX';
   } else {
-    paletteData.modifyingPhox = false;
+    session.paletteData.modifyingPhox = false;
     modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
   }
 };
@@ -924,10 +664,10 @@ navBar.appendChild(redoButton);
 // Sidebar
 const alphabetCanvas = document.createElement('canvas');
 const alphabetWidth = 100;
-const alphabetCols = Math.ceil(alphabetWidth / font.width);
-const alphabetRows = Math.ceil(font.length / alphabetCols);
-alphabetCanvas.width = alphabetCols * font.width;
-alphabetCanvas.height = alphabetRows * font.height;
+const alphabetCols = Math.ceil(alphabetWidth / doc.font.width);
+const alphabetRows = Math.ceil(doc.font.length / alphabetCols);
+alphabetCanvas.width = alphabetCols * doc.font.width;
+alphabetCanvas.height = alphabetRows * doc.font.height;
 const alphabetViewScale = 2;
 alphabetCanvas.style = `width: ${alphabetCanvas.width * alphabetViewScale}px; image-rendering: pixelated;`;
 const alphabetCtx = alphabetCanvas.getContext('2d')!;
@@ -937,41 +677,41 @@ alphabetContainer.style = 'height: 250px; overflow-y: scroll;';
 alphabetContainer.append(alphabetCanvas);
 sidebar.append(alphabetContainer);
 
-const alphabetData: {
-  selectedChar: number;
-} = {
-  selectedChar: font.charactersList.findIndex(
-    (c) => c.codepoint === dp.char.codePointAt(0),
-  ),
-};
 function selectCharInAlphabet(index: number) {
-  const char = font.charactersList[index];
+  const char = doc.font.charactersList[index];
 
   drawCharShapeInAlphabet(
-    alphabetData.selectedChar,
-    font.charactersList[alphabetData.selectedChar].shape,
+    session.alphabetData.selectedChar,
+    doc.font.charactersList[session.alphabetData.selectedChar].shape,
     '#FFFFFF',
     '#000000',
   );
-  dp.char = String.fromCodePoint(char.codepoint);
-  drawCharShapeInAlphabet(index, font.charactersList[index].shape, '#000000', '#00FFFF');
+  session.dp.char = String.fromCodePoint(char.codepoint);
+  drawCharShapeInAlphabet(
+    index,
+    doc.font.charactersList[index].shape,
+    '#000000',
+    '#00FFFF',
+  );
 
-  alphabetData.selectedChar = index;
+  session.alphabetData.selectedChar = index;
 }
 alphabetCanvas.addEventListener('click', (e) => {
-  const r = Math.floor(e.offsetY / alphabetViewScale / font.height);
-  const c = Math.floor(e.offsetX / alphabetViewScale / font.width);
+  const r = Math.floor(e.offsetY / alphabetViewScale / doc.font.height);
+  const c = Math.floor(e.offsetX / alphabetViewScale / doc.font.width);
   const index = r * alphabetCols + c;
-  const char = font.charactersList[index];
+  const char = doc.font.charactersList[index];
   if (!char) throw new Error(`No char found for position y${r},x${c}`);
 
   selectCharInAlphabet(index);
 
-  if (paletteData.modifyingPhox && paletteData.selectedPhox > 0) {
-    const selectedPalettePhox = getPhoxFromPaletteIndex(paletteData.selectedPhox);
+  if (session.paletteData.modifyingPhox && session.paletteData.selectedPhox > 0) {
+    const selectedPalettePhox = doc.phoxelis.getPhoxFromPaletteIndex(
+      session.paletteData.selectedPhox,
+    );
     if (selectedPalettePhox) {
-      storePhoxInPalette(paletteData.selectedPhox, {
-        char: dp.char,
+      doc.phoxelis.storePhoxInPalette(session.paletteData.selectedPhox, {
+        char: session.dp.char,
         fg: selectedPalettePhox.fg,
         bg: selectedPalettePhox.bg,
       });
@@ -1033,7 +773,7 @@ removeLayerBtn.style.cssText = `
   font-size: 11px;
   cursor: pointer;
 `;
-removeLayerBtn.addEventListener('click', () => removeDocumentLayer(activeLayer));
+removeLayerBtn.addEventListener('click', () => removeDocumentLayer(session.activeLayer));
 layerActions.appendChild(removeLayerBtn);
 
 layerPanel.appendChild(layerActions);
@@ -1194,7 +934,7 @@ function createLayerElement(layer: DocumentLayer) {
     const adjustedTarget = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
     const insertIdx = insertAbove ? adjustedTarget : adjustedTarget + 1;
 
-    moveLayer(layers[dragIdx].id, insertIdx);
+    doc.phoxelis.moveLayer(doc.phoxelis.layers[dragIdx].id, insertIdx);
 
     renderLayerList();
   }
@@ -1362,9 +1102,9 @@ sidebar.append(colorPickerContainer);
 const fgColorButton = document.createElement('button');
 fgColorButton.innerHTML = 'Foreground';
 function selectColorType(type: 'fg' | 'bg') {
-  selectedColorType = type;
+  session.selectedColorType = type;
 
-  colorPicker.color.hexString = dp[type];
+  colorPicker.color.hexString = session.dp[type];
 }
 
 fgColorButton.addEventListener('click', () => selectColorType('fg'));
@@ -1385,7 +1125,6 @@ appContainer.appendChild(content);
 appContainer.append(contentFooter);
 document.body.appendChild(appContainer);
 
-let selectedColorType: 'fg' | 'bg' = 'fg';
 const colorPicker = iro.ColorPicker('#colorpicker', {
   width: 150,
   layout: [
@@ -1398,15 +1137,17 @@ const colorPicker = iro.ColorPicker('#colorpicker', {
   ],
 });
 colorPicker.on('color:change', (color: any) => {
-  dp[selectedColorType] = color.hexString;
+  session.dp[session.selectedColorType] = color.hexString;
 
-  if (paletteData.modifyingPhox && paletteData.selectedPhox > 0) {
-    const selectedPalettePhox = getPhoxFromPaletteIndex(paletteData.selectedPhox);
+  if (session.paletteData.modifyingPhox && session.paletteData.selectedPhox > 0) {
+    const selectedPalettePhox = doc.phoxelis.getPhoxFromPaletteIndex(
+      session.paletteData.selectedPhox,
+    );
     if (selectedPalettePhox) {
-      storePhoxInPalette(paletteData.selectedPhox, {
+      doc.phoxelis.storePhoxInPalette(session.paletteData.selectedPhox, {
         char: selectedPalettePhox.char,
-        fg: selectedColorType === 'fg' ? dp[selectedColorType] : selectedPalettePhox.fg,
-        bg: selectedColorType === 'bg' ? dp[selectedColorType] : selectedPalettePhox.bg,
+        fg: session.selectedColorType === 'fg' ? session.dp[session.selectedColorType] : selectedPalettePhox.fg,
+        bg: session.selectedColorType === 'bg' ? session.dp[session.selectedColorType] : selectedPalettePhox.bg,
       });
     }
   }
@@ -1414,10 +1155,10 @@ colorPicker.on('color:change', (color: any) => {
 selectColorType('fg');
 
 const renderLoop = () => {
-  renderFrame(
-    layers.map((l) => ({
-      additionalTarget: documentLayers[l.id].target,
-      opacity: documentLayers[l.id].visible ? documentLayers[l.id].opacity / 100 : 0,
+  doc.phoxelis.renderFrame(
+    doc.phoxelis.layers.map((l) => ({
+      additionalTarget: doc.layers[l.id].target,
+      opacity: doc.layers[l.id].visible ? doc.layers[l.id].opacity / 100 : 0,
     })),
   );
   window.requestAnimationFrame(renderLoop);
@@ -1549,17 +1290,17 @@ type CellPosition = { x: number; y: number };
 const mousePos: CellPosition = { x: -1, y: -1 };
 
 function setMousePos(event: PointerEvent) {
-  const { width, top, left } = canvas.getBoundingClientRect();
-  const scale = width / (cols * font.width);
+  const { width, top, left } = doc.phoxelis.canvas.getBoundingClientRect();
+  const scale = width / (doc.size.cols * doc.font.width);
   const mouseScreenPosX = event.clientX - left;
   const mouseScreenPosY = event.clientY - top;
   mousePos.x = Math.min(
-    cols - 1,
-    Math.max(0, Math.floor(mouseScreenPosX / (font.width * scale))),
+    doc.size.cols - 1,
+    Math.max(0, Math.floor(mouseScreenPosX / (doc.font.width * scale))),
   );
   mousePos.y = Math.min(
-    rows - 1,
-    Math.max(0, Math.floor(mouseScreenPosY / (font.height * scale))),
+    doc.size.rows - 1,
+    Math.max(0, Math.floor(mouseScreenPosY / (doc.font.height * scale))),
   );
 }
 drawboard.addEventListener('pointerdown', setMousePos);
@@ -1687,17 +1428,17 @@ const drawTool: DrawTool = {
   },
   addPhoxelToDraft(p: Phoxel) {
     this.data!.draftPhoxels.set(`${p.r};${p.c}`, p);
-    renderDpWithMode(draftScreen, p.r, p.c, draftMainLayer, {
+    renderDpWithMode(draftScreen, p.r, p.c, getDraftBaseLayer(), {
       draftErasure: true,
     });
   },
   onPointerDown() {
     this.data.drawing = true;
-    this.addPhoxelToDraft({ phox: dp, r: mousePos.y, c: mousePos.x });
+    this.addPhoxelToDraft({ phox: session.dp, r: mousePos.y, c: mousePos.x });
   },
   onPointerMove() {
     if (this.data.drawing) {
-      this.addPhoxelToDraft({ phox: dp, r: mousePos.y, c: mousePos.x });
+      this.addPhoxelToDraft({ phox: session.dp, r: mousePos.y, c: mousePos.x });
     }
   },
   onPointerUp() {
@@ -1743,19 +1484,19 @@ const rectTool: Tool = {
     const c2 = Math.max(startC, mousePos.x);
     // Top & bottom edges
     for (let c = c1; c <= c2; c++) {
-      renderDpWithMode(draftScreen, r1, c, draftMainLayer, {
+      renderDpWithMode(draftScreen, r1, c, getDraftBaseLayer(), {
         draftErasure: true,
       });
-      renderDpWithMode(draftScreen, r2, c, draftMainLayer, {
+      renderDpWithMode(draftScreen, r2, c, getDraftBaseLayer(), {
         draftErasure: true,
       });
     }
     // Left & right edges
     for (let r = r1; r <= r2; r++) {
-      renderDpWithMode(draftScreen, r, c1, draftMainLayer, {
+      renderDpWithMode(draftScreen, r, c1, getDraftBaseLayer(), {
         draftErasure: true,
       });
-      renderDpWithMode(draftScreen, r, c2, draftMainLayer, {
+      renderDpWithMode(draftScreen, r, c2, getDraftBaseLayer(), {
         draftErasure: true,
       });
     }
@@ -1819,7 +1560,7 @@ const filledRectTool: Tool = {
     const c2 = Math.max(startC, mousePos.x);
     for (let r = r1; r <= r2; r++) {
       for (let c = c1; c <= c2; c++) {
-        renderDpWithMode(draftScreen, r, c, draftMainLayer, {
+        renderDpWithMode(draftScreen, r, c, getDraftBaseLayer(), {
           draftErasure: true,
         });
       }
@@ -1903,7 +1644,7 @@ const lineTool: Tool = {
     const { startR, startC } = this.data!;
     const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
     for (const { r, c } of cells) {
-      renderDpWithMode(draftScreen, r, c, draftMainLayer, {
+      renderDpWithMode(draftScreen, r, c, getDraftBaseLayer(), {
         draftErasure: true,
       });
     }
@@ -1953,7 +1694,7 @@ const ellipseTool: Tool = {
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseOutline(
       (r, c) =>
-        renderDpWithMode(draftScreen, r, c, draftMainLayer, {
+        renderDpWithMode(draftScreen, r, c, getDraftBaseLayer(), {
           draftErasure: true,
         }),
       startR,
@@ -2005,7 +1746,7 @@ const filledEllipseTool: Tool = {
     const ry = Math.abs(mousePos.y - startR);
     drawEllipseFill(
       (r, c) =>
-        renderDpWithMode(draftScreen, r, c, draftMainLayer, {
+        renderDpWithMode(draftScreen, r, c, getDraftBaseLayer(), {
           draftErasure: true,
         }),
       startR,
@@ -2117,7 +1858,7 @@ function drawEllipseFill(
 
   for (
     let r = Math.max(0, Math.floor(rMin));
-    r <= Math.min(rows - 1, Math.ceil(rMax));
+    r <= Math.min(doc.size.rows - 1, Math.ceil(rMax));
     r++
   ) {
     const dy = r - centerR;
@@ -2127,7 +1868,7 @@ function drawEllipseFill(
     if (ratio > 1) continue;
     const dx = Math.sqrt(Math.max(0, 1 - ratio)) * halfRx;
     const left = Math.max(0, Math.ceil(centerC - dx));
-    const right = Math.min(cols - 1, Math.floor(centerC + dx));
+    const right = Math.min(doc.size.cols - 1, Math.floor(centerC + dx));
     for (let c = left; c <= right; c++) {
       renderFn(r, c);
     }
@@ -2205,8 +1946,8 @@ function drawCharShapeInAlphabet(
   fg: string,
   bg: string,
 ) {
-  const yOffset = Math.floor(index / alphabetCols) * font.height;
-  const xOffset = (index % alphabetCols) * font.width;
+  const yOffset = Math.floor(index / alphabetCols) * doc.font.height;
+  const xOffset = (index % alphabetCols) * doc.font.width;
   for (let y = 0; y < charShape.length; y++) {
     for (let x = 0; x < charShape[0].length; x++) {
       const pixelVal = charShape[y][x];
@@ -2216,7 +1957,7 @@ function drawCharShapeInAlphabet(
   }
 }
 
-font.charactersList.forEach((char, i) => {
+doc.font.charactersList.forEach((char, i) => {
   drawCharShapeInAlphabet(i, char.shape, '#FFFFFF', '#000000');
 });
 
@@ -2246,10 +1987,10 @@ function resetWorkspace() {
 }
 
 async function saveDocument(filename: string) {
-  const phoxelisData = exportPhoxelis(filename);
+  const phoxelisData = doc.phoxelis.exportPhoxelis(filename);
   const documentData = {
     phoxelis: phoxelisData,
-    documentLayers: _.mapValues(documentLayers, (e) => ({
+    layers: _.mapValues(doc.layers, (e) => ({
       ...e,
       target: undefined,
     })),
@@ -2270,11 +2011,13 @@ async function loadDocument(filename: string) {
   resetWorkspace();
 
   const fileData = JSON.parse(fileDataString) as Awaited<ReturnType<typeof saveDocument>>;
-  importPhoxelis(fileData.phoxelis);
-  documentLayers = _.mapValues(fileData.documentLayers, (l) => {
+  console.log('fileData.phoxelis', fileData.phoxelis);
+  doc.phoxelis.importPhoxelis(fileData.phoxelis);
+
+  doc.layers = _.mapValues(fileData.layers, (l) => {
     const target = document.createElement('canvas');
-    target.width = font.width * cols;
-    target.height = font.height * rows;
+    target.width = doc.font.width * doc.size.cols;
+    target.height = doc.font.height * doc.size.rows;
     target.style = layerPreviewStyle;
 
     return {
@@ -2283,7 +2026,8 @@ async function loadDocument(filename: string) {
     };
   });
 
-  activeLayer = layers[0].id;
+  console.log('doc.layers', doc.layers);
+  session.activeLayer = doc.phoxelis.layers[0].id;
   renderLayerList();
 
   console.log(`${filename} imported.`);
@@ -2309,4 +2053,5 @@ if (savedRefImageBase64) {
   clearRefImageStorage();
 }
 
-loadDocument(filename);
+// TODO bugged document. How to handle these?
+// loadDocument(filename);
