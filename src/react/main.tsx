@@ -38,8 +38,8 @@ const size = {
   rows: 37,
   cols: 152,
 };
-const fontObj = await getFont('1_Trithemius8x16');
-const phoxelisCanvas = Phoxelis(size.rows, size.cols, fontObj, true);
+const font = await getFont('1_Trithemius8x16');
+const phoxelis = Phoxelis(size.rows, size.cols, font, true);
 
 interface WorkspaceDocument {
   phoxelis: ReturnType<typeof Phoxelis>;
@@ -49,8 +49,8 @@ interface WorkspaceDocument {
 }
 
 let doc: WorkspaceDocument = {
-  phoxelis: phoxelisCanvas,
-  font: fontObj,
+  phoxelis,
+  font,
   size,
   layers: {},
 };
@@ -199,7 +199,7 @@ function renderDpWithMode(
     target.renderPhoxel(session.dp.char, session.dp.fg, session.dp.bg, r, c, layerId);
     return;
   } else if (session.drawMode === 'char') {
-    const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, layerId);
+    const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(
       session.dp.char,
@@ -210,7 +210,7 @@ function renderDpWithMode(
       layerId,
     );
   } else if (session.drawMode === 'color') {
-    const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, layerId);
+    const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(
       underlyingPhoxel.char,
@@ -221,7 +221,7 @@ function renderDpWithMode(
       layerId,
     );
   } else if (session.drawMode === 'fg') {
-    const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, layerId);
+    const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(
       underlyingPhoxel.char,
@@ -232,7 +232,7 @@ function renderDpWithMode(
       layerId,
     );
   } else if (session.drawMode === 'bg') {
-    const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, layerId);
+    const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(
       underlyingPhoxel.char,
@@ -567,7 +567,9 @@ drawboard.style =
   'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
 doc.phoxelis.canvas.style = `position: relative; border: 1px solid black; image-rendering: pixelated;`;
 const draftScreen = Phoxelis(doc.size.rows, doc.size.cols, doc.font);
-const getDraftBaseLayer = () => draftScreen.layers[0].id;
+const getDraftBaseLayer = () => {
+  return draftScreen.layers[0].id
+};
 draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black; image-rendering: pixelated;`;
 const refImage = document.createElement('img');
 const refImageWrapper = document.createElement('div');
@@ -2011,7 +2013,6 @@ async function loadDocument(filename: string) {
   resetWorkspace();
 
   const fileData = JSON.parse(fileDataString) as Awaited<ReturnType<typeof saveDocument>>;
-  console.log('fileData.phoxelis', fileData.phoxelis);
   doc.phoxelis.importPhoxelis(fileData.phoxelis);
 
   doc.layers = _.mapValues(fileData.layers, (l) => {
@@ -2026,7 +2027,6 @@ async function loadDocument(filename: string) {
     };
   });
 
-  console.log('doc.layers', doc.layers);
   session.activeLayer = doc.phoxelis.layers[0].id;
   renderLayerList();
 
