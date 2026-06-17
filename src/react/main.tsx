@@ -21,6 +21,17 @@ import { App } from './App';
 // TODO doc.layers as proxy. Decouple react from what exists rn
 import { proxy } from 'valtio';
 
+const layerPreviewStyle = `height: 100%; width: 100%; object-fit: contain;`;
+
+const layerList = document.createElement('div');
+layerList.style.cssText = `
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+`;
+
 ReactDOM.createRoot(document.querySelector('#app')!).render(
   <React.StrictMode>
     <App />
@@ -39,7 +50,10 @@ const size = {
   cols: 152,
 };
 const font = await getFont('1_Trithemius8x16');
-const phoxelis = Phoxelis(size.rows, size.cols, font, true);
+const phoxelis = Phoxelis(size.rows, size.cols, font, {
+  renderPalette: true,
+  createBaseLayer: false,
+});
 
 interface WorkspaceDocument {
   phoxelis: ReturnType<typeof Phoxelis>;
@@ -54,6 +68,7 @@ let doc: WorkspaceDocument = {
   size,
   layers: {},
 };
+createDocumentLayer(); // Create base layer
 
 interface Session {
   dp: Phox;
@@ -85,16 +100,8 @@ let session: Session = {
   },
   selectedColorType: 'fg',
 };
+selectLayer(session.activeLayer);
 
-const layerPreviewStyle = `height: 100%; width: 100%; object-fit: contain;`;
-const layerList = document.createElement('div');
-layerList.style.cssText = `
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 300px;
-  overflow-y: auto;
-`;
 
 function renderLayerList() {
   doc.phoxelis.layers.toReversed().forEach((l) => {
@@ -105,9 +112,6 @@ function renderLayerList() {
     layerList.appendChild(layerEl);
   });
 }
-
-createDocumentLayer(doc.phoxelis.layers[0].id);
-selectLayer(doc.phoxelis.layers[0].id);
 
 type DocumentLayer = {
   layerId: string;
@@ -135,7 +139,7 @@ function createDocumentLayer(layerId?: string) {
 
   createLayerElement(doc.layers[lid]);
   renderLayerList();
-  selectLayer(lid);
+  return lid;
 }
 
 function removeDocumentLayer(layerId: string) {
@@ -363,7 +367,9 @@ paletteOverlay.addEventListener('click', (e) => {
 
   colorPicker.color.hexString = session.dp[session.selectedColorType];
   selectCharInAlphabet(
-    doc.font.charactersList.findIndex((c) => c.codepoint === session.dp.char.codePointAt(0)),
+    doc.font.charactersList.findIndex(
+      (c) => c.codepoint === session.dp.char.codePointAt(0),
+    ),
   );
 
   const ctx = paletteOverlay.getContext('2d');
@@ -568,7 +574,7 @@ drawboard.style =
 doc.phoxelis.canvas.style = `position: relative; border: 1px solid black; image-rendering: pixelated;`;
 const draftScreen = Phoxelis(doc.size.rows, doc.size.cols, doc.font);
 const getDraftBaseLayer = () => {
-  return draftScreen.layers[0].id
+  return draftScreen.layers[0].id;
 };
 draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black; image-rendering: pixelated;`;
 const refImage = document.createElement('img');
@@ -760,7 +766,10 @@ addLayerBtn.style.cssText = `
   font-size: 11px;
   cursor: pointer;
 `;
-addLayerBtn.addEventListener('click', () => createDocumentLayer());
+addLayerBtn.addEventListener('click', () => {
+  const layerId = createDocumentLayer();
+  selectLayer(layerId);
+});
 layerActions.appendChild(addLayerBtn);
 
 const removeLayerBtn = document.createElement('button');
@@ -1148,8 +1157,14 @@ colorPicker.on('color:change', (color: any) => {
     if (selectedPalettePhox) {
       doc.phoxelis.storePhoxInPalette(session.paletteData.selectedPhox, {
         char: selectedPalettePhox.char,
-        fg: session.selectedColorType === 'fg' ? session.dp[session.selectedColorType] : selectedPalettePhox.fg,
-        bg: session.selectedColorType === 'bg' ? session.dp[session.selectedColorType] : selectedPalettePhox.bg,
+        fg:
+          session.selectedColorType === 'fg'
+            ? session.dp[session.selectedColorType]
+            : selectedPalettePhox.fg,
+        bg:
+          session.selectedColorType === 'bg'
+            ? session.dp[session.selectedColorType]
+            : selectedPalettePhox.bg,
       });
     }
   }
@@ -1458,7 +1473,7 @@ const drawTool: DrawTool = {
   },
   resetTool() {
     this.data.draftPhoxels = new Map();
-    draftScreen.reset();
+    draftScreen.reset(true);
     this.data.drawing = false;
   },
   abort() {
@@ -1478,7 +1493,7 @@ const rectTool: Tool = {
   onPointerMove(_e: PointerEvent) {
     if (!this.data!.drawing) return;
     // Clear draft and redraw preview rectangle
-    draftScreen.reset();
+    draftScreen.reset(true);
     const { startR, startC } = this.data!;
     const r1 = Math.min(startR, mousePos.y);
     const r2 = Math.max(startR, mousePos.y);
@@ -1533,7 +1548,7 @@ const rectTool: Tool = {
     this.resetTool!();
   },
   resetTool() {
-    draftScreen.reset();
+    draftScreen.reset(true);
     this.data!.startR = -1;
     this.data!.startC = -1;
     this.data!.drawing = false;
@@ -1554,7 +1569,7 @@ const filledRectTool: Tool = {
   },
   onPointerMove(_e: PointerEvent) {
     if (!this.data!.drawing) return;
-    draftScreen.reset();
+    draftScreen.reset(true);
     const { startR, startC } = this.data!;
     const r1 = Math.min(startR, mousePos.y);
     const r2 = Math.max(startR, mousePos.y);
@@ -1591,7 +1606,7 @@ const filledRectTool: Tool = {
     this.resetTool!();
   },
   resetTool() {
-    draftScreen.reset();
+    draftScreen.reset(true);
     this.data!.startR = -1;
     this.data!.startC = -1;
     this.data!.drawing = false;
@@ -1642,7 +1657,7 @@ const lineTool: Tool = {
   },
   onPointerMove(_e: PointerEvent) {
     if (!this.data!.drawing) return;
-    draftScreen.reset();
+    draftScreen.reset(true);
     const { startR, startC } = this.data!;
     const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
     for (const { r, c } of cells) {
@@ -1668,7 +1683,7 @@ const lineTool: Tool = {
     this.resetTool!();
   },
   resetTool() {
-    draftScreen.reset();
+    draftScreen.reset(true);
     this.data!.startR = -1;
     this.data!.startC = -1;
     this.data!.drawing = false;
@@ -1690,7 +1705,7 @@ const ellipseTool: Tool = {
   },
   onPointerMove(_e: PointerEvent) {
     if (!this.data!.drawing) return;
-    draftScreen.reset();
+    draftScreen.reset(true);
     const { startR, startC } = this.data!;
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
@@ -1721,7 +1736,7 @@ const ellipseTool: Tool = {
     this.resetTool!();
   },
   resetTool() {
-    draftScreen.reset();
+    draftScreen.reset(true);
     this.data!.startR = -1;
     this.data!.startC = -1;
     this.data!.drawing = false;
@@ -1742,7 +1757,7 @@ const filledEllipseTool: Tool = {
   },
   onPointerMove(_e: PointerEvent) {
     if (!this.data!.drawing) return;
-    draftScreen.reset();
+    draftScreen.reset(true);
     const { startR, startC } = this.data!;
     const rx = Math.abs(mousePos.x - startC);
     const ry = Math.abs(mousePos.y - startR);
@@ -1773,7 +1788,7 @@ const filledEllipseTool: Tool = {
     this.resetTool!();
   },
   resetTool() {
-    draftScreen.reset();
+    draftScreen.reset(true);
     this.data!.startR = -1;
     this.data!.startC = -1;
   },
