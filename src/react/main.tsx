@@ -184,7 +184,8 @@ async function Workspace(config: {
   draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black; image-rendering: pixelated;`;
 
   const layersWrapper = document.createElement('div');
-  layersWrapper.appendChild(ws.phoxelis.canvas);
+  layersWrapper.style = 'position: relative';
+  layersWrapper.appendChild(phoxelis.canvas);
   layersWrapper.appendChild(refImageWrapper);
   layersWrapper.appendChild(draftScreen.canvas);
   drawboard.appendChild(layersWrapper);
@@ -325,6 +326,14 @@ async function Workspace(config: {
       }
     }
   });
+  const fgColorButton = document.createElement('button');
+  fgColorButton.innerHTML = 'Foreground';
+  fgColorButton.addEventListener('click', () => workspace.selectColorType('fg'));
+  colorPickerEl.append(fgColorButton);
+  const bgColorButton = document.createElement('button');
+  bgColorButton.innerHTML = 'Background';
+  bgColorButton.addEventListener('click', () => workspace.selectColorType('bg'));
+  colorPickerEl.append(bgColorButton);
   function selectColorType(type: 'fg' | 'bg') {
     session.selectedColorType = type;
     colorPicker.color.hexString = session.dp[type];
@@ -333,11 +342,13 @@ async function Workspace(config: {
   selectColorType('fg');
 
   function setReferenceImage(base64: string) {
-    if(!refImagePanzoom) {
-      console.error('setReferenceImage error: No refImagePanzoom. Did you startPanzoom()?');
+    if (!refImagePanzoom) {
+      console.error(
+        'setReferenceImage error: No refImagePanzoom. Did you startPanzoom()?',
+      );
       return;
     }
-    
+
     refImage.src = base64;
     refImageScale = 1;
     refImagePanzoom.reset();
@@ -1497,7 +1508,7 @@ async function Workspace(config: {
     refImage,
     paletteSelector,
     currTool,
-    colorPicker,
+    colorPicker: colorPickerEl,
     alphabet: alphabetContainer,
     createLayer,
     removeLayer,
@@ -2478,24 +2489,9 @@ function createLayerElement(layer: DocumentLayer) {
 
 layerPanel.appendChild(layerList);
 
-// ─── Color Picker ────────────────────────────────────────────────────────────
-const colorPickerContainer = document.createElement('div');
-colorPickerContainer.id = 'colorpicker';
-sidebar.append(colorPickerContainer);
 sidebar.append(workspace.alphabet);
-
-const fgColorButton = document.createElement('button');
-fgColorButton.innerHTML = 'Foreground';
-
-fgColorButton.addEventListener('click', () => workspace.selectColorType('fg'));
-const bgColorButton = document.createElement('button');
-bgColorButton.innerHTML = 'Background';
-bgColorButton.addEventListener('click', () => workspace.selectColorType('bg'));
-colorPickerContainer.append(fgColorButton);
-colorPickerContainer.append(bgColorButton);
-
+sidebar.append(workspace.colorPicker);
 sidebar.append(layerPanel);
-
 content.append(drawModeSidebar);
 content.append(leftSidebar);
 content.append(workspace.drawboard);
@@ -2504,6 +2500,8 @@ appContainer.appendChild(navBar);
 appContainer.appendChild(content);
 appContainer.append(footer);
 document.body.appendChild(appContainer);
+
+workspace.startPanzoom();
 
 // ─── Restore reference image & panzoom config on load ────────────────────────
 // TODO store panzoom config as part of document
