@@ -1,10 +1,10 @@
-import { getFont, Phoxelis, type Phox, type CharShape } from "phoxelis";
-import "../style.css";
-import Panzoom from "@panzoom/panzoom";
-import Hammer from "hammerjs";
-import _ from "lodash";
-import iro from "@jaames/iro";
-import { downloadArrayBuffer as downloadAsFile, toggleFullScreen } from "../utils";
+import { getFont, Phoxelis, type Phox, type CharShape } from 'phoxelis';
+import '../style.css';
+import Panzoom from '@panzoom/panzoom';
+import Hammer from 'hammerjs';
+import _ from 'lodash';
+import iro from '@jaames/iro';
+import { downloadArrayBuffer as downloadAsFile, toggleFullScreen } from '../utils';
 import {
   saveRefImageToStorage,
   loadRefImageFromStorage,
@@ -12,18 +12,18 @@ import {
   loadRefImagePanzoomConfig,
   clearRefImageStorage,
   fileToBase64,
-} from "../refImageStorage";
+} from '../refImageStorage';
 
-import React, { useEffect, useRef } from "react";
-import ReactDOM from "react-dom/client";
+import React, { useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom/client';
 
 // TODO doc.layers as proxy. Decouple react from what exists rn
-import { proxy } from "valtio";
+import { proxy } from 'valtio';
 
 const layerPreviewStyle = `height: 100%; width: 100%; object-fit: contain;`;
 const paletteScale = 2;
 
-const layerList = document.createElement("div");
+const layerList = document.createElement('div');
 layerList.style.cssText = `
   display: flex;
   flex-direction: column;
@@ -39,12 +39,12 @@ type Phoxel = {
 };
 type PhoxelPosition = [r: number, c: number];
 
-const filename = "test_file";
+const filename = 'test_file';
 const size = {
   rows: 37,
   cols: 152,
 };
-const font = await getFont("1_Trithemius8x16");
+const font = await getFont('1_Trithemius8x16');
 const phoxelis = Phoxelis(size.rows, size.cols, font, {
   renderPalette: true,
   createBaseLayer: false,
@@ -67,7 +67,7 @@ createDocumentLayer(); // Create base layer
 
 interface Session {
   dp: Phox;
-  drawMode: "draw" | "char" | "fg" | "bg" | "color" | "erase";
+  drawMode: 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase';
   activeLayer: string;
   paletteData: {
     selectedPhox: number;
@@ -76,13 +76,13 @@ interface Session {
   alphabetData: {
     selectedChar: number;
   };
-  selectedColorType: "fg" | "bg";
+  selectedColorType: 'fg' | 'bg';
 }
 
-const startDp = { char: "D", fg: "#00FF00", bg: "#FF00FF" };
+const startDp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
 let session: Session = {
-  dp: { char: "D", fg: "#00FF00", bg: "#FF00FF" },
-  drawMode: "draw",
+  dp: { char: 'D', fg: '#00FF00', bg: '#FF00FF' },
+  drawMode: 'draw',
   activeLayer: doc.phoxelis.layers[0].id,
   paletteData: {
     selectedPhox: -1,
@@ -93,7 +93,7 @@ let session: Session = {
       (c) => c.codepoint === startDp.char.codePointAt(0),
     ),
   },
-  selectedColorType: "fg",
+  selectedColorType: 'fg',
 };
 selectLayer(session.activeLayer);
 
@@ -116,7 +116,7 @@ type DocumentLayer = {
 };
 
 function createDocumentLayer(layerId?: string) {
-  const target = document.createElement("canvas");
+  const target = document.createElement('canvas');
   target.width = doc.font.width * doc.size.cols;
   target.height = doc.font.height * doc.size.rows;
   target.style = layerPreviewStyle;
@@ -163,10 +163,10 @@ function selectLayer(layerId: string) {
     return;
   }
   layerList
-    .querySelectorAll(".layer-row")
-    .forEach((el) => ((el as HTMLDivElement).style.background = "#2a2a2a"));
+    .querySelectorAll('.layer-row')
+    .forEach((el) => ((el as HTMLDivElement).style.background = '#2a2a2a'));
   session.activeLayer = layerId;
-  (layerRow as HTMLDivElement).style.background = "#7a7a7a";
+  (layerRow as HTMLDivElement).style.background = '#7a7a7a';
 }
 
 const panzoomConfiguration = {
@@ -174,11 +174,11 @@ const panzoomConfiguration = {
   maxScale: 10,
   noBind: true,
   relative: true,
-  cursor: "default",
+  cursor: 'default',
   startX: 0,
   startY: 0,
   startScale: 1,
-  excludeClass: "panzoom-exclude",
+  excludeClass: 'panzoom-exclude',
 };
 const refImagePanzoomConfig = { ...panzoomConfiguration };
 let refImageScale = refImagePanzoomConfig.startScale;
@@ -192,10 +192,10 @@ function renderDpWithMode(
   layerId: string,
   options: { draftErasure: boolean } = { draftErasure: false },
 ) {
-  if (session.drawMode === "draw") {
+  if (session.drawMode === 'draw') {
     target.renderPhoxel(session.dp.char, session.dp.fg, session.dp.bg, r, c, layerId);
     return;
-  } else if (session.drawMode === "char") {
+  } else if (session.drawMode === 'char') {
     const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(
@@ -206,7 +206,7 @@ function renderDpWithMode(
       c,
       layerId,
     );
-  } else if (session.drawMode === "color") {
+  } else if (session.drawMode === 'color') {
     const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(
@@ -217,7 +217,7 @@ function renderDpWithMode(
       c,
       layerId,
     );
-  } else if (session.drawMode === "fg") {
+  } else if (session.drawMode === 'fg') {
     const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(
@@ -228,7 +228,7 @@ function renderDpWithMode(
       c,
       layerId,
     );
-  } else if (session.drawMode === "bg") {
+  } else if (session.drawMode === 'bg') {
     const underlyingPhoxel = doc.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
     if (!underlyingPhoxel) return;
     target.renderPhoxel(
@@ -239,9 +239,9 @@ function renderDpWithMode(
       c,
       layerId,
     );
-  } else if (session.drawMode === "erase") {
+  } else if (session.drawMode === 'erase') {
     if (options.draftErasure) {
-      target.renderPhoxel("D", "#FF0000", "#FF000055", r, c, layerId);
+      target.renderPhoxel('D', '#FF0000', '#FF000055', r, c, layerId);
     } else {
       target.removePhoxel(r, c, layerId);
     }
@@ -302,7 +302,7 @@ function undoLastChange() {
   const lastChange = changesHistory.pop();
 
   if (!lastChange) {
-    console.warn("Nothing to undo");
+    console.warn('Nothing to undo');
     return;
   }
 
@@ -314,7 +314,7 @@ function redoLastChange() {
   const lastChange = redoHistory.pop();
 
   if (!lastChange) {
-    console.warn("Nothing to redo");
+    console.warn('Nothing to redo');
     return;
   }
 
@@ -328,10 +328,10 @@ function App(props: { children?: React.ReactNode }) {
   return (
     <div
       style={{
-        width: "100%",
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       {props.children}
@@ -339,15 +339,15 @@ function App(props: { children?: React.ReactNode }) {
   );
 }
 
-const appContainer = document.createElement("div");
-appContainer.style = "width: 100%; height: 100%; display: flex; flex-direction: column;";
+const appContainer = document.createElement('div');
+appContainer.style = 'width: 100%; height: 100%; display: flex; flex-direction: column;';
 
 function NavBar(props: { children?: React.ReactNode }) {
   return (
     <div
       style={{
-        width: "100%",
-        background: "#888888",
+        width: '100%',
+        background: '#888888',
       }}
     >
       {props.children}
@@ -355,17 +355,17 @@ function NavBar(props: { children?: React.ReactNode }) {
   );
 }
 
-const navBar = document.createElement("div");
+const navBar = document.createElement('div');
 navBar.style = `width: 100%; background: #888888;`;
 
 function Content(props: { children?: React.ReactNode }) {
   return (
     <div
       style={{
-        width: "100%",
-        display: "flex",
+        width: '100%',
+        display: 'flex',
         flex: 1,
-        flexDirection: "row",
+        flexDirection: 'row',
         minHeight: 0,
       }}
     >
@@ -374,22 +374,22 @@ function Content(props: { children?: React.ReactNode }) {
   );
 }
 
-const content = document.createElement("div");
+const content = document.createElement('div');
 content.style =
-  "width: 100%; display: flex; flex: 1; flex-direction: row; min-height: 0;";
+  'width: 100%; display: flex; flex: 1; flex-direction: row; min-height: 0;';
 
 function ContentFooter(props: { children?: React.ReactNode }) {
-  return <div style={{ overflowX: "scroll" }}>{props.children}</div>;
+  return <div style={{ overflowX: 'scroll' }}>{props.children}</div>;
 }
 
-const contentFooter = document.createElement("div");
-contentFooter.style = "overflow-x: scroll;";
+const contentFooter = document.createElement('div');
+contentFooter.style = 'overflow-x: scroll;';
 
 function PaletteSelector() {
   const paletteScaledHeight = doc.font.height * paletteScale;
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: 'relative' }}>
       <Palette paletteScaledHeight={paletteScaledHeight} />
       <PaletteOverlayCanvas paletteScaledHeight={paletteScaledHeight} />
     </div>
@@ -402,7 +402,7 @@ function Palette(props: { paletteScaledHeight: number }) {
   useEffect(() => {
     // MOUNT PALETTE CANVAS
     if (!containerRef.current) {
-      console.error("PaletteSelector warn: No container ref to mount palette canvas");
+      console.error('PaletteSelector warn: No container ref to mount palette canvas');
       return;
     }
 
@@ -419,8 +419,8 @@ function Palette(props: { paletteScaledHeight: number }) {
   return <div ref={containerRef}></div>;
 }
 
-const paletteWrapper = document.createElement("div");
-paletteWrapper.style = "position: relative;";
+const paletteWrapper = document.createElement('div');
+paletteWrapper.style = 'position: relative;';
 
 function PaletteOverlayCanvas(props: { paletteScaledHeight: number }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -430,11 +430,11 @@ function PaletteOverlayCanvas(props: { paletteScaledHeight: number }) {
       onClick={(e) => onPaletteOverlayClick(e.nativeEvent)}
       style={{
         height: props.paletteScaledHeight,
-        border: "1px solid black",
-        position: "absolute",
+        border: '1px solid black',
+        position: 'absolute',
         top: 0,
         left: 0,
-        imageRendering: "pixelated",
+        imageRendering: 'pixelated',
       }}
       ref={canvasRef}
       width={doc.phoxelis.palette.width}
@@ -443,7 +443,7 @@ function PaletteOverlayCanvas(props: { paletteScaledHeight: number }) {
   );
 }
 
-const paletteOverlay = document.createElement("canvas");
+const paletteOverlay = document.createElement('canvas');
 paletteOverlay.width = doc.phoxelis.palette.width;
 paletteOverlay.height = doc.phoxelis.palette.height;
 const paletteScaledHeight = doc.font.height * paletteScale;
@@ -458,7 +458,7 @@ const onPaletteOverlayClick = (e: MouseEvent) => {
   const phox = doc.phoxelis.getPhoxFromPaletteIndex(pos);
 
   if (!phox) {
-    console.warn("Null Phox selected. Omitting selection");
+    console.warn('Null Phox selected. Omitting selection');
     return;
   }
   session.dp = phox;
@@ -471,65 +471,84 @@ const onPaletteOverlayClick = (e: MouseEvent) => {
     ),
   );
 
-  const ctx = paletteOverlay.getContext("2d");
+  const ctx = paletteOverlay.getContext('2d');
   ctx!.reset();
-  ctx!.strokeStyle = "green";
+  ctx!.strokeStyle = 'green';
   ctx!.lineWidth = 2;
   ctx!.strokeRect(pos * doc.font.width, 0, doc.font.width, doc.font.height);
 };
-paletteOverlay.addEventListener("click", onPaletteOverlayClick);
+paletteOverlay.addEventListener('click', onPaletteOverlayClick);
 paletteWrapper.append(doc.phoxelis.palette);
 paletteWrapper.append(paletteOverlay);
 contentFooter.append(paletteWrapper);
 
 function Sidebar(props: { children?: React.ReactNode }) {
-  return <div style={{ display: "flex", flexDirection: "column" }}></div>;
+  return <div style={{ display: 'flex', flexDirection: 'column' }}></div>;
 }
 
-const sidebar = document.createElement("div");
+const sidebar = document.createElement('div');
 sidebar.style = `display: flex; flex-direction: column;`;
 
 // ─── Left Sidebar (Tool Selector) ────────────────────────────────────────────
 const drawModeButtons: HTMLButtonElement[] = [];
 
 type DrawModeDefinition = {
-  name: "draw" | "char" | "fg" | "bg" | "color" | "erase";
+  name: 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase';
   icon: string;
   tooltip: string;
 };
 
 const drawModeDefs: DrawModeDefinition[] = [
-  { name: "draw", icon: "✏", tooltip: "Draw (char + fg + bg)" },
-  { name: "char", icon: "A", tooltip: "Char only" },
-  { name: "fg", icon: "F", tooltip: "Foreground color only" },
-  { name: "bg", icon: "B", tooltip: "Background color only" },
-  { name: "color", icon: "◉", tooltip: "Color (fg + bg) only" },
-  { name: "erase", icon: "✕", tooltip: "Erase" },
+  { name: 'draw', icon: '✏', tooltip: 'Draw (char + fg + bg)' },
+  { name: 'char', icon: 'A', tooltip: 'Char only' },
+  { name: 'fg', icon: 'F', tooltip: 'Foreground color only' },
+  { name: 'bg', icon: 'B', tooltip: 'Background color only' },
+  { name: 'color', icon: '◉', tooltip: 'Color (fg + bg) only' },
+  { name: 'erase', icon: '✕', tooltip: 'Erase' },
 ];
 
-function DrawModeButton(props: { def: DrawModeDefinition }) {
+function DrawModeButton({ def }: { def: DrawModeDefinition }) {
+  // TODO listen for session.drawMode
+
   return (
     <button
-      style={`
-        background: #444;
-        color: #ccc;
-        border: 1px solid #555;
-        border-radius: 3px;
-        width: 36px;
-        height: 36px;
-        font-size: 18px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.15s;
-      `}
-    ></button>
+      title={def.tooltip}
+      style={{
+        background: session.drawMode === def.name ? '#666' : '#444',
+        color: '#ccc',
+        border: `1px solid ${session.drawMode === def.name ? '#888' : '#555'}`,
+        borderRadius: '3px',
+        width: '36px',
+        height: '36px',
+        fontSize: '18px',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'background 0.15s, border-color 0.15s',
+      }}
+      onMouseEnter={(e) => {
+        if (session.drawMode !== def.name) {
+          e.currentTarget.style.background = '#555';
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background =
+          session.drawMode === def.name ? '#666' : '#444';
+        e.currentTarget.style.borderColor =
+          session.drawMode === def.name ? '#888' : '#555';
+      }}
+      onClick={() => {
+        session.drawMode = def.name;
+      }}
+    >
+      {def.icon}
+    </button>
   );
 }
 
 function createDrawModeButton(def: DrawModeDefinition): HTMLButtonElement {
-  const btn = document.createElement("button");
+  const btn = document.createElement('button');
   btn.textContent = def.icon;
   btn.title = def.tooltip;
   btn.style.cssText = `
@@ -546,26 +565,48 @@ function createDrawModeButton(def: DrawModeDefinition): HTMLButtonElement {
     justify-content: center;
     transition: background 0.15s;
   `;
-  btn.addEventListener("mouseenter", () => {
-    btn.style.background = "#555";
+  btn.addEventListener('mouseenter', () => {
+    btn.style.background = '#555';
   });
-  btn.addEventListener("mouseleave", () => {
-    btn.style.background = session.drawMode === def.name ? "#666" : "#444";
+  btn.addEventListener('mouseleave', () => {
+    btn.style.background = session.drawMode === def.name ? '#666' : '#444';
   });
-  btn.addEventListener("click", () => {
+  btn.addEventListener('click', () => {
     drawModeButtons.forEach((b) => {
-      b.style.background = "#444";
-      b.style.borderColor = "#555";
+      b.style.background = '#444';
+      b.style.borderColor = '#555';
     });
-    btn.style.background = "#666";
-    btn.style.borderColor = "#888";
+    btn.style.background = '#666';
+    btn.style.borderColor = '#888';
     session.drawMode = def.name;
   });
   return btn;
 }
 
+function DrawModeSidebar(props: {}) {
+  return (
+    <div
+      style={{
+        width: '40px',
+        flexShrink: 0,
+        background: '#2a2a2a',
+        borderRight: '1px solid #444',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '8px 4px',
+        gap: 4,
+      }}
+    >
+      {drawModeDefs.map((d) => (
+        <DrawModeButton key={d.name} def={d} />
+      ))}
+    </div>
+  );
+}
+
 // ─── Left Sidebar (Draw Mode Selector) ───────────────────────────────────────
-const drawModeSidebar = document.createElement("div");
+const drawModeSidebar = document.createElement('div');
 drawModeSidebar.style = `
   width: 40px;
   flex-shrink: 0;
@@ -586,12 +627,30 @@ for (const def of drawModeDefs) {
 
 // Set initial active state for 'draw' mode
 if (drawModeButtons.length > 0) {
-  drawModeButtons[0].style.background = "#666";
-  drawModeButtons[0].style.borderColor = "#888";
+  drawModeButtons[0].style.background = '#666';
+  drawModeButtons[0].style.borderColor = '#888';
+}
+
+function LefstSideBar() {
+  return (
+    <div
+      style={`
+        width: 48px;
+        flex-shrink: 0;
+        background: #333;
+        border-right: 1px solid #555;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 8px 4px;
+        gap: 4px;
+      `}
+    ></div>
+  );
 }
 
 // ─── Left Sidebar (Tool Selector) ────────────────────────────────────────────
-const leftSidebar = document.createElement("div");
+const leftSidebar = document.createElement('div');
 leftSidebar.style = `
   width: 48px;
   flex-shrink: 0;
@@ -613,45 +672,45 @@ type ToolDefinition = {
 
 const toolDefs: ToolDefinition[] = [
   {
-    name: "draw",
-    icon: "✏",
-    tooltip: "Draw (freehand)",
+    name: 'draw',
+    icon: '✏',
+    tooltip: 'Draw (freehand)',
     createTool: () => drawTool,
   },
   {
-    name: "rect",
-    icon: "□",
-    tooltip: "Rectangle (outline)",
+    name: 'rect',
+    icon: '□',
+    tooltip: 'Rectangle (outline)',
     createTool: () => rectTool,
   },
   {
-    name: "filledRect",
-    icon: "■",
-    tooltip: "Filled Rectangle",
+    name: 'filledRect',
+    icon: '■',
+    tooltip: 'Filled Rectangle',
     createTool: () => filledRectTool,
   },
   {
-    name: "line",
-    icon: "╱",
-    tooltip: "Line",
+    name: 'line',
+    icon: '╱',
+    tooltip: 'Line',
     createTool: () => lineTool,
   },
   {
-    name: "ellipse",
-    icon: "⬭",
-    tooltip: "Ellipse (outline)",
+    name: 'ellipse',
+    icon: '⬭',
+    tooltip: 'Ellipse (outline)',
     createTool: () => ellipseTool,
   },
   {
-    name: "filledEllipse",
-    icon: "●",
-    tooltip: "Filled Ellipse",
+    name: 'filledEllipse',
+    icon: '●',
+    tooltip: 'Filled Ellipse',
     createTool: () => filledEllipseTool,
   },
 ];
 
 function createToolButton(def: ToolDefinition): HTMLButtonElement {
-  const btn = document.createElement("button");
+  const btn = document.createElement('button');
   btn.textContent = def.icon;
   btn.title = def.tooltip;
   btn.style.cssText = `
@@ -668,21 +727,21 @@ function createToolButton(def: ToolDefinition): HTMLButtonElement {
     justify-content: center;
     transition: background 0.15s;
   `;
-  btn.addEventListener("mouseenter", () => {
-    btn.style.background = "#555";
+  btn.addEventListener('mouseenter', () => {
+    btn.style.background = '#555';
   });
-  btn.addEventListener("mouseleave", () => {
-    btn.style.background = currTool?.tool.name === def.name ? "#666" : "#444";
+  btn.addEventListener('mouseleave', () => {
+    btn.style.background = currTool?.tool.name === def.name ? '#666' : '#444';
   });
-  btn.addEventListener("click", () => {
+  btn.addEventListener('click', () => {
     // Remove active state from all buttons
-    leftSidebar.querySelectorAll("button").forEach((b) => {
-      b.style.background = "#444";
-      b.style.borderColor = "#555";
+    leftSidebar.querySelectorAll('button').forEach((b) => {
+      b.style.background = '#444';
+      b.style.borderColor = '#555';
     });
     // Set active state
-    btn.style.background = "#666";
-    btn.style.borderColor = "#888";
+    btn.style.background = '#666';
+    btn.style.borderColor = '#888';
     setTool(def.createTool());
   });
   return btn;
@@ -693,41 +752,41 @@ for (const def of toolDefs) {
 }
 
 // Drawboard
-const drawboard = document.createElement("div");
+const drawboard = document.createElement('div');
 drawboard.style =
-  "width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;";
+  'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
 doc.phoxelis.canvas.style = `position: relative; border: 1px solid black; image-rendering: pixelated;`;
 const draftScreen = Phoxelis(doc.size.rows, doc.size.cols, doc.font);
 const getDraftBaseLayer = () => {
   return draftScreen.layers[0].id;
 };
 draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black; image-rendering: pixelated;`;
-const refImage = document.createElement("img");
-const refImageWrapper = document.createElement("div");
+const refImage = document.createElement('img');
+const refImageWrapper = document.createElement('div');
 refImageWrapper.append(refImage);
 refImageWrapper.style = `position: absolute; top: 0px; right: 0px; z-index: -999; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;`;
 
-const layersWrapper = document.createElement("div");
+const layersWrapper = document.createElement('div');
 layersWrapper.appendChild(doc.phoxelis.canvas);
 layersWrapper.appendChild(refImageWrapper);
 layersWrapper.appendChild(draftScreen.canvas);
 drawboard.appendChild(layersWrapper);
 
 // Navbar
-const saveButton = document.createElement("button");
-saveButton.innerHTML = "Save";
+const saveButton = document.createElement('button');
+saveButton.innerHTML = 'Save';
 saveButton.onclick = async () => {
   await saveDocument(filename);
 };
 navBar.appendChild(saveButton);
 
-const fullscreenButton = document.createElement("button");
-fullscreenButton.innerHTML = "Fullscreen";
+const fullscreenButton = document.createElement('button');
+fullscreenButton.innerHTML = 'Fullscreen';
 fullscreenButton.onclick = () => toggleFullScreen(document.body);
 navBar.appendChild(fullscreenButton);
 
-const exportButton = document.createElement("button");
-exportButton.innerHTML = "Export";
+const exportButton = document.createElement('button');
+exportButton.innerHTML = 'Export';
 exportButton.onclick = () =>
   downloadAsFile(
     JSON.stringify(doc.phoxelis.exportPhoxelis(filename)),
@@ -735,10 +794,10 @@ exportButton.onclick = () =>
   );
 navBar.appendChild(exportButton);
 
-const referenceImageButton = document.createElement("input");
-referenceImageButton.type = "file";
-referenceImageButton.accept = "image/*";
-referenceImageButton.addEventListener("change", async (e) => {
+const referenceImageButton = document.createElement('input');
+referenceImageButton.type = 'file';
+referenceImageButton.accept = 'image/*';
+referenceImageButton.addEventListener('change', async (e) => {
   if (!e?.target) {
     return;
   }
@@ -752,50 +811,50 @@ referenceImageButton.addEventListener("change", async (e) => {
         const base64 = await fileToBase64(file);
         const ok = saveRefImageToStorage(base64);
         if (!ok) {
-          console.warn("Reference image too large for localStorage");
+          console.warn('Reference image too large for localStorage');
         }
         refImage.src = base64;
-        refImage.style.display = "block";
+        refImage.style.display = 'block';
 
         // Reset panzoom config for new image
         refImageScale = refImagePanzoomConfig.startScale;
         refImagePanzoom.reset();
       } catch (err) {
-        console.error("Failed to load reference image:", err);
+        console.error('Failed to load reference image:', err);
       }
     }
   }
 });
 navBar.appendChild(referenceImageButton);
-const moveRefImageToggle = document.createElement("input");
-moveRefImageToggle.type = "checkbox";
+const moveRefImageToggle = document.createElement('input');
+moveRefImageToggle.type = 'checkbox';
 navBar.appendChild(moveRefImageToggle);
 
-const modifyPalettePhoxButton = document.createElement("button");
-modifyPalettePhoxButton.innerHTML = "Modify Palette Phox";
+const modifyPalettePhoxButton = document.createElement('button');
+modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
 modifyPalettePhoxButton.onclick = () => {
   if (!session.paletteData.modifyingPhox) {
     session.paletteData.modifyingPhox = true;
-    modifyPalettePhoxButton.innerHTML = "UPDATING PALETTE PHOX";
+    modifyPalettePhoxButton.innerHTML = 'UPDATING PALETTE PHOX';
   } else {
     session.paletteData.modifyingPhox = false;
-    modifyPalettePhoxButton.innerHTML = "Modify Palette Phox";
+    modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
   }
 };
 navBar.appendChild(modifyPalettePhoxButton);
 
-const undoButton = document.createElement("button");
-undoButton.innerHTML = "Undo";
+const undoButton = document.createElement('button');
+undoButton.innerHTML = 'Undo';
 undoButton.onclick = () => undoLastChange();
 navBar.appendChild(undoButton);
 
-const redoButton = document.createElement("button");
-redoButton.innerHTML = "Redo";
+const redoButton = document.createElement('button');
+redoButton.innerHTML = 'Redo';
 redoButton.onclick = () => redoLastChange();
 navBar.appendChild(redoButton);
 
 // Sidebar
-const alphabetCanvas = document.createElement("canvas");
+const alphabetCanvas = document.createElement('canvas');
 const alphabetWidth = 100;
 const alphabetCols = Math.ceil(alphabetWidth / doc.font.width);
 const alphabetRows = Math.ceil(doc.font.length / alphabetCols);
@@ -803,10 +862,10 @@ alphabetCanvas.width = alphabetCols * doc.font.width;
 alphabetCanvas.height = alphabetRows * doc.font.height;
 const alphabetViewScale = 2;
 alphabetCanvas.style = `width: ${alphabetCanvas.width * alphabetViewScale}px; image-rendering: pixelated;`;
-const alphabetCtx = alphabetCanvas.getContext("2d")!;
+const alphabetCtx = alphabetCanvas.getContext('2d')!;
 
-const alphabetContainer = document.createElement("div");
-alphabetContainer.style = "height: 250px; overflow-y: scroll;";
+const alphabetContainer = document.createElement('div');
+alphabetContainer.style = 'height: 250px; overflow-y: scroll;';
 alphabetContainer.append(alphabetCanvas);
 sidebar.append(alphabetContainer);
 
@@ -816,20 +875,20 @@ function selectCharInAlphabet(index: number) {
   drawCharShapeInAlphabet(
     session.alphabetData.selectedChar,
     doc.font.charactersList[session.alphabetData.selectedChar].shape,
-    "#FFFFFF",
-    "#000000",
+    '#FFFFFF',
+    '#000000',
   );
   session.dp.char = String.fromCodePoint(char.codepoint);
   drawCharShapeInAlphabet(
     index,
     doc.font.charactersList[index].shape,
-    "#000000",
-    "#00FFFF",
+    '#000000',
+    '#00FFFF',
   );
 
   session.alphabetData.selectedChar = index;
 }
-alphabetCanvas.addEventListener("click", (e) => {
+alphabetCanvas.addEventListener('click', (e) => {
   const r = Math.floor(e.offsetY / alphabetViewScale / doc.font.height);
   const c = Math.floor(e.offsetX / alphabetViewScale / doc.font.width);
   const index = r * alphabetCols + c;
@@ -853,15 +912,15 @@ alphabetCanvas.addEventListener("click", (e) => {
 });
 
 // ─── Layer Management Panel ──────────────────────────────────────────────────
-const layerPanel = document.createElement("div");
+const layerPanel = document.createElement('div');
 layerPanel.style.cssText = `
   padding: 8px;
   border-top: 1px solid #444;
   background: #1e1e1e;
 `;
 
-const layerPanelTitle = document.createElement("div");
-layerPanelTitle.textContent = "Layers";
+const layerPanelTitle = document.createElement('div');
+layerPanelTitle.textContent = 'Layers';
 layerPanelTitle.style.cssText = `
   font-size: 12px;
   font-weight: bold;
@@ -872,15 +931,15 @@ layerPanelTitle.style.cssText = `
 `;
 layerPanel.appendChild(layerPanelTitle);
 
-const layerActions = document.createElement("div");
+const layerActions = document.createElement('div');
 layerActions.style.cssText = `
   display: flex;
   gap: 4px;
   margin-bottom: 8px;
 `;
 
-const addLayerBtn = document.createElement("button");
-addLayerBtn.textContent = "+ Add";
+const addLayerBtn = document.createElement('button');
+addLayerBtn.textContent = '+ Add';
 addLayerBtn.style.cssText = `
   flex: 1;
   padding: 4px 8px;
@@ -891,14 +950,14 @@ addLayerBtn.style.cssText = `
   font-size: 11px;
   cursor: pointer;
 `;
-addLayerBtn.addEventListener("click", () => {
+addLayerBtn.addEventListener('click', () => {
   const layerId = createDocumentLayer();
   selectLayer(layerId);
 });
 layerActions.appendChild(addLayerBtn);
 
-const removeLayerBtn = document.createElement("button");
-removeLayerBtn.textContent = "− Remove";
+const removeLayerBtn = document.createElement('button');
+removeLayerBtn.textContent = '− Remove';
 removeLayerBtn.style.cssText = `
   flex: 1;
   padding: 4px 8px;
@@ -909,15 +968,15 @@ removeLayerBtn.style.cssText = `
   font-size: 11px;
   cursor: pointer;
 `;
-removeLayerBtn.addEventListener("click", () => removeDocumentLayer(session.activeLayer));
+removeLayerBtn.addEventListener('click', () => removeDocumentLayer(session.activeLayer));
 layerActions.appendChild(removeLayerBtn);
 
 layerPanel.appendChild(layerActions);
 
 function createLayerElement(layer: DocumentLayer) {
-  const layerRow = document.createElement("div");
+  const layerRow = document.createElement('div');
   layerRow.id = `layer-${layer.layerId}`;
-  layerRow.classList.add("layer-row");
+  layerRow.classList.add('layer-row');
   layerRow.style.cssText = `
     display: flex;
     align-items: center;
@@ -930,12 +989,12 @@ function createLayerElement(layer: DocumentLayer) {
     user-select: none;
     transition: background 0.1s;
   `;
-  layerRow.addEventListener("click", () => {
+  layerRow.addEventListener('click', () => {
     selectLayer(layer.layerId);
   });
 
   // Drag handle (grip icon)
-  const dragHandle = document.createElement("div");
+  const dragHandle = document.createElement('div');
   dragHandle.style.cssText = `
     width: 16px;
     height: 28px;
@@ -956,7 +1015,7 @@ function createLayerElement(layer: DocumentLayer) {
   layerRow.appendChild(dragHandle);
 
   // Preview container
-  const previewContainer = document.createElement("div");
+  const previewContainer = document.createElement('div');
   previewContainer.style.cssText = `
     width: 28px;
     height: 28px;
@@ -972,8 +1031,8 @@ function createLayerElement(layer: DocumentLayer) {
   layerRow.appendChild(previewContainer);
 
   // Name input
-  const nameInput = document.createElement("input");
-  nameInput.type = "text";
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
   nameInput.value = layer.name;
   nameInput.style.cssText = `
     flex: 1;
@@ -986,7 +1045,7 @@ function createLayerElement(layer: DocumentLayer) {
     font-size: 11px;
     outline: none;
   `;
-  nameInput.addEventListener("change", (e) => {
+  nameInput.addEventListener('change', (e) => {
     if (e.target instanceof HTMLInputElement) {
       layer.name = e.target.value;
     }
@@ -994,10 +1053,10 @@ function createLayerElement(layer: DocumentLayer) {
   layerRow.appendChild(nameInput);
 
   // Opacity slider
-  const opacitySlider = document.createElement("input");
-  opacitySlider.type = "range";
-  opacitySlider.min = "0";
-  opacitySlider.max = "100";
+  const opacitySlider = document.createElement('input');
+  opacitySlider.type = 'range';
+  opacitySlider.min = '0';
+  opacitySlider.max = '100';
   opacitySlider.value = String(layer.opacity);
   opacitySlider.style.cssText = `
     width: 50px;
@@ -1005,7 +1064,7 @@ function createLayerElement(layer: DocumentLayer) {
     accent-color: #666;
     flex-shrink: 0;
   `;
-  opacitySlider.addEventListener("change", (e) => {
+  opacitySlider.addEventListener('change', (e) => {
     if (e.target instanceof HTMLInputElement) {
       layer.opacity = parseInt(e.target.value);
     }
@@ -1013,8 +1072,8 @@ function createLayerElement(layer: DocumentLayer) {
   layerRow.appendChild(opacitySlider);
 
   // Eye button
-  const eyeBtn = document.createElement("button");
-  eyeBtn.textContent = layer.visible ? "👁‍🗨" : "👁";
+  const eyeBtn = document.createElement('button');
+  eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
   eyeBtn.style.cssText = `
     width: 24px;
     height: 24px;
@@ -1029,16 +1088,16 @@ function createLayerElement(layer: DocumentLayer) {
     flex-shrink: 0;
     opacity: layer.visible ? 1 : 0.4;
   `;
-  eyeBtn.addEventListener("click", (e) => {
+  eyeBtn.addEventListener('click', (e) => {
     layer.visible = !layer.visible;
-    eyeBtn.textContent = layer.visible ? "👁‍🗨" : "👁";
+    eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
     e.stopImmediatePropagation();
   });
   layerRow.appendChild(eyeBtn);
 
   // ── Unified pointer-event drag-and-drop ──
-  const dropIndicator = document.createElement("div");
-  dropIndicator.setAttribute("data-drop-indicator", "line");
+  const dropIndicator = document.createElement('div');
+  dropIndicator.setAttribute('data-drop-indicator', 'line');
   dropIndicator.style.cssText = `
     position: absolute;
     left: -4px;
@@ -1050,7 +1109,7 @@ function createLayerElement(layer: DocumentLayer) {
     opacity: 0;
     transition: opacity 0.1s;
   `;
-  layerRow.style.position = "relative";
+  layerRow.style.position = 'relative';
   layerRow.appendChild(dropIndicator);
 
   let ghost: HTMLElement | null = null;
@@ -1079,19 +1138,19 @@ function createLayerElement(layer: DocumentLayer) {
   function showIndicator(row: HTMLElement, clientY: number) {
     // Hide any existing indicator
     if (pointerTargetRow && pointerTargetRow !== row) {
-      const prev = pointerTargetRow.querySelector("[data-drop-indicator]") as HTMLElement;
-      if (prev) prev.style.opacity = "0";
+      const prev = pointerTargetRow.querySelector('[data-drop-indicator]') as HTMLElement;
+      if (prev) prev.style.opacity = '0';
     }
 
-    const indicator = row.querySelector("[data-drop-indicator]") as HTMLElement;
+    const indicator = row.querySelector('[data-drop-indicator]') as HTMLElement;
     if (!indicator) return;
 
     const rect = row.getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
     const above = clientY < midY;
-    indicator.style.top = above ? "0" : "auto";
-    indicator.style.bottom = above ? "auto" : "0";
-    indicator.style.opacity = "1";
+    indicator.style.top = above ? '0' : 'auto';
+    indicator.style.bottom = above ? 'auto' : '0';
+    indicator.style.opacity = '1';
     pointerTargetRow = row;
   }
 
@@ -1105,10 +1164,10 @@ function createLayerElement(layer: DocumentLayer) {
   // Find target row under pointer
   function findTarget(clientX: number, clientY: number): HTMLElement | null {
     if (!ghost) return null;
-    ghost.style.display = "none";
+    ghost.style.display = 'none';
     const el = document.elementFromPoint(clientX, clientY);
-    ghost.style.display = "";
-    return el?.closest(".layer-row") ?? null;
+    ghost.style.display = '';
+    return el?.closest('.layer-row') ?? null;
   }
 
   // Cleanup all drag state
@@ -1118,14 +1177,14 @@ function createLayerElement(layer: DocumentLayer) {
       ghost = null;
     }
     if (pointerDownRow) {
-      pointerDownRow.style.opacity = "1";
-      pointerDownRow.style.zIndex = "";
+      pointerDownRow.style.opacity = '1';
+      pointerDownRow.style.zIndex = '';
     }
     if (pointerTargetRow) {
       const indicator = pointerTargetRow.querySelector(
-        "[data-drop-indicator]",
+        '[data-drop-indicator]',
       ) as HTMLElement;
-      if (indicator) indicator.style.opacity = "0";
+      if (indicator) indicator.style.opacity = '0';
     }
     pointerDownRow = null;
     pointerTargetRow = null;
@@ -1133,9 +1192,9 @@ function createLayerElement(layer: DocumentLayer) {
   }
 
   // Pointer down — start tracking
-  dragHandle.addEventListener("pointerdown", (e: PointerEvent) => {
+  dragHandle.addEventListener('pointerdown', (e: PointerEvent) => {
     // Only respond to left-click (mouse) or any touch/pen
-    if (e.button !== 0 && e.pointerType !== "touch") return;
+    if (e.button !== 0 && e.pointerType !== 'touch') return;
     pointerStartX = e.clientX;
     pointerStartY = e.clientY;
     pointerDownRow = layerRow;
@@ -1145,7 +1204,7 @@ function createLayerElement(layer: DocumentLayer) {
   });
 
   // Pointer move — handle both the "threshold check" and active dragging
-  dragHandle.addEventListener("pointermove", (e: PointerEvent) => {
+  dragHandle.addEventListener('pointermove', (e: PointerEvent) => {
     if (!pointerDownRow) return;
 
     // If we haven't started dragging yet, check the threshold
@@ -1159,18 +1218,18 @@ function createLayerElement(layer: DocumentLayer) {
 
       // Create ghost clone
       ghost = pointerDownRow.cloneNode(true) as HTMLElement;
-      ghost.style.position = "fixed";
+      ghost.style.position = 'fixed';
       ghost.style.width = `${pointerDownRow.offsetWidth}px`;
-      ghost.style.zIndex = "9999";
-      ghost.style.opacity = "0.85";
-      ghost.style.pointerEvents = "none";
-      ghost.style.transition = "none";
+      ghost.style.zIndex = '9999';
+      ghost.style.opacity = '0.85';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.transition = 'none';
       ghost.style.transform = `translate(${e.clientX - pointerDownRow.getBoundingClientRect().left - 8}px, ${e.clientY - pointerDownRow.getBoundingClientRect().top - 14}px)`;
       document.body.appendChild(ghost);
 
       // Hide original row
-      pointerDownRow.style.opacity = "0.3";
-      pointerDownRow.style.zIndex = "100";
+      pointerDownRow.style.opacity = '0.3';
+      pointerDownRow.style.zIndex = '100';
     }
 
     // Active dragging — update ghost and find target
@@ -1184,16 +1243,16 @@ function createLayerElement(layer: DocumentLayer) {
       } else if (target === pointerDownRow && pointerTargetRow) {
         // Pointer is back on the source row, clear indicator
         const indicator = pointerTargetRow.querySelector(
-          "[data-drop-indicator]",
+          '[data-drop-indicator]',
         ) as HTMLElement;
-        if (indicator) indicator.style.opacity = "0";
+        if (indicator) indicator.style.opacity = '0';
         pointerTargetRow = null;
       }
     }
   });
 
   // Pointer up — finalize the drag
-  dragHandle.addEventListener("pointerup", (e: PointerEvent) => {
+  dragHandle.addEventListener('pointerup', (e: PointerEvent) => {
     if (!pointerDownRow) return;
 
     if (isDragging) {
@@ -1218,7 +1277,7 @@ function createLayerElement(layer: DocumentLayer) {
   });
 
   // Pointer cancel (e.g. system interrupt) — cleanup
-  dragHandle.addEventListener("pointercancel", () => {
+  dragHandle.addEventListener('pointercancel', () => {
     cleanupDrag();
     try {
       dragHandle.releasePointerCapture(0);
@@ -1232,21 +1291,21 @@ function createLayerElement(layer: DocumentLayer) {
 layerPanel.appendChild(layerList);
 
 // ─── Color Picker ────────────────────────────────────────────────────────────
-const colorPickerContainer = document.createElement("div");
-colorPickerContainer.id = "colorpicker";
+const colorPickerContainer = document.createElement('div');
+colorPickerContainer.id = 'colorpicker';
 sidebar.append(colorPickerContainer);
-const fgColorButton = document.createElement("button");
-fgColorButton.innerHTML = "Foreground";
-function selectColorType(type: "fg" | "bg") {
+const fgColorButton = document.createElement('button');
+fgColorButton.innerHTML = 'Foreground';
+function selectColorType(type: 'fg' | 'bg') {
   session.selectedColorType = type;
 
   colorPicker.color.hexString = session.dp[type];
 }
 
-fgColorButton.addEventListener("click", () => selectColorType("fg"));
-const bgColorButton = document.createElement("button");
-bgColorButton.innerHTML = "Background";
-bgColorButton.addEventListener("click", () => selectColorType("bg"));
+fgColorButton.addEventListener('click', () => selectColorType('fg'));
+const bgColorButton = document.createElement('button');
+bgColorButton.innerHTML = 'Background';
+bgColorButton.addEventListener('click', () => selectColorType('bg'));
 colorPickerContainer.append(fgColorButton);
 colorPickerContainer.append(bgColorButton);
 
@@ -1261,7 +1320,7 @@ appContainer.appendChild(content);
 appContainer.append(contentFooter);
 document.body.appendChild(appContainer);
 
-const colorPicker = iro.ColorPicker("#colorpicker", {
+const colorPicker = iro.ColorPicker('#colorpicker', {
   width: 150,
   layout: [
     {
@@ -1272,7 +1331,7 @@ const colorPicker = iro.ColorPicker("#colorpicker", {
     },
   ],
 });
-colorPicker.on("color:change", (color: any) => {
+colorPicker.on('color:change', (color: any) => {
   session.dp[session.selectedColorType] = color.hexString;
 
   if (session.paletteData.modifyingPhox && session.paletteData.selectedPhox > 0) {
@@ -1283,18 +1342,18 @@ colorPicker.on("color:change", (color: any) => {
       doc.phoxelis.storePhoxInPalette(session.paletteData.selectedPhox, {
         char: selectedPalettePhox.char,
         fg:
-          session.selectedColorType === "fg"
+          session.selectedColorType === 'fg'
             ? session.dp[session.selectedColorType]
             : selectedPalettePhox.fg,
         bg:
-          session.selectedColorType === "bg"
+          session.selectedColorType === 'bg'
             ? session.dp[session.selectedColorType]
             : selectedPalettePhox.bg,
       });
     }
   }
 });
-selectColorType("fg");
+selectColorType('fg');
 
 const renderLoop = () => {
   doc.phoxelis.renderFrame(
@@ -1322,7 +1381,7 @@ interface Hotkey {
 const hotkeys: Hotkey[] = [
   {
     ctrl: true,
-    key: "s",
+    key: 's',
     onHotkeyStart: (e) => {
       e.preventDefault();
     },
@@ -1330,8 +1389,8 @@ const hotkeys: Hotkey[] = [
       saveDocument(filename);
     },
   },
-  { ctrl: true, key: "z", onHotkeyEnd: () => undoLastChange() },
-  { ctrl: true, key: "y", onHotkeyEnd: () => redoLastChange() },
+  { ctrl: true, key: 'z', onHotkeyEnd: () => undoLastChange() },
+  { ctrl: true, key: 'y', onHotkeyEnd: () => redoLastChange() },
   {
     ctrl: true,
     mouse: 1,
@@ -1351,7 +1410,7 @@ const hotkeys: Hotkey[] = [
 ];
 const downHotkeys: Hotkey[] = [];
 
-window.addEventListener("keydown", (e) => {
+window.addEventListener('keydown', (e) => {
   const matchingHotkey = hotkeys.find(
     (h) =>
       !!h.ctrl === e.ctrlKey &&
@@ -1364,7 +1423,7 @@ window.addEventListener("keydown", (e) => {
     downHotkeys.push(matchingHotkey);
   }
 });
-window.addEventListener("keyup", (e) => {
+window.addEventListener('keyup', (e) => {
   const matchinDownHotkey = downHotkeys.find((h) => e.key.toLocaleLowerCase() === h.key);
   if (matchinDownHotkey) {
     matchinDownHotkey.onHotkeyEnd?.(e);
@@ -1384,7 +1443,7 @@ window.addEventListener("keyup", (e) => {
     matchingHotkey.onHotkeyEnd?.(e);
   }
 });
-drawboard.addEventListener("pointerdown", (e) => {
+drawboard.addEventListener('pointerdown', (e) => {
   const matchingHotkey = hotkeys.find(
     (h) =>
       !!h.ctrl === e.ctrlKey &&
@@ -1397,7 +1456,7 @@ drawboard.addEventListener("pointerdown", (e) => {
     downHotkeys.push(matchingHotkey);
   }
 });
-drawboard.addEventListener("pointerup", (e) => {
+drawboard.addEventListener('pointerup', (e) => {
   const matchinDownHotkey = downHotkeys.find((h) => e.button === h.mouse);
   if (matchinDownHotkey) {
     matchinDownHotkey.onHotkeyEnd?.(e);
@@ -1422,8 +1481,8 @@ const panzoom = Panzoom(layersWrapper, panzoomConfiguration);
 const refImagePanzoom = Panzoom(refImage, refImagePanzoomConfig);
 const hammer = new Hammer(drawboard);
 
-hammer.get("pinch").set({ enable: true });
-hammer.on("pinchstart", (e) => {
+hammer.get('pinch').set({ enable: true });
+hammer.on('pinchstart', (e) => {
   setTool(panzoomTool);
   currTool?.handlers.onPinchStart(e);
 });
@@ -1445,14 +1504,14 @@ function setMousePos(event: PointerEvent) {
     Math.max(0, Math.floor(mouseScreenPosY / (doc.font.height * scale))),
   );
 }
-drawboard.addEventListener("pointerdown", setMousePos);
-drawboard.addEventListener("pointermove", setMousePos);
-drawboard.addEventListener("pointerup", setMousePos);
+drawboard.addEventListener('pointerdown', setMousePos);
+drawboard.addEventListener('pointermove', setMousePos);
+drawboard.addEventListener('pointerup', setMousePos);
 
 const abortActiveTool = () => {
   currTool?.tool.abort?.();
 };
-window.addEventListener("mouseout", (e) => {
+window.addEventListener('mouseout', (e) => {
   if (e.relatedTarget === null) {
     abortActiveTool();
   }
@@ -1480,7 +1539,7 @@ interface PanzoomTool extends Tool {
   };
 }
 const panzoomTool: PanzoomTool = {
-  name: "panzoom",
+  name: 'panzoom',
   data: {
     panzooming: false,
     zooming: false,
@@ -1563,7 +1622,7 @@ interface DrawTool extends Tool {
   addPhoxelToDraft: (p: Phoxel) => void;
 }
 const drawTool: DrawTool = {
-  name: "draw",
+  name: 'draw',
   data: {
     draftPhoxels: new Map(),
     drawing: false,
@@ -1608,7 +1667,7 @@ const drawTool: DrawTool = {
 
 // ─── Rectangle (outline) Tool ────────────────────────────────────────────────
 const rectTool: Tool = {
-  name: "rect",
+  name: 'rect',
   data: { startR: -1, startC: -1, drawing: false },
   onPointerDown(_e: PointerEvent) {
     this.data!.startR = mousePos.y;
@@ -1685,7 +1744,7 @@ const rectTool: Tool = {
 
 // ─── Filled Rectangle Tool ───────────────────────────────────────────────────
 const filledRectTool: Tool = {
-  name: "filledRect",
+  name: 'filledRect',
   data: { startR: -1, startC: -1, drawing: false },
   onPointerDown(_e: PointerEvent) {
     this.data!.startR = mousePos.y;
@@ -1773,7 +1832,7 @@ function bresenhamCells(
 }
 
 const lineTool: Tool = {
-  name: "line",
+  name: 'line',
   data: { startR: -1, startC: -1, drawing: false },
   onPointerDown(_e: PointerEvent) {
     this.data!.startR = mousePos.y;
@@ -1821,7 +1880,7 @@ const lineTool: Tool = {
 // ─── Ellipse Tool (outline) ──────────────────────────────────────────────────
 // Uses the midpoint ellipse algorithm, with rx/ry derived from start→current position
 const ellipseTool: Tool = {
-  name: "ellipse",
+  name: 'ellipse',
   data: { startR: -1, startC: -1, drawing: false },
   onPointerDown(_e: PointerEvent) {
     this.data!.startR = mousePos.y;
@@ -1873,7 +1932,7 @@ const ellipseTool: Tool = {
 
 // ─── Filled Ellipse Tool ─────────────────────────────────────────────────────
 const filledEllipseTool: Tool = {
-  name: "filledEllipse",
+  name: 'filledEllipse',
   data: { startR: -1, startC: -1, drawing: false },
   onPointerDown(_e: PointerEvent) {
     this.data!.startR = mousePos.y;
@@ -2033,12 +2092,12 @@ let previousTool: Tool | null = null;
 function setTool(tool: Tool) {
   if (currTool) {
     currTool.tool.abort?.();
-    drawboard.removeEventListener("pointerdown", currTool.handlers.onPointerDown);
-    drawboard.removeEventListener("pointermove", currTool.handlers.onPointerMove);
-    drawboard.removeEventListener("pointerup", currTool.handlers.onPointerUp);
-    hammer.off("pinchstart", currTool.handlers.onPinchStart);
-    hammer.off("pinchmove", currTool.handlers.onPinchMove);
-    hammer.off("pinchend", currTool.handlers.onPinchEnd);
+    drawboard.removeEventListener('pointerdown', currTool.handlers.onPointerDown);
+    drawboard.removeEventListener('pointermove', currTool.handlers.onPointerMove);
+    drawboard.removeEventListener('pointerup', currTool.handlers.onPointerUp);
+    hammer.off('pinchstart', currTool.handlers.onPinchStart);
+    hammer.off('pinchmove', currTool.handlers.onPinchMove);
+    hammer.off('pinchend', currTool.handlers.onPinchEnd);
     previousTool = currTool.tool;
   }
 
@@ -2063,12 +2122,12 @@ function setTool(tool: Tool) {
       onPinchEnd: (e) => tool.onPinchEnd!(e),
     },
   };
-  drawboard.addEventListener("pointerdown", currTool.handlers.onPointerDown);
-  drawboard.addEventListener("pointermove", currTool.handlers.onPointerMove);
-  window.addEventListener("pointerup", currTool.handlers.onPointerUp);
-  hammer.on("pinchstart", currTool.handlers.onPinchStart);
-  hammer.on("pinchmove", currTool.handlers.onPinchMove);
-  hammer.on("pinchend", currTool.handlers.onPinchEnd);
+  drawboard.addEventListener('pointerdown', currTool.handlers.onPointerDown);
+  drawboard.addEventListener('pointermove', currTool.handlers.onPointerMove);
+  window.addEventListener('pointerup', currTool.handlers.onPointerUp);
+  hammer.on('pinchstart', currTool.handlers.onPinchStart);
+  hammer.on('pinchmove', currTool.handlers.onPinchMove);
+  hammer.on('pinchend', currTool.handlers.onPinchEnd);
 }
 function setPreviousTool() {
   if (previousTool) setTool(previousTool);
@@ -2100,7 +2159,7 @@ function drawCharShapeInAlphabet(
 }
 
 doc.font.charactersList.forEach((char, i) => {
-  drawCharShapeInAlphabet(i, char.shape, "#FFFFFF", "#000000");
+  drawCharShapeInAlphabet(i, char.shape, '#FFFFFF', '#000000');
 });
 
 async function saveFile(data: string, filename: string) {
@@ -2120,7 +2179,7 @@ async function loadFile(filename: string) {
     const fileDataString = await file.text();
     return fileDataString;
   } catch (error) {
-    console.error("loadFile Error:", error);
+    console.error('loadFile Error:', error);
   }
 }
 
@@ -2156,7 +2215,7 @@ async function loadDocument(filename: string) {
   doc.phoxelis.importPhoxelis(fileData.phoxelis);
 
   doc.layers = _.mapValues(fileData.layers, (l) => {
-    const target = document.createElement("canvas");
+    const target = document.createElement('canvas');
     target.width = doc.font.width * doc.size.cols;
     target.height = doc.font.height * doc.size.rows;
     target.style = layerPreviewStyle;
@@ -2180,7 +2239,7 @@ const savedRefImageBase64 = loadRefImageFromStorage();
 if (savedRefImageBase64) {
   // Restore the reference image
   refImage.src = savedRefImageBase64;
-  refImage.style.display = "block";
+  refImage.style.display = 'block';
 
   // Restore panzoom config if available
   if (savedRefImagePanzoom) {
@@ -2196,7 +2255,7 @@ if (savedRefImageBase64) {
 // TODO bugged document. How to handle these?
 // loadDocument(filename);
 
-ReactDOM.createRoot(document.querySelector("#app")!).render(
+ReactDOM.createRoot(document.querySelector('#app')!).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>,
