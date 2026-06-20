@@ -94,6 +94,7 @@ async function Editor() {
       const workspaceData = workspace.exportData();
       const dataString = JSON.stringify(workspaceData);
       await saveFile(dataString, `${name}.${ext}`);
+      localStorage.setItem('last_doc', name);
       alert('Document saved');
     } catch (error) {
       console.error(`saveDocument error: ${error}`);
@@ -127,7 +128,7 @@ async function Editor() {
       size: { rows: 37, cols: 152 },
       fontName: '1_Trithemius8x16',
     },
-    name?: string
+    name?: string,
   ) {
     layerList.replaceChildren();
     sidebar.replaceChildren();
@@ -140,6 +141,35 @@ async function Editor() {
     let documentName = name;
 
     const { ds, session } = workspace;
+
+    async function saveDocumentCommand() {
+      if (!documentName) {
+        const docName = prompt();
+
+        if (!docName) {
+          alert('No name provided. Not saving');
+          return;
+        }
+
+        documentName = docName;
+      }
+      await saveDocument(documentName, workspace);
+    }
+
+    async function loadDocumentCommand() {
+      const docName = prompt();
+
+      if (!docName) {
+        alert('No name provided. Not saving');
+        return;
+      }
+
+      try {
+        await loadDocument(docName);
+      } catch (error) {
+        console.error(error);
+      }
+    }
 
     function renderLayerList() {
       workspace
@@ -275,37 +305,12 @@ async function Editor() {
 
     const saveButton = document.createElement('button');
     saveButton.innerHTML = 'Save';
-    saveButton.onclick = async () => {
-      if (!documentName) {
-        const docName = prompt();
-
-        if (!docName) {
-          alert('No name provided. Not saving');
-          return;
-        }
-
-        documentName = docName;
-      }
-      await saveDocument(documentName, workspace);
-    };
+    saveButton.onclick = saveDocumentCommand;
     navBar.appendChild(saveButton);
 
     const loadButton = document.createElement('button');
     loadButton.innerHTML = 'Load';
-    loadButton.onclick = async () => {
-      const docName = prompt();
-
-      if (!docName) {
-        alert('No name provided. Not saving');
-        return;
-      }
-
-      try {
-        await loadDocument(docName);
-      } catch (error) {
-        console.error(error);
-      }
-    };
+    loadButton.onclick = loadDocumentCommand;
     navBar.appendChild(loadButton);
 
     const fullscreenButton = document.createElement('button');
@@ -760,13 +765,40 @@ async function Editor() {
     document.body.appendChild(appContainer);
 
     workspace.startPanzoom();
+
+    // Hotkeys
+    workspace.hotkeys.push({
+      ctrl: true,
+      key: 's',
+      onHotkeyStart: (e) => {
+        e.preventDefault();
+      },
+      onHotkeyEnd() {
+        saveDocumentCommand();
+      },
+    });
+    workspace.hotkeys.push({
+      ctrl: true,
+      key: 'o',
+      onHotkeyStart: (e) => {
+        e.preventDefault();
+      },
+      onHotkeyEnd() {
+        loadDocumentCommand();
+      },
+    });
   }
 
-  await startSession();
-  // setTimeout(cleanLayout,2500);
-  // setTimeout(startWorkspace,4500);
-
-  // workspace.loadDocument('test');
+  return {
+    loadDocument,
+    startSession
+  }
 }
 
 const editor = await Editor();
+const lastDoc = localStorage.getItem('last_doc');
+if(lastDoc) {
+  editor.loadDocument(lastDoc);
+} else {
+  editor.startSession();
+}

@@ -603,17 +603,6 @@ export async function Workspace(config: WorkspaceInputConfig) {
   }
 
   const hotkeys: Hotkey[] = [
-    {
-      ctrl: true,
-      key: 's',
-      onHotkeyStart: (e) => {
-        e.preventDefault();
-      },
-      onHotkeyEnd() {
-        // TODO should occur outside of workspace?
-        // saveDocument();
-      },
-    },
     { ctrl: true, key: 'z', onHotkeyEnd: () => undoLastChange() },
     { ctrl: true, key: 'y', onHotkeyEnd: () => redoLastChange() },
     {
@@ -1476,6 +1465,7 @@ export async function Workspace(config: WorkspaceInputConfig) {
     layersTargets,
     colorPicker: colorPickerEl,
     alphabet: alphabetContainer,
+    hotkeys,
     createLayer,
     removeLayer,
     moveLayer,
