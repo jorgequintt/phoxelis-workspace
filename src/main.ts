@@ -25,14 +25,32 @@ const workspace = await Workspace({
 const { ws, session, filename } = workspace;
 
 function renderLayerList() {
-  ws.phoxelis.layers.toReversed().forEach((l) => {
-    let layerEl = layerList.querySelector(`#layer-${l.id}`);
+  workspace.getSortedLayers().toReversed().forEach((lid) => {
+    let layerEl = layerList.querySelector(`#layer-${lid}`);
     if (!layerEl) {
-      layerEl = createLayerElement(ws.layers[l.id]);
+      layerEl = createLayerElement(lid, ws.layers[lid]);
     }
     layerList.appendChild(layerEl);
   });
 }
+renderLayerList();
+
+function selectLayer(layerId: string) {
+  const layerRow = layerList.querySelector(`#layer-${layerId}`);
+  if (!layerRow) {
+    console.error(`selectLayer error: Could not find layer by id ${layerId}`);
+    return;
+  }
+
+  // workspace.selectLayer(layerId);
+  session.activeLayer = layerId;
+
+  layerList
+    .querySelectorAll('.layer-row')
+    .forEach((el) => ((el as HTMLDivElement).style.background = '#2a2a2a'));
+  (layerRow as HTMLDivElement).style.background = '#7a7a7a';
+}
+selectLayer(session.activeLayer);
 
 const appContainer = document.createElement('div');
 appContainer.style = 'width: 100%; height: 100%; display: flex; flex-direction: column;';
@@ -185,7 +203,7 @@ const exportButton = document.createElement('button');
 exportButton.innerHTML = 'Export';
 exportButton.onclick = () =>
   downloadAsFile(
-    JSON.stringify(ws.phoxelis.exportPhoxelis(filename)),
+    JSON.stringify(workspace.exportPhoxelis()),
     `${filename}.phoxelis`,
   );
 navBar.appendChild(exportButton);
@@ -271,18 +289,6 @@ layerActions.style.cssText = `
   margin-bottom: 8px;
 `;
 
-function selectLayer(layerId: string) {
-  const layerRow = layerList.querySelector(`#layer-${layerId}`);
-  if (!layerRow) {
-    console.error(`selectLayer error: Could not find layer by id ${layerId}`);
-    return;
-  }
-  layerList
-    .querySelectorAll('.layer-row')
-    .forEach((el) => ((el as HTMLDivElement).style.background = '#2a2a2a'));
-  (layerRow as HTMLDivElement).style.background = '#7a7a7a';
-}
-
 const addLayerBtn = document.createElement('button');
 addLayerBtn.textContent = '+ Add';
 addLayerBtn.style.cssText = `
@@ -297,10 +303,9 @@ addLayerBtn.style.cssText = `
 `;
 addLayerBtn.addEventListener('click', () => {
   const layerId = workspace.createLayer();
-  createLayerElement(ws.layers[layerId]);
-  renderLayerList();
-  workspace.selectLayer(layerId);
+  createLayerElement(layerId, ws.layers[layerId]);
   selectLayer(layerId);
+  renderLayerList();
 });
 layerActions.appendChild(addLayerBtn);
 
@@ -326,9 +331,9 @@ layerActions.appendChild(removeLayerBtn);
 
 layerPanel.appendChild(layerActions);
 
-function createLayerElement(layer: DocumentLayer) {
+function createLayerElement(layerId: string, layer: DocumentLayer) {
   const layerRow = document.createElement('div');
-  layerRow.id = `layer-${layer.layerId}`;
+  layerRow.id = `layer-${layerId}`;
   layerRow.classList.add('layer-row');
   layerRow.style.cssText = `
     display: flex;
@@ -343,7 +348,7 @@ function createLayerElement(layer: DocumentLayer) {
     transition: background 0.1s;
   `;
   layerRow.addEventListener('click', () => {
-    workspace.selectLayer(layer.layerId);
+    selectLayer(layerId);
   });
 
   const dragHandle = document.createElement('div');
@@ -378,7 +383,7 @@ function createLayerElement(layer: DocumentLayer) {
     align-items: center;
     justify-content: center;
   `;
-  previewContainer.appendChild(layer.target);
+  previewContainer.appendChild(workspace.layersTargets[layerId]);
   layerRow.appendChild(previewContainer);
 
   const nameInput = document.createElement('input');
@@ -475,7 +480,7 @@ function createLayerElement(layer: DocumentLayer) {
     const adjustedTarget = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
     const insertIdx = insertAbove ? adjustedTarget : adjustedTarget + 1;
 
-    ws.phoxelis.moveLayer(ws.phoxelis.layers[dragIdx].id, insertIdx);
+    workspace.moveLayer(workspace.getSortedLayers()[dragIdx], insertIdx);
 
     renderLayerList();
   }

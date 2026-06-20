@@ -16,19 +16,22 @@ type Phoxel = {
 type PhoxelPosition = [r: number, c: number];
 
 export type DocumentLayer = {
-  layerId: string;
   name: string;
-  target: HTMLCanvasElement;
   opacity: number;
   visible: boolean;
 };
 
 interface WorkspaceState {
-  phoxelis: ReturnType<typeof Phoxelis>;
-  font: Awaited<ReturnType<typeof getFont>>;
   layers: Record<string, DocumentLayer>;
-  size: { rows: number; cols: number };
-  refImageBase64: string;
+  refImage: {
+    moving: boolean;
+    base64: string;
+    config: {
+      panX: number;
+      panY: number;
+      scale: number;
+    };
+  };
 }
 
 interface SessionState {
@@ -100,6 +103,7 @@ export const toolDefs: ToolDefinition[] = [
 ];
 
 // & This is good. Let's not sell our app soul to react
+// MARK: Workspace
 export async function Workspace(config: {
   size: {
     rows: number;
@@ -120,31 +124,41 @@ export async function Workspace(config: {
     return draftScreen.layers[0].id;
   };
 
-  let ws: WorkspaceState = {
-    phoxelis,
-    font,
-    size,
-    layers: {},
-    refImageBase64: '',
-  };
-  createLayer(); // Create base layer
+  const layersTargets: Record<string, HTMLCanvasElement> = {};
 
-  const startDp = { char: 'D', fg: '#00FF00', bg: '#FF00FF' };
-  let session: SessionState = {
+  // What outer users can set. To be persisted in document
+  const defaultState = () => ({
+    layers: {},
+    refImage: {
+      moving: false,
+      base64: '',
+      config: {
+        panX: 0,
+        panY: 0,
+        scale: 1,
+      },
+    },
+  });
+  let ws: WorkspaceState = defaultState();
+  createLayer(); // Base layer
+
+  // What outer users can set. Should not persist
+  const defaultSessionState = (): SessionState => ({
     dp: { char: 'D', fg: '#00FF00', bg: '#FF00FF' },
     drawMode: 'draw',
-    activeLayer: ws.phoxelis.layers[0].id,
+    activeLayer: phoxelis.layers[0].id,
     paletteData: {
       selectedPhox: -1,
       modifyingPhox: false,
     },
     alphabetData: {
-      selectedChar: ws.font.charactersList.findIndex(
-        (c) => c.codepoint === startDp.char.codePointAt(0),
+      selectedChar: font.charactersList.findIndex(
+        (c) => c.codepoint === ("D").codePointAt(0),
       ),
     },
     selectedColorType: 'fg',
-  };
+  });
+  let session: SessionState = defaultSessionState();
   selectLayer(session.activeLayer);
 
   // MARK: Elements
@@ -169,10 +183,10 @@ export async function Workspace(config: {
   const paletteSelector = document.createElement('div');
   paletteSelector.style = 'position: relative;';
   const paletteOverlay = document.createElement('canvas');
-  paletteOverlay.width = ws.phoxelis.palette.width;
-  paletteOverlay.height = ws.phoxelis.palette.height;
-  const paletteScaledHeight = ws.font.height * paletteScale;
-  ws.phoxelis.palette.style = `height: ${paletteScaledHeight}px; image-rendering: pixelated; border: 1px solid black;`;
+  paletteOverlay.width = phoxelis.palette.width;
+  paletteOverlay.height = phoxelis.palette.height;
+  const paletteScaledHeight = font.height * paletteScale;
+  phoxelis.palette.style = `height: ${paletteScaledHeight}px; image-rendering: pixelated; border: 1px solid black;`;
   paletteOverlay.style = `height: ${paletteScaledHeight}px; border: 1px solid black; position: absolute; top: 0; left: 0; image-rendering: pixelated;`;
   const onPaletteOverlayClick = (e: MouseEvent) => {
     if (!paletteOverlay) {
@@ -182,11 +196,11 @@ export async function Workspace(config: {
       return;
     }
     const x = e.offsetX;
-    const paletteMaxCells = ws.phoxelis.palette.width / ws.font.width;
+    const paletteMaxCells = phoxelis.palette.width / font.width;
     const pos = Math.floor(
-      (x / (paletteScale * ws.phoxelis.palette.width)) * paletteMaxCells,
+      (x / (paletteScale * phoxelis.palette.width)) * paletteMaxCells,
     );
-    const phox = ws.phoxelis.getPhoxFromPaletteIndex(pos);
+    const phox = phoxelis.getPhoxFromPaletteIndex(pos);
     if (!phox) {
       console.warn('Null Phox selected. Omitting selection');
       return;
@@ -195,7 +209,7 @@ export async function Workspace(config: {
     session.paletteData.selectedPhox = pos;
     colorPicker.color.hexString = session.dp[session.selectedColorType];
     selectCharInAlphabet(
-      ws.font.charactersList.findIndex(
+      font.charactersList.findIndex(
         (c) => c.codepoint === session.dp.char.codePointAt(0),
       ),
     );
@@ -203,18 +217,18 @@ export async function Workspace(config: {
     ctx!.reset();
     ctx!.strokeStyle = 'green';
     ctx!.lineWidth = 2;
-    ctx!.strokeRect(pos * ws.font.width, 0, ws.font.width, ws.font.height);
+    ctx!.strokeRect(pos * font.width, 0, font.width, font.height);
   };
   paletteOverlay.addEventListener('click', onPaletteOverlayClick);
-  paletteSelector.append(ws.phoxelis.palette);
+  paletteSelector.append(phoxelis.palette);
   paletteSelector.append(paletteOverlay);
 
   const alphabetCanvas = document.createElement('canvas');
   const alphabetWidth = 100;
-  const alphabetCols = Math.ceil(alphabetWidth / ws.font.width);
-  const alphabetRows = Math.ceil(ws.font.length / alphabetCols);
-  alphabetCanvas.width = alphabetCols * ws.font.width;
-  alphabetCanvas.height = alphabetRows * ws.font.height;
+  const alphabetCols = Math.ceil(alphabetWidth / font.width);
+  const alphabetRows = Math.ceil(font.length / alphabetCols);
+  alphabetCanvas.width = alphabetCols * font.width;
+  alphabetCanvas.height = alphabetRows * font.height;
   const alphabetViewScale = 2;
   alphabetCanvas.style = `width: ${alphabetCanvas.width * alphabetViewScale}px; image-rendering: pixelated;`;
   const alphabetCtx = alphabetCanvas.getContext('2d')!;
@@ -223,18 +237,18 @@ export async function Workspace(config: {
   alphabetContainer.append(alphabetCanvas);
 
   function selectCharInAlphabet(index: number) {
-    const char = ws.font.charactersList[index];
+    const char = font.charactersList[index];
 
     drawCharShapeInAlphabet(
       session.alphabetData.selectedChar,
-      ws.font.charactersList[session.alphabetData.selectedChar].shape,
+      font.charactersList[session.alphabetData.selectedChar].shape,
       '#FFFFFF',
       '#000000',
     );
     session.dp.char = String.fromCodePoint(char.codepoint);
     drawCharShapeInAlphabet(
       index,
-      ws.font.charactersList[index].shape,
+      font.charactersList[index].shape,
       '#000000',
       '#00FFFF',
     );
@@ -242,20 +256,20 @@ export async function Workspace(config: {
     session.alphabetData.selectedChar = index;
   }
   alphabetCanvas.addEventListener('click', (e) => {
-    const r = Math.floor(e.offsetY / alphabetViewScale / ws.font.height);
-    const c = Math.floor(e.offsetX / alphabetViewScale / ws.font.width);
+    const r = Math.floor(e.offsetY / alphabetViewScale / font.height);
+    const c = Math.floor(e.offsetX / alphabetViewScale / font.width);
     const index = r * alphabetCols + c;
-    const char = ws.font.charactersList[index];
+    const char = font.charactersList[index];
     if (!char) throw new Error(`No char found for position y${r},x${c}`);
 
     selectCharInAlphabet(index);
 
     if (session.paletteData.modifyingPhox && session.paletteData.selectedPhox > 0) {
-      const selectedPalettePhox = ws.phoxelis.getPhoxFromPaletteIndex(
+      const selectedPalettePhox = phoxelis.getPhoxFromPaletteIndex(
         session.paletteData.selectedPhox,
       );
       if (selectedPalettePhox) {
-        ws.phoxelis.storePhoxInPalette(session.paletteData.selectedPhox, {
+        phoxelis.storePhoxInPalette(session.paletteData.selectedPhox, {
           char: session.dp.char,
           fg: selectedPalettePhox.fg,
           bg: selectedPalettePhox.bg,
@@ -281,11 +295,11 @@ export async function Workspace(config: {
     session.dp[session.selectedColorType] = color.hexString;
 
     if (session.paletteData.modifyingPhox && session.paletteData.selectedPhox > 0) {
-      const selectedPalettePhox = ws.phoxelis.getPhoxFromPaletteIndex(
+      const selectedPalettePhox = phoxelis.getPhoxFromPaletteIndex(
         session.paletteData.selectedPhox,
       );
       if (selectedPalettePhox) {
-        ws.phoxelis.storePhoxInPalette(session.paletteData.selectedPhox, {
+        phoxelis.storePhoxInPalette(session.paletteData.selectedPhox, {
           char: selectedPalettePhox.char,
           fg:
             session.selectedColorType === 'fg'
@@ -327,46 +341,51 @@ export async function Workspace(config: {
     refImagePanzoom.reset();
   }
 
+  // MARK: Layers
   function createLayer(layerId?: string) {
     const target = document.createElement('canvas');
-    target.width = ws.font.width * ws.size.cols;
-    target.height = ws.font.height * ws.size.rows;
+    target.width = font.width * size.cols;
+    target.height = font.height * size.rows;
     target.style = layerPreviewStyle;
 
-    const lid = layerId ?? ws.phoxelis.addLayer();
+    const lid = layerId ?? phoxelis.addLayer();
 
     ws.layers[lid] = {
-      layerId: lid,
-      name: `Layer #${ws.phoxelis.layers.length}`,
-      target,
+      name: `Layer #${phoxelis.layers.length}`,
       opacity: 100,
       visible: true,
     };
+
+    layersTargets[lid] = target;
 
     return lid;
   }
 
   function removeLayer(layerId: string) {
-    if (ws.phoxelis.layers.length === 1) {
+    if (phoxelis.layers.length === 1) {
       console.warn("removeDocumentLayer error: You can't remove the base layer.");
       return;
     }
 
-    const layerPosition = ws.phoxelis.layerPositions[layerId];
-    ws.phoxelis.removeLayer(layerId);
+    const layerPosition = phoxelis.layerPositions[layerId];
+    phoxelis.removeLayer(layerId);
     delete ws.layers[layerId];
 
-
-    const newSelectPos = Math.max(
-      0,
-      Math.min(ws.phoxelis.layers.length - 1, layerPosition),
-    );
-    const layerBeforeId = ws.phoxelis.layers[newSelectPos].id;
+    const newSelectPos = Math.max(0, Math.min(phoxelis.layers.length - 1, layerPosition));
+    const layerBeforeId = phoxelis.layers[newSelectPos].id;
     selectLayer(layerBeforeId);
+  }
+
+  function moveLayer(...args: Parameters<typeof phoxelis.moveLayer>) {
+    return phoxelis.moveLayer(...args);
   }
 
   function selectLayer(layerId: string) {
     session.activeLayer = layerId;
+  }
+
+  function getSortedLayers(){
+    return phoxelis.layers.map(l => l.id);
   }
 
   function renderDpWithMode(
@@ -380,7 +399,7 @@ export async function Workspace(config: {
       target.renderPhoxel(session.dp.char, session.dp.fg, session.dp.bg, r, c, layerId);
       return;
     } else if (session.drawMode === 'char') {
-      const underlyingPhoxel = ws.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
+      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
       if (!underlyingPhoxel) return;
       target.renderPhoxel(
         session.dp.char,
@@ -391,7 +410,7 @@ export async function Workspace(config: {
         layerId,
       );
     } else if (session.drawMode === 'color') {
-      const underlyingPhoxel = ws.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
+      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
       if (!underlyingPhoxel) return;
       target.renderPhoxel(
         underlyingPhoxel.char,
@@ -402,7 +421,7 @@ export async function Workspace(config: {
         layerId,
       );
     } else if (session.drawMode === 'fg') {
-      const underlyingPhoxel = ws.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
+      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
       if (!underlyingPhoxel) return;
       target.renderPhoxel(
         underlyingPhoxel.char,
@@ -413,7 +432,7 @@ export async function Workspace(config: {
         layerId,
       );
     } else if (session.drawMode === 'bg') {
-      const underlyingPhoxel = ws.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
+      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
       if (!underlyingPhoxel) return;
       target.renderPhoxel(
         underlyingPhoxel.char,
@@ -433,7 +452,6 @@ export async function Workspace(config: {
   }
 
   // MARK: Undo-Redo Stack Management
-  // TODO to session? And to its own class?
   type ChangesStack = Array<() => void>;
   let changesHistory: Array<{ changes: ChangesStack; undoChanges: ChangesStack }> = [];
   let redoHistory: Array<{ changes: ChangesStack; undoChanges: ChangesStack }> = [];
@@ -444,12 +462,12 @@ export async function Workspace(config: {
     const changes: ChangesStack = [];
 
     phoxelPositions.forEach(([r, c]) => {
-      const origPhox = ws.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
+      const origPhox = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
       if (!origPhox) {
-        undoChanges.push(() => ws.phoxelis.removePhoxel(r, c, session.activeLayer));
+        undoChanges.push(() => phoxelis.removePhoxel(r, c, session.activeLayer));
       } else {
         undoChanges.push(() =>
-          ws.phoxelis.renderPhoxel(
+          phoxelis.renderPhoxel(
             origPhox.char,
             origPhox.fg,
             origPhox.bg,
@@ -460,14 +478,14 @@ export async function Workspace(config: {
         );
       }
 
-      renderDpWithMode(ws.phoxelis, r, c, session.activeLayer);
+      renderDpWithMode(phoxelis, r, c, session.activeLayer);
 
-      const newPhox = ws.phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
+      const newPhox = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
       if (!newPhox) {
-        changes.push(() => ws.phoxelis.removePhoxel(r, c, session.activeLayer));
+        changes.push(() => phoxelis.removePhoxel(r, c, session.activeLayer));
       } else {
         changes.push(() =>
-          ws.phoxelis.renderPhoxel(
+          phoxelis.renderPhoxel(
             newPhox.char,
             newPhox.fg,
             newPhox.bg,
@@ -660,17 +678,17 @@ export async function Workspace(config: {
   const mousePos: CellPosition = { x: -1, y: -1 };
 
   function setMousePos(event: PointerEvent) {
-    const { width, top, left } = ws.phoxelis.canvas.getBoundingClientRect();
-    const scale = width / (ws.size.cols * ws.font.width);
+    const { width, top, left } = phoxelis.canvas.getBoundingClientRect();
+    const scale = width / (size.cols * font.width);
     const mouseScreenPosX = event.clientX - left;
     const mouseScreenPosY = event.clientY - top;
     mousePos.x = Math.min(
-      ws.size.cols - 1,
-      Math.max(0, Math.floor(mouseScreenPosX / (ws.font.width * scale))),
+      size.cols - 1,
+      Math.max(0, Math.floor(mouseScreenPosX / (font.width * scale))),
     );
     mousePos.y = Math.min(
-      ws.size.rows - 1,
-      Math.max(0, Math.floor(mouseScreenPosY / (ws.font.height * scale))),
+      size.rows - 1,
+      Math.max(0, Math.floor(mouseScreenPosY / (font.height * scale))),
     );
   }
   drawboard.addEventListener('pointerdown', setMousePos);
@@ -702,7 +720,6 @@ export async function Workspace(config: {
     data?: Record<string, any>;
   }
 
-  let movingRefImage = false;
   interface PanzoomTool extends Tool {
     data: {
       panzooming: boolean;
@@ -724,7 +741,7 @@ export async function Workspace(config: {
     },
     onPointerMove(e) {
       if (!this.data.panzooming) return;
-      const targetZoom = movingRefImage ? refImagePanzoom : panzoom;
+      const targetZoom = ws.refImage.moving ? refImagePanzoom : panzoom;
 
       if (!targetZoom) {
         console.error(
@@ -750,7 +767,7 @@ export async function Workspace(config: {
     },
     onPinchStart() {
       this.data.panzooming = true;
-      const targetZoom = movingRefImage ? refImagePanzoom : panzoom;
+      const targetZoom = ws.refImage.moving ? refImagePanzoom : panzoom;
 
       if (!targetZoom) {
         console.error(
@@ -759,7 +776,7 @@ export async function Workspace(config: {
         return;
       }
 
-      if (movingRefImage) {
+      if (ws.refImage.moving) {
         refImageScale = targetZoom.getScale();
       } else {
         scale = targetZoom.getScale();
@@ -767,7 +784,7 @@ export async function Workspace(config: {
     },
     onPinchMove(e) {
       if (this.data.panzooming) {
-        const targetZoom = movingRefImage ? refImagePanzoom : panzoom;
+        const targetZoom = ws.refImage.moving ? refImagePanzoom : panzoom;
 
         if (!targetZoom) {
           console.error(
@@ -776,7 +793,7 @@ export async function Workspace(config: {
           return;
         }
 
-        const s = movingRefImage ? refImageScale : scale;
+        const s = ws.refImage.moving ? refImageScale : scale;
         const newZoomVal = s * e.scale;
         targetZoom.zoom(newZoomVal);
         targetZoom.pan(
@@ -792,12 +809,16 @@ export async function Workspace(config: {
       setPreviousTool();
     },
     submit() {
-      // TODO store panzoom config in document
-      // saveRefImagePanzoomConfig(
-      //   refImagePanzoom?.getScale(),
-      //   refImagePanzoom?.getPan().x,
-      //   refImagePanzoom?.getPan().y,
-      // );
+      if (!refImagePanzoom) {
+        console.error(
+          'panzoomTool.submit error: No target panzoom object. Did you startPanzoom()?',
+        );
+        return;
+      }
+
+      ws.refImage.config.panX = refImagePanzoom.getPan().x;
+      ws.refImage.config.panY = refImagePanzoom.getPan().y;
+      ws.refImage.config.scale = refImagePanzoom.getScale();
     },
     resetTool() {
       this.data.panzooming = false;
@@ -1264,7 +1285,7 @@ export async function Workspace(config: {
 
     for (
       let r = Math.max(0, Math.floor(rMin));
-      r <= Math.min(ws.size.rows - 1, Math.ceil(rMax));
+      r <= Math.min(size.rows - 1, Math.ceil(rMax));
       r++
     ) {
       const dy = r - centerR;
@@ -1274,7 +1295,7 @@ export async function Workspace(config: {
       if (ratio > 1) continue;
       const dx = Math.sqrt(Math.max(0, 1 - ratio)) * halfRx;
       const left = Math.max(0, Math.ceil(centerC - dx));
-      const right = Math.min(ws.size.cols - 1, Math.floor(centerC + dx));
+      const right = Math.min(size.cols - 1, Math.floor(centerC + dx));
       for (let c = left; c <= right; c++) {
         renderFn(r, c);
       }
@@ -1353,8 +1374,8 @@ export async function Workspace(config: {
     fg: string,
     bg: string,
   ) {
-    const yOffset = Math.floor(index / alphabetCols) * ws.font.height;
-    const xOffset = (index % alphabetCols) * ws.font.width;
+    const yOffset = Math.floor(index / alphabetCols) * font.height;
+    const xOffset = (index % alphabetCols) * font.width;
     for (let y = 0; y < charShape.length; y++) {
       for (let x = 0; x < charShape[0].length; x++) {
         const pixelVal = charShape[y][x];
@@ -1364,7 +1385,7 @@ export async function Workspace(config: {
     }
   }
 
-  ws.font.charactersList.forEach((char, i) => {
+  font.charactersList.forEach((char, i) => {
     drawCharShapeInAlphabet(i, char.shape, '#FFFFFF', '#000000');
   });
 
@@ -1392,7 +1413,7 @@ export async function Workspace(config: {
   }
 
   async function saveDocument(filename: string) {
-    const phoxelisData = ws.phoxelis.exportPhoxelis(filename);
+    const phoxelisData = phoxelis.exportPhoxelis(filename);
 
     // TODO store refImage and refImagePanzoom confg
     const documentData = {
@@ -1419,12 +1440,12 @@ export async function Workspace(config: {
     const fileData = JSON.parse(fileDataString) as Awaited<
       ReturnType<typeof saveDocument>
     >;
-    ws.phoxelis.importPhoxelis(fileData.phoxelis);
+    phoxelis.importPhoxelis(fileData.phoxelis);
 
     ws.layers = _.mapValues(fileData.layers, (l) => {
       const target = document.createElement('canvas');
-      target.width = ws.font.width * ws.size.cols;
-      target.height = ws.font.height * ws.size.rows;
+      target.width = font.width * size.cols;
+      target.height = font.height * size.rows;
       target.style = layerPreviewStyle;
 
       return {
@@ -1433,16 +1454,20 @@ export async function Workspace(config: {
       };
     });
 
-    session.activeLayer = ws.phoxelis.layers[0].id;
+    session.activeLayer = phoxelis.layers[0].id;
 
     console.log(`${filename} imported.`);
   }
 
+  function exportPhoxelis() {
+    return phoxelis.exportPhoxelis(filename);
+  }
+
   // MARK: Rendering
   const renderLoop = () => {
-    ws.phoxelis.renderFrame(
-      ws.phoxelis.layers.map((l) => ({
-        additionalTarget: ws.layers[l.id].target,
+    phoxelis.renderFrame(
+      phoxelis.layers.map((l) => ({
+        additionalTarget: layersTargets[l.id],
         opacity: ws.layers[l.id].visible ? ws.layers[l.id].opacity / 100 : 0,
       })),
     );
@@ -1460,17 +1485,15 @@ export async function Workspace(config: {
     filename,
     ws,
     session,
-    draftScreen,
-    refImagePanzoomConfig,
     drawboard,
-    refImage,
     paletteSelector,
-    currTool,
+    currTool, 
+    layersTargets,
     colorPicker: colorPickerEl,
     alphabet: alphabetContainer,
-    movingRefImage,
     createLayer,
     removeLayer,
+    moveLayer,
     selectLayer,
     getDraftBaseLayer,
     renderDpWithMode,
@@ -1483,5 +1506,7 @@ export async function Workspace(config: {
     loadDocument,
     selectColorType,
     startPanzoom,
+    getSortedLayers,
+    exportPhoxelis
   };
 }
