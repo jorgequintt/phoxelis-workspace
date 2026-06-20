@@ -5,7 +5,7 @@ import Hammer from 'hammerjs';
 import _ from 'lodash';
 import iro from '@jaames/iro';
 
-const layerPreviewStyle = `height: 100%; width: 100%; object-fit: contain;`;
+const ext = 'phx';
 const paletteScale = 2;
 
 type Phoxel = {
@@ -21,17 +21,9 @@ export type DocumentLayer = {
   visible: boolean;
 };
 
-interface WorkspaceState {
+interface DocumentState {
+  name: string,
   layers: Record<string, DocumentLayer>;
-  refImage: {
-    moving: boolean;
-    base64: string;
-    config: {
-      panX: number;
-      panY: number;
-      scale: number;
-    };
-  };
 }
 
 interface SessionState {
@@ -111,9 +103,15 @@ export async function Workspace(config: {
     cols: number;
   };
   fontName: Parameters<typeof getFont>[0];
-  filename: string;
+  name: string;
 }) {
-  const { size, filename, fontName } = config;
+  let { size, name, fontName } = config;
+
+  if (!name){
+    throw new Error('Workspace: Not a valid name provided.');
+  }
+
+  const filename = () => `${name}.${ext}`;
 
   const font = await getFont(fontName);
   const phoxelis = Phoxelis(size.rows, size.cols, font, {
@@ -125,22 +123,14 @@ export async function Workspace(config: {
     return draftScreen.layers[0].id;
   };
 
-  const layersTargets: Record<string, HTMLCanvasElement> = {};
-
+  let layersTargets: Record<string, HTMLCanvasElement> = {};
+  
   // What outer users can set. To be persisted in document
-  const defaultState = () => ({
+  const defaultDocumentState = () => ({
+    name: '',
     layers: {},
-    refImage: {
-      moving: false,
-      base64: '',
-      config: {
-        panX: 0,
-        panY: 0,
-        scale: 1,
-      },
-    },
   });
-  let ws: WorkspaceState = defaultState();
+  let doc: DocumentState = defaultDocumentState();
   createLayer(); // Base layer
 
   // What outer users can set. Should not persist
@@ -154,7 +144,7 @@ export async function Workspace(config: {
     },
     alphabetData: {
       selectedChar: font.charactersList.findIndex(
-        (c) => c.codepoint === ("D").codePointAt(0),
+        (c) => c.codepoint === 'D'.codePointAt(0),
       ),
     },
     selectedColorType: 'fg',
@@ -345,14 +335,11 @@ export async function Workspace(config: {
 
   // MARK: Layers
   function createLayer(layerId?: string) {
-    const target = document.createElement('canvas');
-    target.width = font.width * size.cols;
-    target.height = font.height * size.rows;
-    target.style = layerPreviewStyle;
+    const target = createLayerTarget();
 
     const lid = layerId ?? phoxelis.addLayer();
 
-    ws.layers[lid] = {
+    doc.layers[lid] = {
       name: `Layer #${phoxelis.layers.length}`,
       opacity: 100,
       visible: true,
@@ -371,7 +358,7 @@ export async function Workspace(config: {
 
     const layerPosition = phoxelis.layerPositions[layerId];
     phoxelis.removeLayer(layerId);
-    delete ws.layers[layerId];
+    delete doc.layers[layerId];
 
     const newSelectPos = Math.max(0, Math.min(phoxelis.layers.length - 1, layerPosition));
     const layerBeforeId = phoxelis.layers[newSelectPos].id;
@@ -386,8 +373,16 @@ export async function Workspace(config: {
     session.activeLayer = layerId;
   }
 
-  function getSortedLayers(){
-    return phoxelis.layers.map(l => l.id);
+  function getSortedLayers() {
+    return phoxelis.layers.map((l) => l.id);
+  }
+
+  function createLayerTarget() {
+    const target = document.createElement('canvas');
+    target.width = font.width * size.cols;
+    target.height = font.height * size.rows;
+    target.style = `height: 100%; width: 100%; object-fit: contain;`;
+    return target;
   }
 
   function renderDpWithMode(
@@ -531,7 +526,7 @@ export async function Workspace(config: {
   // sampleRenderContent(phoxelis, rows, cols);
 
   // MARK: Hotkeys
-
+  // TODO I think this should go outside
   interface Hotkey {
     ctrl?: boolean;
     alt?: boolean;
@@ -550,7 +545,8 @@ export async function Workspace(config: {
         e.preventDefault();
       },
       onHotkeyEnd() {
-        saveDocument(filename);
+        // TODO should occur outside of workspace?
+        // saveDocument();
       },
     },
     { ctrl: true, key: 'z', onHotkeyEnd: () => undoLastChange() },
@@ -1404,55 +1400,76 @@ export async function Workspace(config: {
     }
   }
 
-  async function saveDocument(filename: string) {
-    const phoxelisData = phoxelis.exportPhoxelis(filename);
+  async function createDocument() {
+    const phoxelisData = phoxelis.exportPhoxelis(name);
 
-    // TODO store refImage and refImagePanzoom confg
     const documentData = {
+      name,
       phoxelis: phoxelisData,
-      layers: _.mapValues(ws.layers, (e) => ({
-        ...e,
-        target: undefined,
-      })),
+      layers: doc.layers,
+      refImage: {
+        base64: refImage.src ?? '',
+        config: {
+          panX: refImagePanzoom?.getPan().x ?? 0,
+          panY: refImagePanzoom?.getPan().y ?? 0,
+          scale: refImagePanzoom?.getScale() ?? 1,
+        }
+      }
     };
 
-    const dataStr = JSON.stringify(documentData);
-    saveFile(dataStr, filename);
     return documentData;
   }
 
-  async function loadDocument(filename: string) {
-    // TODO improve this and saveDocument to prevent bad documents
-    const fileDataString = await loadFile(filename);
+  async function saveDocument(name: string){
+    const document = createDocument();
+    const dataStr = JSON.stringify(document);
+    await saveFile(dataStr, `${name}.phx`);
+  }
+
+  // TODO start document?
+  async function loadDocument(name: string) {
+    if(!refImagePanzoom) {
+      console.error('loadDocument error: refImagePanzoom is null. Did you startPanzoom()?');
+      return;
+    }
+   
+    const fileDataString = await loadFile(`${name}.${ext}`);
     if (!fileDataString) {
-      console.error(`loadPhoxelis error: Could not load file "${filename}"`);
+      console.error(`loadPhoxelis error: Could not load file "${`${name}.${ext}`}"`);
       return;
     }
 
     const fileData = JSON.parse(fileDataString) as Awaited<
-      ReturnType<typeof saveDocument>
+      ReturnType<typeof createDocument>
     >;
+
+    // Reset
+    doc = defaultDocumentState();
+    session = defaultSessionState();
+    layersTargets = {};
+
+    name = fileData.name;
     phoxelis.importPhoxelis(fileData.phoxelis);
 
-    ws.layers = _.mapValues(fileData.layers, (l) => {
-      const target = document.createElement('canvas');
-      target.width = font.width * size.cols;
-      target.height = font.height * size.rows;
-      target.style = layerPreviewStyle;
+    doc.layers = _.mapValues(fileData.layers, (l, k) => {
+      const target = createLayerTarget();
+      layersTargets[k] = target;
 
       return {
-        ...l,
-        target,
+        ...l
       };
     });
+    selectLayer(phoxelis.layers[0].id);
 
-    session.activeLayer = phoxelis.layers[0].id;
+    setReferenceImage(fileData.refImage.base64);
+    refImagePanzoom.pan(fileData.refImage.config.panX, fileData.refImage.config.panX);
+    refImagePanzoom.zoom(fileData.refImage.config.scale);
 
     console.log(`${filename} imported.`);
   }
 
   function exportPhoxelis() {
-    return phoxelis.exportPhoxelis(filename);
+    return phoxelis.exportPhoxelis(name);
   }
 
   // MARK: Rendering
@@ -1460,7 +1477,7 @@ export async function Workspace(config: {
     phoxelis.renderFrame(
       phoxelis.layers.map((l) => ({
         additionalTarget: layersTargets[l.id],
-        opacity: ws.layers[l.id].visible ? ws.layers[l.id].opacity / 100 : 0,
+        opacity: doc.layers[l.id].visible ? doc.layers[l.id].opacity / 100 : 0,
       })),
     );
     window.requestAnimationFrame(renderLoop);
@@ -1475,11 +1492,11 @@ export async function Workspace(config: {
 
   return {
     filename,
-    ws,
+    doc,
     session,
     drawboard,
     paletteSelector,
-    currTool, 
+    currTool,
     layersTargets,
     colorPicker: colorPickerEl,
     alphabet: alphabetContainer,
@@ -1494,11 +1511,12 @@ export async function Workspace(config: {
     commitPhoxels,
     setReferenceImage,
     setTool,
+    createDocument,
     saveDocument,
     loadDocument,
     selectColorType,
     startPanzoom,
     getSortedLayers,
-    exportPhoxelis
+    exportPhoxelis,
   };
 }

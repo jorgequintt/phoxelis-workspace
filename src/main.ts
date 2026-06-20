@@ -1,11 +1,57 @@
 import './style.css';
 import _ from 'lodash';
-import { downloadArrayBuffer as downloadAsFile, toggleFullScreen } from './utils';
+import { fileToBase64, downloadArrayBuffer as downloadAsFile, toggleFullScreen } from './utils';
 import {
-  saveRefImageToStorage,
-  fileToBase64,
-} from './refImageStorage';
-import { drawModeDefs, toolDefs, Workspace, type DocumentLayer, type DrawModeDefinition, type ToolDefinition } from './workspace/Workspace';
+  drawModeDefs,
+  toolDefs,
+  Workspace,
+  type DocumentLayer,
+  type DrawModeDefinition,
+  type ToolDefinition,
+} from './workspace/Workspace';
+
+// MARK: Elements
+const appContainer = document.createElement('div');
+appContainer.style = 'width: 100%; height: 100%; display: flex; flex-direction: column;';
+
+const navBar = document.createElement('div');
+navBar.style = `width: 100%; background: #888888;`;
+
+const content = document.createElement('div');
+content.style =
+  'width: 100%; display: flex; flex: 1; flex-direction: row; min-height: 0;';
+
+const footer = document.createElement('div');
+footer.style = 'overflow-x: scroll;';
+
+const sidebar = document.createElement('div');
+sidebar.style = `display: flex; flex-direction: column;`;
+
+const secondLeftSidebar = document.createElement('div');
+secondLeftSidebar.style = `
+  width: 40px;
+  flex-shrink: 0;
+  background: #2a2a2a;
+  border-right: 1px solid #444;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  gap: 4px;
+`;
+
+const leftSidebar = document.createElement('div');
+leftSidebar.style = `
+  width: 40px;
+  flex-shrink: 0;
+  background: #333;
+  border-right: 1px solid #555;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  gap: 4px;
+`;
 
 const layerList = document.createElement('div');
 layerList.style.cssText = `
@@ -16,22 +62,26 @@ layerList.style.cssText = `
   overflow-y: auto;
 `;
 
+
 const workspace = await Workspace({
   size: { rows: 37, cols: 152 },
-  filename: 'test_file',
+  name: 'test_file',
   fontName: '1_Trithemius8x16',
 });
 
-const { ws, session, filename } = workspace;
+const { doc, session, filename } = workspace;
 
 function renderLayerList() {
-  workspace.getSortedLayers().toReversed().forEach((lid) => {
-    let layerEl = layerList.querySelector(`#layer-${lid}`);
-    if (!layerEl) {
-      layerEl = createLayerElement(lid, ws.layers[lid]);
-    }
-    layerList.appendChild(layerEl);
-  });
+  workspace
+    .getSortedLayers()
+    .toReversed()
+    .forEach((lid) => {
+      let layerEl = layerList.querySelector(`#layer-${lid}`);
+      if (!layerEl) {
+        layerEl = createLayerElement(lid, doc.layers[lid]);
+      }
+      layerList.appendChild(layerEl);
+    });
 }
 renderLayerList();
 
@@ -52,23 +102,7 @@ function selectLayer(layerId: string) {
 }
 selectLayer(session.activeLayer);
 
-const appContainer = document.createElement('div');
-appContainer.style = 'width: 100%; height: 100%; display: flex; flex-direction: column;';
-
-const navBar = document.createElement('div');
-navBar.style = `width: 100%; background: #888888;`;
-
-const content = document.createElement('div');
-content.style =
-  'width: 100%; display: flex; flex: 1; flex-direction: row; min-height: 0;';
-
-const footer = document.createElement('div');
-footer.style = 'overflow-x: scroll;';
-
 footer.append(workspace.paletteSelector);
-
-const sidebar = document.createElement('div');
-sidebar.style = `display: flex; flex-direction: column;`;
 
 const drawModeButtons: HTMLButtonElement[] = [];
 
@@ -108,22 +142,10 @@ function createDrawModeButton(def: DrawModeDefinition): HTMLButtonElement {
   return btn;
 }
 
-const drawModeSidebar = document.createElement('div');
-drawModeSidebar.style = `
-  width: 40px;
-  flex-shrink: 0;
-  background: #2a2a2a;
-  border-right: 1px solid #444;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px 4px;
-  gap: 4px;
-`;
 
 for (const def of drawModeDefs) {
   const btn = createDrawModeButton(def);
-  drawModeSidebar.appendChild(btn);
+  secondLeftSidebar.appendChild(btn);
   drawModeButtons.push(btn);
 }
 
@@ -131,19 +153,6 @@ if (drawModeButtons.length > 0) {
   drawModeButtons[0].style.background = '#666';
   drawModeButtons[0].style.borderColor = '#888';
 }
-
-const leftSidebar = document.createElement('div');
-leftSidebar.style = `
-  width: 48px;
-  flex-shrink: 0;
-  background: #333;
-  border-right: 1px solid #555;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px 4px;
-  gap: 4px;
-`;
 
 function createToolButton(def: ToolDefinition): HTMLButtonElement {
   const btn = document.createElement('button');
@@ -187,12 +196,42 @@ for (const def of toolDefs) {
   leftSidebar.appendChild(createToolButton(def));
 }
 
+const newButton = document.createElement('button');
+newButton.innerHTML = 'New';
+newButton.onclick = async () => {
+  // await workspace.newDocument();
+};
+navBar.appendChild(newButton);
+
 const saveButton = document.createElement('button');
 saveButton.innerHTML = 'Save';
 saveButton.onclick = async () => {
-  await workspace.saveDocument(filename);
+  if (!workspace.doc.name) {
+    const docName = prompt();
+
+    if (!docName) {
+      alert('No name provided. Not saving');
+      return;
+    }
+
+    workspace.doc.name = docName;
+  }
+  await workspace.saveDocument(workspace.doc.name);
 };
 navBar.appendChild(saveButton);
+
+const loadButton = document.createElement('button');
+loadButton.innerHTML = 'Load';
+loadButton.onclick = async () => {
+  const docName = prompt();
+
+  if (!docName) {
+    alert('No name provided. Not saving');
+    return;
+  }
+  await workspace.loadDocument(docName);
+};
+navBar.appendChild(loadButton);
 
 const fullscreenButton = document.createElement('button');
 fullscreenButton.innerHTML = 'Fullscreen';
@@ -202,10 +241,7 @@ navBar.appendChild(fullscreenButton);
 const exportButton = document.createElement('button');
 exportButton.innerHTML = 'Export';
 exportButton.onclick = () =>
-  downloadAsFile(
-    JSON.stringify(workspace.exportPhoxelis()),
-    `${filename}.phoxelis`,
-  );
+  downloadAsFile(JSON.stringify(workspace.exportPhoxelis()), `${filename}.phoxelis`);
 navBar.appendChild(exportButton);
 
 const referenceImageButton = document.createElement('input');
@@ -223,9 +259,9 @@ referenceImageButton.addEventListener('change', async (e) => {
       // Convert to base64 for storage
       try {
         const base64 = await fileToBase64(file);
-        const ok = saveRefImageToStorage(base64);
-        if (!ok) {
-          console.warn('Reference image too large for localStorage');
+
+        if (!base64) {
+          throw new Error('Failed converting image to base64');
         }
 
         workspace.setReferenceImage(base64);
@@ -303,7 +339,7 @@ addLayerBtn.style.cssText = `
 `;
 addLayerBtn.addEventListener('click', () => {
   const layerId = workspace.createLayer();
-  createLayerElement(layerId, ws.layers[layerId]);
+  createLayerElement(layerId, doc.layers[layerId]);
   selectLayer(layerId);
   renderLayerList();
 });
@@ -629,7 +665,7 @@ layerPanel.appendChild(layerList);
 sidebar.append(workspace.alphabet);
 sidebar.append(workspace.colorPicker);
 sidebar.append(layerPanel);
-content.append(drawModeSidebar);
+content.append(secondLeftSidebar);
 content.append(leftSidebar);
 content.append(workspace.drawboard);
 content.append(sidebar);
@@ -639,3 +675,5 @@ appContainer.append(footer);
 document.body.appendChild(appContainer);
 
 workspace.startPanzoom();
+
+workspace.loadDocument('test');
