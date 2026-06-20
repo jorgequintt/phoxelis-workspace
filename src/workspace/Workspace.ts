@@ -457,11 +457,13 @@ export async function Workspace(config: {
   function commitPhoxels(phoxelPositions: Array<PhoxelPosition>) {
     const undoChanges: ChangesStack = [];
     const changes: ChangesStack = [];
+    const currentLayerId = session.activeLayer; // Captured for undo/redo funcs
 
     phoxelPositions.forEach(([r, c]) => {
       const origPhox = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
       if (!origPhox) {
-        undoChanges.push(() => phoxelis.removePhoxel(r, c, session.activeLayer));
+        // Note: Pass currentLayerId, not session.activeLayer to funcs
+        undoChanges.push(() => phoxelis.removePhoxel(r, c, currentLayerId));
       } else {
         undoChanges.push(() =>
           phoxelis.renderPhoxel(
@@ -470,7 +472,7 @@ export async function Workspace(config: {
             origPhox.bg,
             r,
             c,
-            session.activeLayer,
+            currentLayerId,
           ),
         );
       }
@@ -479,7 +481,7 @@ export async function Workspace(config: {
 
       const newPhox = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
       if (!newPhox) {
-        changes.push(() => phoxelis.removePhoxel(r, c, session.activeLayer));
+        changes.push(() => phoxelis.removePhoxel(r, c, currentLayerId));
       } else {
         changes.push(() =>
           phoxelis.renderPhoxel(
@@ -488,7 +490,7 @@ export async function Workspace(config: {
             newPhox.bg,
             r,
             c,
-            session.activeLayer,
+            currentLayerId,
           ),
         );
       }
