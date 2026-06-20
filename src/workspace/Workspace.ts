@@ -46,6 +46,7 @@ interface SessionState {
     selectedChar: number;
   };
   selectedColorType: 'fg' | 'bg';
+  movingRefImage: boolean;
 }
 
 export type DrawModeDefinition = {
@@ -157,6 +158,7 @@ export async function Workspace(config: {
       ),
     },
     selectedColorType: 'fg',
+    movingRefImage: false
   });
   let session: SessionState = defaultSessionState();
   selectLayer(session.activeLayer);
@@ -741,7 +743,7 @@ export async function Workspace(config: {
     },
     onPointerMove(e) {
       if (!this.data.panzooming) return;
-      const targetZoom = ws.refImage.moving ? refImagePanzoom : panzoom;
+      const targetZoom = session.movingRefImage ? refImagePanzoom : panzoom;
 
       if (!targetZoom) {
         console.error(
@@ -767,7 +769,7 @@ export async function Workspace(config: {
     },
     onPinchStart() {
       this.data.panzooming = true;
-      const targetZoom = ws.refImage.moving ? refImagePanzoom : panzoom;
+      const targetZoom = session.movingRefImage ? refImagePanzoom : panzoom;
 
       if (!targetZoom) {
         console.error(
@@ -776,7 +778,7 @@ export async function Workspace(config: {
         return;
       }
 
-      if (ws.refImage.moving) {
+      if (session.movingRefImage) {
         refImageScale = targetZoom.getScale();
       } else {
         scale = targetZoom.getScale();
@@ -784,7 +786,7 @@ export async function Workspace(config: {
     },
     onPinchMove(e) {
       if (this.data.panzooming) {
-        const targetZoom = ws.refImage.moving ? refImagePanzoom : panzoom;
+        const targetZoom = session.movingRefImage ? refImagePanzoom : panzoom;
 
         if (!targetZoom) {
           console.error(
@@ -793,7 +795,7 @@ export async function Workspace(config: {
           return;
         }
 
-        const s = ws.refImage.moving ? refImageScale : scale;
+        const s = session.movingRefImage ? refImageScale : scale;
         const newZoomVal = s * e.scale;
         targetZoom.zoom(newZoomVal);
         targetZoom.pan(
@@ -806,19 +808,9 @@ export async function Workspace(config: {
       if (!this.data!.panzooming) return;
       this.resetTool!();
       this.submit!();
-      setPreviousTool();
     },
     submit() {
-      if (!refImagePanzoom) {
-        console.error(
-          'panzoomTool.submit error: No target panzoom object. Did you startPanzoom()?',
-        );
-        return;
-      }
-
-      ws.refImage.config.panX = refImagePanzoom.getPan().x;
-      ws.refImage.config.panY = refImagePanzoom.getPan().y;
-      ws.refImage.config.scale = refImagePanzoom.getScale();
+      setPreviousTool();
     },
     resetTool() {
       this.data.panzooming = false;
