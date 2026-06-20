@@ -12,7 +12,8 @@ import {
   type DocumentLayer,
   type DrawModeDefinition,
   type ToolDefinition,
-  type WorkspaceConfig,
+  type WorkspaceExportConfig,
+  type WorkspaceInputConfig,
   type WorkspaceObj,
 } from './workspace/Workspace';
 
@@ -113,23 +114,30 @@ async function Editor() {
       );
     }
 
-    const documentData = JSON.parse(fileData) as WorkspaceConfig;
+    const documentData = JSON.parse(fileData) as WorkspaceExportConfig;
 
-    console.log({documentData});
     // TODO check if valid structure
     // TODO How to handle versions of documents?
 
-    startSession(documentData);
+    startSession(documentData, name);
   }
 
   async function startSession(
-    config: WorkspaceConfig = {
+    config: WorkspaceInputConfig = {
       size: { rows: 37, cols: 152 },
       fontName: '1_Trithemius8x16',
     },
+    name?: string
   ) {
+    layerList.replaceChildren();
+    sidebar.replaceChildren();
+    content.replaceChildren();
+    footer.replaceChildren();
+    appContainer.replaceChildren();
+    document.body.replaceChildren();
+
     const workspace = await Workspace(config);
-    let documentName = '';
+    let documentName = name;
 
     const { ds, session } = workspace;
 
@@ -734,12 +742,6 @@ async function Editor() {
     }
 
     // layerList.replaceChildren();
-
-    sidebar.replaceChildren();
-    content.replaceChildren();
-    footer.replaceChildren();
-    appContainer.replaceChildren();
-    document.body.replaceChildren();
     layerPanel.appendChild(layerList);
     sidebar.appendChild(workspace.alphabet);
     sidebar.appendChild(workspace.colorPicker);

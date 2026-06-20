@@ -93,29 +93,35 @@ export const toolDefs: ToolDefinition[] = [
 
 export type WorkspaceObj = Awaited<ReturnType<typeof Workspace>>;
 
-export interface WorkspaceConfig {
+export interface WorkspaceData {
+  phoxelis: ReturnType<ReturnType<typeof Phoxelis>['exportPhoxelis']>; // TODO export type in phoxelis for this
+  layers: DocumentState['layers'];
+  refImage: {
+    src: string;
+    config: {
+      panX: number;
+      panY: number;
+      scale: number;
+    };
+  };
+}
+
+export interface WorkspaceInputConfig {
   size: {
     rows: number;
     cols: number;
   };
   fontName: Parameters<typeof getFont>[0];
-  data?: {
-    phoxelis: ReturnType<ReturnType<typeof Phoxelis>['exportPhoxelis']>; // TODO export type in phoxelis for this
-    layers: DocumentState['layers'];
-    refImage: {
-      src: string;
-      config: {
-        panX: number;
-        panY: number;
-        scale: number;
-      };
-    };
-  };
+  data?: WorkspaceData;
+}
+
+export interface WorkspaceExportConfig extends WorkspaceInputConfig {
+  data: WorkspaceData;
 }
 
 // & Keep decoupling with the same method: Imperfect step in the right direction, not frozen planning the perfect step
 // MARK: Workspace
-export async function Workspace(config: WorkspaceConfig) {
+export async function Workspace(config: WorkspaceInputConfig) {
   let { size, fontName, data } = config;
 
   const font = await getFont(fontName);
@@ -350,7 +356,7 @@ export async function Workspace(config: WorkspaceConfig) {
     panzoom = Panzoom(layersWrapper, panzoomConfiguration);
     refImagePanzoom = Panzoom(refImage, refImagePanzoomConfig);
 
-    if(data) {
+    if (data) {
       refImagePanzoom.pan(data.refImage.config.panX, data.refImage.config.panY);
       refImagePanzoom.zoom(data.refImage.config.scale);
     }
@@ -375,6 +381,7 @@ export async function Workspace(config: WorkspaceConfig) {
 
   // MARK: Load data variable if present. Create defaults if not
   if (data) {
+    console.log('There is data. Loading into phoxelis');
     phoxelis.importPhoxelis(data.phoxelis);
 
     ds.layers = _.mapValues(data.layers, (l, k) => {
@@ -1410,27 +1417,28 @@ export async function Workspace(config: WorkspaceConfig) {
   });
 
   // MARK: File management
-  function exportData(): WorkspaceConfig {
+  function exportData(): WorkspaceExportConfig {
     const phoxelisData = phoxelis.exportPhoxelis();
 
     const documentData = {
       size,
       fontName,
-      phoxelis: phoxelisData,
-      layers: ds.layers,
-      refImage: {
-        src: refImage.src ?? '',
-        config: {
-          panX: refImagePanzoom?.getPan().x ?? 0,
-          panY: refImagePanzoom?.getPan().y ?? 0,
-          scale: refImagePanzoom?.getScale() ?? 1,
+      data: {
+        phoxelis: phoxelisData,
+        layers: ds.layers,
+        refImage: {
+          src: refImage.src ?? '',
+          config: {
+            panX: refImagePanzoom?.getPan().x ?? 0,
+            panY: refImagePanzoom?.getPan().y ?? 0,
+            scale: refImagePanzoom?.getScale() ?? 1,
+          },
         },
       },
     };
 
     return documentData;
   }
-
 
   // // TODO start document?
 
@@ -1484,6 +1492,6 @@ export async function Workspace(config: WorkspaceConfig) {
     getSortedLayers,
     exportPhoxelis,
     getReferenceImageConfig,
-    exportData
+    exportData,
   };
 }
