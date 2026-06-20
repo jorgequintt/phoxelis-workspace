@@ -72,6 +72,8 @@ layerList.style.cssText = `
 const ext = 'phx';
 
 async function Editor() {
+  let currentWorkspace: WorkspaceObj | null = null;
+
   async function saveFile(data: string, filename: string) {
     const root = await navigator.storage.getDirectory();
     const fileHandle = await root.getFileHandle(filename, { create: true });
@@ -123,6 +125,7 @@ async function Editor() {
     startSession(documentData, name);
   }
 
+
   async function startSession(
     config: WorkspaceInputConfig = {
       size: { rows: 37, cols: 152 },
@@ -130,14 +133,23 @@ async function Editor() {
     },
     name?: string,
   ) {
+    if (currentWorkspace) {
+      currentWorkspace.dispose();
+    }
+    console.log('start session');
+    console.log('startup content.childNodes', content.childNodes);
+    leftSidebar.replaceChildren();
+    secondLeftSidebar.replaceChildren();
     layerList.replaceChildren();
     sidebar.replaceChildren();
     content.replaceChildren();
     footer.replaceChildren();
     appContainer.replaceChildren();
     document.body.replaceChildren();
+    console.log('startup after content.childNodes', content.childNodes);
 
     const workspace = await Workspace(config);
+    currentWorkspace = workspace;
     let documentName = name;
 
     const { ds, session } = workspace;
@@ -169,6 +181,10 @@ async function Editor() {
       } catch (error) {
         console.error(error);
       }
+    }
+
+    async function newDocumentCommand() {
+      await startSession();
     }
 
     function renderLayerList() {
@@ -299,7 +315,7 @@ async function Editor() {
     const newButton = document.createElement('button');
     newButton.innerHTML = 'New';
     newButton.onclick = async () => {
-      // await workspace.newDocument();
+      await newDocumentCommand();
     };
     navBar.appendChild(newButton);
 
@@ -752,10 +768,13 @@ async function Editor() {
     sidebar.appendChild(workspace.colorPicker);
     sidebar.appendChild(layerPanel);
 
+    console.log('content.childNodes', content.childNodes);
     content.appendChild(secondLeftSidebar);
     content.appendChild(leftSidebar);
     content.appendChild(workspace.drawboard);
     content.appendChild(sidebar);
+    console.log('after content.childNodes', content.childNodes);
+
 
     footer.appendChild(workspace.paletteSelector);
 
@@ -787,17 +806,28 @@ async function Editor() {
         loadDocumentCommand();
       },
     });
+    workspace.hotkeys.push({
+      ctrl: true,
+      shift: true,
+      key: 'o',
+      onHotkeyStart: (e) => {
+        e.preventDefault();
+      },
+      onHotkeyEnd() {
+        newDocumentCommand();
+      },
+    });
   }
 
   return {
     loadDocument,
-    startSession
-  }
+    startSession,
+  };
 }
 
 const editor = await Editor();
 const lastDoc = localStorage.getItem('last_doc');
-if(lastDoc) {
+if (lastDoc) {
   editor.loadDocument(lastDoc);
 } else {
   editor.startSession();
