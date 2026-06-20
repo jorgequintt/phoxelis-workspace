@@ -592,7 +592,6 @@ export async function Workspace(config: WorkspaceInputConfig) {
   // sampleRenderContent(phoxelis, rows, cols);
 
   // MARK: Hotkeys
-  // TODO I think this should go outside
   interface Hotkey {
     ctrl?: boolean;
     alt?: boolean;

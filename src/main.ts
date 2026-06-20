@@ -136,8 +136,6 @@ async function Editor() {
     if (currentWorkspace) {
       currentWorkspace.dispose();
     }
-    console.log('start session');
-    console.log('startup content.childNodes', content.childNodes);
     leftSidebar.replaceChildren();
     secondLeftSidebar.replaceChildren();
     layerList.replaceChildren();
@@ -146,7 +144,6 @@ async function Editor() {
     footer.replaceChildren();
     appContainer.replaceChildren();
     document.body.replaceChildren();
-    console.log('startup after content.childNodes', content.childNodes);
 
     const workspace = await Workspace(config);
     currentWorkspace = workspace;
@@ -370,6 +367,10 @@ async function Editor() {
     navBar.appendChild(referenceImageButton);
     const moveRefImageToggle = document.createElement('input');
     moveRefImageToggle.type = 'checkbox';
+    moveRefImageToggle.addEventListener('change', (e) => {
+      const checked = (e.target as HTMLInputElement).checked
+      session.movingRefImage = checked;
+    });
     navBar.appendChild(moveRefImageToggle);
 
     const modifyPalettePhoxButton = document.createElement('button');
@@ -768,12 +769,10 @@ async function Editor() {
     sidebar.appendChild(workspace.colorPicker);
     sidebar.appendChild(layerPanel);
 
-    console.log('content.childNodes', content.childNodes);
     content.appendChild(secondLeftSidebar);
     content.appendChild(leftSidebar);
     content.appendChild(workspace.drawboard);
     content.appendChild(sidebar);
-    console.log('after content.childNodes', content.childNodes);
 
 
     footer.appendChild(workspace.paletteSelector);
