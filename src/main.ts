@@ -1,6 +1,10 @@
 import './style.css';
 import _ from 'lodash';
-import { fileToBase64, downloadArrayBuffer as downloadAsFile, toggleFullScreen } from './utils';
+import {
+  fileToBase64,
+  downloadArrayBuffer as downloadAsFile,
+  toggleFullScreen,
+} from './utils';
 import {
   drawModeDefs,
   toolDefs,
@@ -8,6 +12,8 @@ import {
   type DocumentLayer,
   type DrawModeDefinition,
   type ToolDefinition,
+  type WorkspaceConfig,
+  type WorkspaceObj,
 } from './workspace/Workspace';
 
 // MARK: Elements
@@ -62,253 +68,314 @@ layerList.style.cssText = `
   overflow-y: auto;
 `;
 
+const ext = 'phx';
 
-const workspace = await Workspace({
-  size: { rows: 37, cols: 152 },
-  name: 'test_file',
-  fontName: '1_Trithemius8x16',
-});
+async function Editor() {
+  async function saveFile(data: string, filename: string) {
+    const root = await navigator.storage.getDirectory();
+    const fileHandle = await root.getFileHandle(filename, { create: true });
+    const accessHandle = await fileHandle.createWritable();
 
-const { doc, session, filename } = workspace;
-
-function renderLayerList() {
-  workspace
-    .getSortedLayers()
-    .toReversed()
-    .forEach((lid) => {
-      let layerEl = layerList.querySelector(`#layer-${lid}`);
-      if (!layerEl) {
-        layerEl = createLayerElement(lid, doc.layers[lid]);
-      }
-      layerList.appendChild(layerEl);
-    });
-}
-renderLayerList();
-
-function selectLayer(layerId: string) {
-  const layerRow = layerList.querySelector(`#layer-${layerId}`);
-  if (!layerRow) {
-    console.error(`selectLayer error: Could not find layer by id ${layerId}`);
-    return;
+    accessHandle.write(data);
+    accessHandle.close();
   }
 
-  // workspace.selectLayer(layerId);
-  session.activeLayer = layerId;
+  async function loadFile(filename: string) {
+    const root = await navigator.storage.getDirectory();
+    const fileHandle = await root.getFileHandle(filename);
+    const file = await fileHandle.getFile();
+    const fileDataString = await file.text();
+    return fileDataString;
+  }
 
-  layerList
-    .querySelectorAll('.layer-row')
-    .forEach((el) => ((el as HTMLDivElement).style.background = '#2a2a2a'));
-  (layerRow as HTMLDivElement).style.background = '#7a7a7a';
-}
-selectLayer(session.activeLayer);
+  async function saveDocument(name: string, workspace: WorkspaceObj) {
+    try {
+      const workspaceData = workspace.exportData();
+      const dataString = JSON.stringify(workspaceData);
+      await saveFile(dataString, `${name}.${ext}`);
+      alert('Document saved');
+    } catch (error) {
+      console.error(`saveDocument error: ${error}`);
+    }
+  }
 
-footer.append(workspace.paletteSelector);
-
-const drawModeButtons: HTMLButtonElement[] = [];
-
-function createDrawModeButton(def: DrawModeDefinition): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.textContent = def.icon;
-  btn.title = def.tooltip;
-  btn.style.cssText = `
-    background: #444;
-    color: #ccc;
-    border: 1px solid #555;
-    border-radius: 3px;
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s;
-  `;
-  btn.addEventListener('mouseenter', () => {
-    btn.style.background = '#555';
-  });
-  btn.addEventListener('mouseleave', () => {
-    btn.style.background = session.drawMode === def.name ? '#666' : '#444';
-  });
-  btn.addEventListener('click', () => {
-    drawModeButtons.forEach((b) => {
-      b.style.background = '#444';
-      b.style.borderColor = '#555';
-    });
-    btn.style.background = '#666';
-    btn.style.borderColor = '#888';
-    session.drawMode = def.name;
-  });
-  return btn;
-}
-
-
-for (const def of drawModeDefs) {
-  const btn = createDrawModeButton(def);
-  secondLeftSidebar.appendChild(btn);
-  drawModeButtons.push(btn);
-}
-
-if (drawModeButtons.length > 0) {
-  drawModeButtons[0].style.background = '#666';
-  drawModeButtons[0].style.borderColor = '#888';
-}
-
-function createToolButton(def: ToolDefinition): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.textContent = def.icon;
-  btn.title = def.tooltip;
-  btn.style.cssText = `
-    background: #444;
-    color: #ccc;
-    border: 1px solid #555;
-    border-radius: 3px;
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s;
-  `;
-  btn.addEventListener('mouseenter', () => {
-    btn.style.background = '#555';
-  });
-  btn.addEventListener('mouseleave', () => {
-    // TODO fix currTool type
-    btn.style.background =
-      (workspace.currTool as any).tool.name === def.name ? '#666' : '#444';
-  });
-  btn.addEventListener('click', () => {
-    leftSidebar.querySelectorAll('button').forEach((b) => {
-      b.style.background = '#444';
-      b.style.borderColor = '#555';
-    });
-    btn.style.background = '#666';
-    btn.style.borderColor = '#888';
-    workspace.setTool(def.name);
-  });
-  return btn;
-}
-
-for (const def of toolDefs) {
-  leftSidebar.appendChild(createToolButton(def));
-}
-
-const newButton = document.createElement('button');
-newButton.innerHTML = 'New';
-newButton.onclick = async () => {
-  // await workspace.newDocument();
-};
-navBar.appendChild(newButton);
-
-const saveButton = document.createElement('button');
-saveButton.innerHTML = 'Save';
-saveButton.onclick = async () => {
-  if (!workspace.doc.name) {
-    const docName = prompt();
-
-    if (!docName) {
-      alert('No name provided. Not saving');
-      return;
+  async function loadDocument(name: string) {
+    if (!name) {
+      throw new Error('Editor.loadDocument error: Empty name provided.');
     }
 
-    workspace.doc.name = docName;
-  }
-  await workspace.saveDocument(workspace.doc.name);
-};
-navBar.appendChild(saveButton);
+    const filename = `${name}.${ext}`;
+    const fileData = await loadFile(filename);
 
-const loadButton = document.createElement('button');
-loadButton.innerHTML = 'Load';
-loadButton.onclick = async () => {
-  const docName = prompt();
+    if (!fileData) {
+      throw new Error(
+        `Editor.loadDocument error: No file with filename ${filename} found`,
+      );
+    }
 
-  if (!docName) {
-    alert('No name provided. Not saving');
-    return;
-  }
-  await workspace.loadDocument(docName);
-};
-navBar.appendChild(loadButton);
+    const documentData = JSON.parse(fileData) as WorkspaceConfig;
 
-const fullscreenButton = document.createElement('button');
-fullscreenButton.innerHTML = 'Fullscreen';
-fullscreenButton.onclick = () => toggleFullScreen(document.body);
-navBar.appendChild(fullscreenButton);
+    console.log({documentData});
+    // TODO check if valid structure
+    // TODO How to handle versions of documents?
 
-const exportButton = document.createElement('button');
-exportButton.innerHTML = 'Export';
-exportButton.onclick = () =>
-  downloadAsFile(JSON.stringify(workspace.exportPhoxelis()), `${filename}.phoxelis`);
-navBar.appendChild(exportButton);
-
-const referenceImageButton = document.createElement('input');
-referenceImageButton.type = 'file';
-referenceImageButton.accept = 'image/*';
-referenceImageButton.addEventListener('change', async (e) => {
-  if (!e?.target) {
-    return;
+    startSession(documentData);
   }
 
-  if (e.target instanceof HTMLInputElement) {
-    const file = e.target.files?.[0]; // Get the selected file
+  async function startSession(
+    config: WorkspaceConfig = {
+      size: { rows: 37, cols: 152 },
+      fontName: '1_Trithemius8x16',
+    },
+  ) {
+    const workspace = await Workspace(config);
+    let documentName = '';
 
-    if (file) {
-      // Convert to base64 for storage
-      try {
-        const base64 = await fileToBase64(file);
+    const { ds, session } = workspace;
 
-        if (!base64) {
-          throw new Error('Failed converting image to base64');
+    function renderLayerList() {
+      workspace
+        .getSortedLayers()
+        .toReversed()
+        .forEach((lid) => {
+          let layerEl = layerList.querySelector(`#layer-${lid}`);
+          if (!layerEl) {
+            layerEl = createLayerElement(lid, ds.layers[lid]);
+          }
+          layerList.appendChild(layerEl);
+        });
+    }
+    renderLayerList();
+
+    function selectLayer(layerId: string) {
+      const layerRow = layerList.querySelector(`#layer-${layerId}`);
+      if (!layerRow) {
+        console.error(`selectLayer error: Could not find layer by id ${layerId}`);
+        return;
+      }
+
+      // workspace.selectLayer(layerId);
+      session.activeLayer = layerId;
+
+      layerList
+        .querySelectorAll('.layer-row')
+        .forEach((el) => ((el as HTMLDivElement).style.background = '#2a2a2a'));
+      (layerRow as HTMLDivElement).style.background = '#7a7a7a';
+    }
+    selectLayer(session.activeLayer);
+
+    const drawModeButtons: HTMLButtonElement[] = [];
+
+    function createDrawModeButton(def: DrawModeDefinition): HTMLButtonElement {
+      const btn = document.createElement('button');
+      btn.textContent = def.icon;
+      btn.title = def.tooltip;
+      btn.style.cssText = `
+    background: #444;
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 3px;
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+  `;
+      btn.addEventListener('mouseenter', () => {
+        btn.style.background = '#555';
+      });
+      btn.addEventListener('mouseleave', () => {
+        btn.style.background = session.drawMode === def.name ? '#666' : '#444';
+      });
+      btn.addEventListener('click', () => {
+        drawModeButtons.forEach((b) => {
+          b.style.background = '#444';
+          b.style.borderColor = '#555';
+        });
+        btn.style.background = '#666';
+        btn.style.borderColor = '#888';
+        session.drawMode = def.name;
+      });
+      return btn;
+    }
+
+    secondLeftSidebar.replaceChildren();
+    for (const def of drawModeDefs) {
+      const btn = createDrawModeButton(def);
+      secondLeftSidebar.appendChild(btn);
+      drawModeButtons.push(btn);
+    }
+
+    if (drawModeButtons.length > 0) {
+      drawModeButtons[0].style.background = '#666';
+      drawModeButtons[0].style.borderColor = '#888';
+    }
+
+    function createToolButton(def: ToolDefinition): HTMLButtonElement {
+      const btn = document.createElement('button');
+      btn.textContent = def.icon;
+      btn.title = def.tooltip;
+      btn.style.cssText = `
+    background: #444;
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 3px;
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+  `;
+      btn.addEventListener('mouseenter', () => {
+        btn.style.background = '#555';
+      });
+      btn.addEventListener('mouseleave', () => {
+        // TODO fix currTool type
+        btn.style.background =
+          (workspace.currTool as any).tool.name === def.name ? '#666' : '#444';
+      });
+      btn.addEventListener('click', () => {
+        leftSidebar.querySelectorAll('button').forEach((b) => {
+          b.style.background = '#444';
+          b.style.borderColor = '#555';
+        });
+        btn.style.background = '#666';
+        btn.style.borderColor = '#888';
+        workspace.setTool(def.name);
+      });
+      return btn;
+    }
+
+    leftSidebar.replaceChildren();
+    for (const def of toolDefs) {
+      leftSidebar.appendChild(createToolButton(def));
+    }
+
+    navBar.replaceChildren();
+    const newButton = document.createElement('button');
+    newButton.innerHTML = 'New';
+    newButton.onclick = async () => {
+      // await workspace.newDocument();
+    };
+    navBar.appendChild(newButton);
+
+    const saveButton = document.createElement('button');
+    saveButton.innerHTML = 'Save';
+    saveButton.onclick = async () => {
+      if (!documentName) {
+        const docName = prompt();
+
+        if (!docName) {
+          alert('No name provided. Not saving');
+          return;
         }
 
-        workspace.setReferenceImage(base64);
-      } catch (err) {
-        console.error('Failed to load reference image:', err);
+        documentName = docName;
       }
-    }
-  }
-});
-navBar.appendChild(referenceImageButton);
-const moveRefImageToggle = document.createElement('input');
-moveRefImageToggle.type = 'checkbox';
-navBar.appendChild(moveRefImageToggle);
+      await saveDocument(documentName, workspace);
+    };
+    navBar.appendChild(saveButton);
 
-const modifyPalettePhoxButton = document.createElement('button');
-modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
-modifyPalettePhoxButton.onclick = () => {
-  if (!session.paletteData.modifyingPhox) {
-    session.paletteData.modifyingPhox = true;
-    modifyPalettePhoxButton.innerHTML = 'UPDATING PALETTE PHOX';
-  } else {
-    session.paletteData.modifyingPhox = false;
+    const loadButton = document.createElement('button');
+    loadButton.innerHTML = 'Load';
+    loadButton.onclick = async () => {
+      const docName = prompt();
+
+      if (!docName) {
+        alert('No name provided. Not saving');
+        return;
+      }
+
+      try {
+        await loadDocument(docName);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    navBar.appendChild(loadButton);
+
+    const fullscreenButton = document.createElement('button');
+    fullscreenButton.innerHTML = 'Fullscreen';
+    fullscreenButton.onclick = () => toggleFullScreen(document.body);
+    navBar.appendChild(fullscreenButton);
+
+    const exportButton = document.createElement('button');
+    exportButton.innerHTML = 'Export';
+    exportButton.onclick = () =>
+      downloadAsFile(JSON.stringify(workspace.exportPhoxelis()), `${name}.${ext}`);
+    navBar.appendChild(exportButton);
+
+    const referenceImageButton = document.createElement('input');
+    referenceImageButton.type = 'file';
+    referenceImageButton.accept = 'image/*';
+    referenceImageButton.addEventListener('change', async (e) => {
+      if (!e?.target) {
+        return;
+      }
+
+      if (e.target instanceof HTMLInputElement) {
+        const file = e.target.files?.[0]; // Get the selected file
+
+        if (file) {
+          // Convert to base64 for storage
+          try {
+            const base64 = await fileToBase64(file);
+
+            if (!base64) {
+              throw new Error('Failed converting image to base64');
+            }
+
+            workspace.setReferenceImage(base64);
+          } catch (err) {
+            console.error('Failed to load reference image:', err);
+          }
+        }
+      }
+    });
+    navBar.appendChild(referenceImageButton);
+    const moveRefImageToggle = document.createElement('input');
+    moveRefImageToggle.type = 'checkbox';
+    navBar.appendChild(moveRefImageToggle);
+
+    const modifyPalettePhoxButton = document.createElement('button');
     modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
-  }
-};
-navBar.appendChild(modifyPalettePhoxButton);
+    modifyPalettePhoxButton.onclick = () => {
+      if (!session.paletteData.modifyingPhox) {
+        session.paletteData.modifyingPhox = true;
+        modifyPalettePhoxButton.innerHTML = 'UPDATING PALETTE PHOX';
+      } else {
+        session.paletteData.modifyingPhox = false;
+        modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
+      }
+    };
+    navBar.appendChild(modifyPalettePhoxButton);
 
-const undoButton = document.createElement('button');
-undoButton.innerHTML = 'Undo';
-undoButton.onclick = () => workspace.undoLastChange();
-navBar.appendChild(undoButton);
+    const undoButton = document.createElement('button');
+    undoButton.innerHTML = 'Undo';
+    undoButton.onclick = () => workspace.undoLastChange();
+    navBar.appendChild(undoButton);
 
-const redoButton = document.createElement('button');
-redoButton.innerHTML = 'Redo';
-redoButton.onclick = () => workspace.redoLastChange();
-navBar.appendChild(redoButton);
+    const redoButton = document.createElement('button');
+    redoButton.innerHTML = 'Redo';
+    redoButton.onclick = () => workspace.redoLastChange();
+    navBar.appendChild(redoButton);
 
-const layerPanel = document.createElement('div');
-layerPanel.style.cssText = `
+    const layerPanel = document.createElement('div');
+    layerPanel.style.cssText = `
   padding: 8px;
   border-top: 1px solid #444;
   background: #1e1e1e;
 `;
 
-const layerPanelTitle = document.createElement('div');
-layerPanelTitle.textContent = 'Layers';
-layerPanelTitle.style.cssText = `
+    const layerPanelTitle = document.createElement('div');
+    layerPanelTitle.textContent = 'Layers';
+    layerPanelTitle.style.cssText = `
   font-size: 12px;
   font-weight: bold;
   color: #aaa;
@@ -316,18 +383,18 @@ layerPanelTitle.style.cssText = `
   text-transform: uppercase;
   letter-spacing: 0.5px;
 `;
-layerPanel.appendChild(layerPanelTitle);
+    layerPanel.appendChild(layerPanelTitle);
 
-const layerActions = document.createElement('div');
-layerActions.style.cssText = `
+    const layerActions = document.createElement('div');
+    layerActions.style.cssText = `
   display: flex;
   gap: 4px;
   margin-bottom: 8px;
 `;
 
-const addLayerBtn = document.createElement('button');
-addLayerBtn.textContent = '+ Add';
-addLayerBtn.style.cssText = `
+    const addLayerBtn = document.createElement('button');
+    addLayerBtn.textContent = '+ Add';
+    addLayerBtn.style.cssText = `
   flex: 1;
   padding: 4px 8px;
   background: #444;
@@ -337,17 +404,17 @@ addLayerBtn.style.cssText = `
   font-size: 11px;
   cursor: pointer;
 `;
-addLayerBtn.addEventListener('click', () => {
-  const layerId = workspace.createLayer();
-  createLayerElement(layerId, doc.layers[layerId]);
-  selectLayer(layerId);
-  renderLayerList();
-});
-layerActions.appendChild(addLayerBtn);
+    addLayerBtn.addEventListener('click', () => {
+      const layerId = workspace.createLayer();
+      createLayerElement(layerId, ds.layers[layerId]);
+      selectLayer(layerId);
+      renderLayerList();
+    });
+    layerActions.appendChild(addLayerBtn);
 
-const removeLayerBtn = document.createElement('button');
-removeLayerBtn.textContent = '− Remove';
-removeLayerBtn.style.cssText = `
+    const removeLayerBtn = document.createElement('button');
+    removeLayerBtn.textContent = '− Remove';
+    removeLayerBtn.style.cssText = `
   flex: 1;
   padding: 4px 8px;
   background: #444;
@@ -357,21 +424,21 @@ removeLayerBtn.style.cssText = `
   font-size: 11px;
   cursor: pointer;
 `;
-removeLayerBtn.addEventListener('click', () => {
-  const layerId = session.activeLayer;
-  workspace.removeLayer(session.activeLayer);
-  layerList.removeChild(layerList.querySelector(`#layer-${layerId}`)!);
-  renderLayerList();
-});
-layerActions.appendChild(removeLayerBtn);
+    removeLayerBtn.addEventListener('click', () => {
+      const layerId = session.activeLayer;
+      workspace.removeLayer(session.activeLayer);
+      layerList.removeChild(layerList.querySelector(`#layer-${layerId}`)!);
+      renderLayerList();
+    });
+    layerActions.appendChild(removeLayerBtn);
 
-layerPanel.appendChild(layerActions);
+    layerPanel.appendChild(layerActions);
 
-function createLayerElement(layerId: string, layer: DocumentLayer) {
-  const layerRow = document.createElement('div');
-  layerRow.id = `layer-${layerId}`;
-  layerRow.classList.add('layer-row');
-  layerRow.style.cssText = `
+    function createLayerElement(layerId: string, layer: DocumentLayer) {
+      const layerRow = document.createElement('div');
+      layerRow.id = `layer-${layerId}`;
+      layerRow.classList.add('layer-row');
+      layerRow.style.cssText = `
     display: flex;
     align-items: center;
     gap: 4px;
@@ -383,12 +450,12 @@ function createLayerElement(layerId: string, layer: DocumentLayer) {
     user-select: none;
     transition: background 0.1s;
   `;
-  layerRow.addEventListener('click', () => {
-    selectLayer(layerId);
-  });
+      layerRow.addEventListener('click', () => {
+        selectLayer(layerId);
+      });
 
-  const dragHandle = document.createElement('div');
-  dragHandle.style.cssText = `
+      const dragHandle = document.createElement('div');
+      dragHandle.style.cssText = `
     width: 16px;
     height: 28px;
     display: flex;
@@ -401,14 +468,14 @@ function createLayerElement(layerId: string, layer: DocumentLayer) {
     touch-action: none;
     user-select: none;
   `;
-  dragHandle.innerHTML = `
+      dragHandle.innerHTML = `
     <span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
     <span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
   `;
-  layerRow.appendChild(dragHandle);
+      layerRow.appendChild(dragHandle);
 
-  const previewContainer = document.createElement('div');
-  previewContainer.style.cssText = `
+      const previewContainer = document.createElement('div');
+      previewContainer.style.cssText = `
     width: 28px;
     height: 28px;
     background: #1a1a1a;
@@ -419,13 +486,13 @@ function createLayerElement(layerId: string, layer: DocumentLayer) {
     align-items: center;
     justify-content: center;
   `;
-  previewContainer.appendChild(workspace.layersTargets[layerId]);
-  layerRow.appendChild(previewContainer);
+      previewContainer.appendChild(workspace.layersTargets[layerId]);
+      layerRow.appendChild(previewContainer);
 
-  const nameInput = document.createElement('input');
-  nameInput.type = 'text';
-  nameInput.value = layer.name;
-  nameInput.style.cssText = `
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.value = layer.name;
+      nameInput.style.cssText = `
     flex: 1;
     min-width: 0;
     padding: 2px 4px;
@@ -436,34 +503,34 @@ function createLayerElement(layerId: string, layer: DocumentLayer) {
     font-size: 11px;
     outline: none;
   `;
-  nameInput.addEventListener('change', (e) => {
-    if (e.target instanceof HTMLInputElement) {
-      layer.name = e.target.value;
-    }
-  });
-  layerRow.appendChild(nameInput);
+      nameInput.addEventListener('change', (e) => {
+        if (e.target instanceof HTMLInputElement) {
+          layer.name = e.target.value;
+        }
+      });
+      layerRow.appendChild(nameInput);
 
-  const opacitySlider = document.createElement('input');
-  opacitySlider.type = 'range';
-  opacitySlider.min = '0';
-  opacitySlider.max = '100';
-  opacitySlider.value = String(layer.opacity);
-  opacitySlider.style.cssText = `
+      const opacitySlider = document.createElement('input');
+      opacitySlider.type = 'range';
+      opacitySlider.min = '0';
+      opacitySlider.max = '100';
+      opacitySlider.value = String(layer.opacity);
+      opacitySlider.style.cssText = `
     width: 50px;
     height: 4px;
     accent-color: #666;
     flex-shrink: 0;
   `;
-  opacitySlider.addEventListener('change', (e) => {
-    if (e.target instanceof HTMLInputElement) {
-      layer.opacity = parseInt(e.target.value);
-    }
-  });
-  layerRow.appendChild(opacitySlider);
+      opacitySlider.addEventListener('change', (e) => {
+        if (e.target instanceof HTMLInputElement) {
+          layer.opacity = parseInt(e.target.value);
+        }
+      });
+      layerRow.appendChild(opacitySlider);
 
-  const eyeBtn = document.createElement('button');
-  eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
-  eyeBtn.style.cssText = `
+      const eyeBtn = document.createElement('button');
+      eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
+      eyeBtn.style.cssText = `
     width: 24px;
     height: 24px;
     background: transparent;
@@ -477,16 +544,16 @@ function createLayerElement(layerId: string, layer: DocumentLayer) {
     flex-shrink: 0;
     opacity: layer.visible ? 1 : 0.4;
   `;
-  eyeBtn.addEventListener('click', (e) => {
-    layer.visible = !layer.visible;
-    eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
-    e.stopImmediatePropagation();
-  });
-  layerRow.appendChild(eyeBtn);
+      eyeBtn.addEventListener('click', (e) => {
+        layer.visible = !layer.visible;
+        eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
+        e.stopImmediatePropagation();
+      });
+      layerRow.appendChild(eyeBtn);
 
-  const dropIndicator = document.createElement('div');
-  dropIndicator.setAttribute('data-drop-indicator', 'line');
-  dropIndicator.style.cssText = `
+      const dropIndicator = document.createElement('div');
+      dropIndicator.setAttribute('data-drop-indicator', 'line');
+      dropIndicator.style.cssText = `
     position: absolute;
     left: -4px;
     right: -4px;
@@ -497,183 +564,207 @@ function createLayerElement(layerId: string, layer: DocumentLayer) {
     opacity: 0;
     transition: opacity 0.1s;
   `;
-  layerRow.style.position = 'relative';
-  layerRow.appendChild(dropIndicator);
+      layerRow.style.position = 'relative';
+      layerRow.appendChild(dropIndicator);
 
-  let ghost: HTMLElement | null = null;
-  let pointerDownRow: HTMLElement | null = null;
-  let pointerTargetRow: HTMLElement | null = null;
-  let pointerStartX = 0;
-  let pointerStartY = 0;
-  let isDragging = false;
+      let ghost: HTMLElement | null = null;
+      let pointerDownRow: HTMLElement | null = null;
+      let pointerTargetRow: HTMLElement | null = null;
+      let pointerStartX = 0;
+      let pointerStartY = 0;
+      let isDragging = false;
 
-  function reorderRows(source: HTMLElement, target: HTMLElement, insertAbove: boolean) {
-    const rows = (Array.from(layerList.children) as HTMLElement[]).toReversed();
-    const dragIdx = rows.indexOf(source);
-    const targetIdx = rows.indexOf(target);
-    if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) return;
+      function reorderRows(
+        source: HTMLElement,
+        target: HTMLElement,
+        insertAbove: boolean,
+      ) {
+        const rows = (Array.from(layerList.children) as HTMLElement[]).toReversed();
+        const dragIdx = rows.indexOf(source);
+        const targetIdx = rows.indexOf(target);
+        if (dragIdx === -1 || targetIdx === -1 || dragIdx === targetIdx) return;
 
-    const adjustedTarget = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
-    const insertIdx = insertAbove ? adjustedTarget : adjustedTarget + 1;
+        const adjustedTarget = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
+        const insertIdx = insertAbove ? adjustedTarget : adjustedTarget + 1;
 
-    workspace.moveLayer(workspace.getSortedLayers()[dragIdx], insertIdx);
+        workspace.moveLayer(workspace.getSortedLayers()[dragIdx], insertIdx);
 
-    renderLayerList();
-  }
+        renderLayerList();
+      }
 
-  function showIndicator(row: HTMLElement, clientY: number) {
-    if (pointerTargetRow && pointerTargetRow !== row) {
-      const prev = pointerTargetRow.querySelector('[data-drop-indicator]') as HTMLElement;
-      if (prev) prev.style.opacity = '0';
-    }
+      function showIndicator(row: HTMLElement, clientY: number) {
+        if (pointerTargetRow && pointerTargetRow !== row) {
+          const prev = pointerTargetRow.querySelector(
+            '[data-drop-indicator]',
+          ) as HTMLElement;
+          if (prev) prev.style.opacity = '0';
+        }
 
-    const indicator = row.querySelector('[data-drop-indicator]') as HTMLElement;
-    if (!indicator) return;
+        const indicator = row.querySelector('[data-drop-indicator]') as HTMLElement;
+        if (!indicator) return;
 
-    const rect = row.getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    const above = clientY < midY;
-    indicator.style.top = above ? '0' : 'auto';
-    indicator.style.bottom = above ? 'auto' : '0';
-    indicator.style.opacity = '1';
-    pointerTargetRow = row;
-  }
+        const rect = row.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        const above = clientY < midY;
+        indicator.style.top = above ? '0' : 'auto';
+        indicator.style.bottom = above ? 'auto' : '0';
+        indicator.style.opacity = '1';
+        pointerTargetRow = row;
+      }
 
-  function updateGhost(clientX: number, clientY: number) {
-    if (!ghost) return;
-    const rowRect = pointerDownRow!.getBoundingClientRect();
-    ghost.style.transform = `translate(${clientX - rowRect.left - 8}px, ${clientY - rowRect.top - 14}px)`;
-  }
+      function updateGhost(clientX: number, clientY: number) {
+        if (!ghost) return;
+        const rowRect = pointerDownRow!.getBoundingClientRect();
+        ghost.style.transform = `translate(${clientX - rowRect.left - 8}px, ${clientY - rowRect.top - 14}px)`;
+      }
 
-  function findTarget(clientX: number, clientY: number): HTMLElement | null {
-    if (!ghost) return null;
-    ghost.style.display = 'none';
-    const el = document.elementFromPoint(clientX, clientY);
-    ghost.style.display = '';
-    return el?.closest('.layer-row') ?? null;
-  }
+      function findTarget(clientX: number, clientY: number): HTMLElement | null {
+        if (!ghost) return null;
+        ghost.style.display = 'none';
+        const el = document.elementFromPoint(clientX, clientY);
+        ghost.style.display = '';
+        return el?.closest('.layer-row') ?? null;
+      }
 
-  function cleanupDrag() {
-    if (ghost) {
-      ghost.remove();
-      ghost = null;
-    }
-    if (pointerDownRow) {
-      pointerDownRow.style.opacity = '1';
-      pointerDownRow.style.zIndex = '';
-    }
-    if (pointerTargetRow) {
-      const indicator = pointerTargetRow.querySelector(
-        '[data-drop-indicator]',
-      ) as HTMLElement;
-      if (indicator) indicator.style.opacity = '0';
-    }
-    pointerDownRow = null;
-    pointerTargetRow = null;
-    isDragging = false;
-  }
-
-  dragHandle.addEventListener('pointerdown', (e: PointerEvent) => {
-    // Only respond to left-click (mouse) or any touch/pen
-    if (e.button !== 0 && e.pointerType !== 'touch') return;
-    pointerStartX = e.clientX;
-    pointerStartY = e.clientY;
-    pointerDownRow = layerRow;
-
-    // Set pointer capture so we keep receiving events even if pointer leaves the element
-    dragHandle.setPointerCapture(e.pointerId);
-  });
-
-  dragHandle.addEventListener('pointermove', (e: PointerEvent) => {
-    if (!pointerDownRow) return;
-
-    if (!isDragging) {
-      const dx = Math.abs(e.clientX - pointerStartX);
-      const dy = Math.abs(e.clientY - pointerStartY);
-      // Start dragging only after moving past the threshold
-      if (dx < 5 && dy < 5) return; // Still within threshold, do nothing
-
-      isDragging = true;
-
-      ghost = pointerDownRow.cloneNode(true) as HTMLElement;
-      ghost.style.position = 'fixed';
-      ghost.style.width = `${pointerDownRow.offsetWidth}px`;
-      ghost.style.zIndex = '9999';
-      ghost.style.opacity = '0.85';
-      ghost.style.pointerEvents = 'none';
-      ghost.style.transition = 'none';
-      ghost.style.transform = `translate(${e.clientX - pointerDownRow.getBoundingClientRect().left - 8}px, ${e.clientY - pointerDownRow.getBoundingClientRect().top - 14}px)`;
-      document.body.appendChild(ghost);
-
-      pointerDownRow.style.opacity = '0.3';
-      pointerDownRow.style.zIndex = '100';
-    }
-
-    if (isDragging) {
-      e.preventDefault();
-      updateGhost(e.clientX, e.clientY);
-
-      const target = findTarget(e.clientX, e.clientY);
-      if (target && target !== pointerDownRow && target !== pointerTargetRow) {
-        showIndicator(target, e.clientY);
-      } else if (target === pointerDownRow && pointerTargetRow) {
-        const indicator = pointerTargetRow.querySelector(
-          '[data-drop-indicator]',
-        ) as HTMLElement;
-        if (indicator) indicator.style.opacity = '0';
+      function cleanupDrag() {
+        if (ghost) {
+          ghost.remove();
+          ghost = null;
+        }
+        if (pointerDownRow) {
+          pointerDownRow.style.opacity = '1';
+          pointerDownRow.style.zIndex = '';
+        }
+        if (pointerTargetRow) {
+          const indicator = pointerTargetRow.querySelector(
+            '[data-drop-indicator]',
+          ) as HTMLElement;
+          if (indicator) indicator.style.opacity = '0';
+        }
+        pointerDownRow = null;
         pointerTargetRow = null;
+        isDragging = false;
       }
+
+      dragHandle.addEventListener('pointerdown', (e: PointerEvent) => {
+        // Only respond to left-click (mouse) or any touch/pen
+        if (e.button !== 0 && e.pointerType !== 'touch') return;
+        pointerStartX = e.clientX;
+        pointerStartY = e.clientY;
+        pointerDownRow = layerRow;
+
+        // Set pointer capture so we keep receiving events even if pointer leaves the element
+        dragHandle.setPointerCapture(e.pointerId);
+      });
+
+      dragHandle.addEventListener('pointermove', (e: PointerEvent) => {
+        if (!pointerDownRow) return;
+
+        if (!isDragging) {
+          const dx = Math.abs(e.clientX - pointerStartX);
+          const dy = Math.abs(e.clientY - pointerStartY);
+          // Start dragging only after moving past the threshold
+          if (dx < 5 && dy < 5) return; // Still within threshold, do nothing
+
+          isDragging = true;
+
+          ghost = pointerDownRow.cloneNode(true) as HTMLElement;
+          ghost.style.position = 'fixed';
+          ghost.style.width = `${pointerDownRow.offsetWidth}px`;
+          ghost.style.zIndex = '9999';
+          ghost.style.opacity = '0.85';
+          ghost.style.pointerEvents = 'none';
+          ghost.style.transition = 'none';
+          ghost.style.transform = `translate(${e.clientX - pointerDownRow.getBoundingClientRect().left - 8}px, ${e.clientY - pointerDownRow.getBoundingClientRect().top - 14}px)`;
+          // document.body.appendChild(ghost);
+
+          pointerDownRow.style.opacity = '0.3';
+          pointerDownRow.style.zIndex = '100';
+        }
+
+        if (isDragging) {
+          e.preventDefault();
+          updateGhost(e.clientX, e.clientY);
+
+          const target = findTarget(e.clientX, e.clientY);
+          if (target && target !== pointerDownRow && target !== pointerTargetRow) {
+            showIndicator(target, e.clientY);
+          } else if (target === pointerDownRow && pointerTargetRow) {
+            const indicator = pointerTargetRow.querySelector(
+              '[data-drop-indicator]',
+            ) as HTMLElement;
+            if (indicator) indicator.style.opacity = '0';
+            pointerTargetRow = null;
+          }
+        }
+      });
+
+      dragHandle.addEventListener('pointerup', (e: PointerEvent) => {
+        if (!pointerDownRow) return;
+
+        if (isDragging) {
+          if (pointerTargetRow) {
+            reorderRows(
+              pointerDownRow,
+              pointerTargetRow,
+              e.clientY >
+                pointerTargetRow.getBoundingClientRect().top +
+                  pointerTargetRow.getBoundingClientRect().height / 2,
+            );
+          }
+          cleanupDrag();
+        }
+
+        // Release pointer capture
+        try {
+          dragHandle.releasePointerCapture(e.pointerId);
+        } catch {}
+        pointerDownRow = null;
+      });
+
+      dragHandle.addEventListener('pointercancel', () => {
+        cleanupDrag();
+        try {
+          dragHandle.releasePointerCapture(0);
+        } catch {}
+      });
+
+      layerList.appendChild(layerRow);
+      return layerRow;
     }
-  });
 
-  dragHandle.addEventListener('pointerup', (e: PointerEvent) => {
-    if (!pointerDownRow) return;
+    // layerList.replaceChildren();
 
-    if (isDragging) {
-      if (pointerTargetRow) {
-        reorderRows(
-          pointerDownRow,
-          pointerTargetRow,
-          e.clientY >
-            pointerTargetRow.getBoundingClientRect().top +
-              pointerTargetRow.getBoundingClientRect().height / 2,
-        );
-      }
-      cleanupDrag();
-    }
+    sidebar.replaceChildren();
+    content.replaceChildren();
+    footer.replaceChildren();
+    appContainer.replaceChildren();
+    document.body.replaceChildren();
+    layerPanel.appendChild(layerList);
+    sidebar.appendChild(workspace.alphabet);
+    sidebar.appendChild(workspace.colorPicker);
+    sidebar.appendChild(layerPanel);
 
-    // Release pointer capture
-    try {
-      dragHandle.releasePointerCapture(e.pointerId);
-    } catch {}
-    pointerDownRow = null;
-  });
+    content.appendChild(secondLeftSidebar);
+    content.appendChild(leftSidebar);
+    content.appendChild(workspace.drawboard);
+    content.appendChild(sidebar);
 
-  dragHandle.addEventListener('pointercancel', () => {
-    cleanupDrag();
-    try {
-      dragHandle.releasePointerCapture(0);
-    } catch {}
-  });
+    footer.appendChild(workspace.paletteSelector);
 
-  layerList.appendChild(layerRow);
-  return layerRow;
+    appContainer.appendChild(navBar);
+    appContainer.appendChild(content);
+    appContainer.appendChild(footer);
+    document.body.appendChild(appContainer);
+
+    workspace.startPanzoom();
+  }
+
+  await startSession();
+  // setTimeout(cleanLayout,2500);
+  // setTimeout(startWorkspace,4500);
+
+  // workspace.loadDocument('test');
 }
 
-layerPanel.appendChild(layerList);
-
-sidebar.append(workspace.alphabet);
-sidebar.append(workspace.colorPicker);
-sidebar.append(layerPanel);
-content.append(secondLeftSidebar);
-content.append(leftSidebar);
-content.append(workspace.drawboard);
-content.append(sidebar);
-appContainer.appendChild(navBar);
-appContainer.appendChild(content);
-appContainer.append(footer);
-document.body.appendChild(appContainer);
-
-workspace.startPanzoom();
-
-workspace.loadDocument('test');
+const editor = await Editor();

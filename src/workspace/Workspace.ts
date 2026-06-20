@@ -5,9 +5,6 @@ import Hammer from 'hammerjs';
 import _ from 'lodash';
 import iro from '@jaames/iro';
 
-const ext = 'phx';
-const paletteScale = 2;
-
 type Phoxel = {
   phox: Phox;
   r: number;
@@ -22,7 +19,6 @@ export type DocumentLayer = {
 };
 
 interface DocumentState {
-  name: string,
   layers: Record<string, DocumentLayer>;
 }
 
@@ -95,23 +91,32 @@ export const toolDefs: ToolDefinition[] = [
   },
 ];
 
-// & This is good. Let's not sell our app soul to react
-// MARK: Workspace
-export async function Workspace(config: {
+export type WorkspaceObj = Awaited<ReturnType<typeof Workspace>>;
+
+export interface WorkspaceConfig {
   size: {
     rows: number;
     cols: number;
   };
   fontName: Parameters<typeof getFont>[0];
-  name: string;
-}) {
-  let { size, name, fontName } = config;
+  data?: {
+    phoxelis: ReturnType<ReturnType<typeof Phoxelis>['exportPhoxelis']>; // TODO export type in phoxelis for this
+    layers: DocumentState['layers'];
+    refImage: {
+      src: string;
+      config: {
+        panX: number;
+        panY: number;
+        scale: number;
+      };
+    };
+  };
+}
 
-  if (!name){
-    throw new Error('Workspace: Not a valid name provided.');
-  }
-
-  const filename = () => `${name}.${ext}`;
+// & Keep decoupling with the same method: Imperfect step in the right direction, not frozen planning the perfect step
+// MARK: Workspace
+export async function Workspace(config: WorkspaceConfig) {
+  let { size, fontName, data } = config;
 
   const font = await getFont(fontName);
   const phoxelis = Phoxelis(size.rows, size.cols, font, {
@@ -124,20 +129,17 @@ export async function Workspace(config: {
   };
 
   let layersTargets: Record<string, HTMLCanvasElement> = {};
-  
+
   // What outer users can set. To be persisted in document
   const defaultDocumentState = () => ({
-    name: '',
     layers: {},
   });
-  let doc: DocumentState = defaultDocumentState();
-  createLayer(); // Base layer
 
   // What outer users can set. Should not persist
-  const defaultSessionState = (): SessionState => ({
+  const defaultSessionState = (activeLayer: string): SessionState => ({
     dp: { char: 'D', fg: '#00FF00', bg: '#FF00FF' },
     drawMode: 'draw',
-    activeLayer: phoxelis.layers[0].id,
+    activeLayer: activeLayer,
     paletteData: {
       selectedPhox: -1,
       modifyingPhox: false,
@@ -148,10 +150,13 @@ export async function Workspace(config: {
       ),
     },
     selectedColorType: 'fg',
-    movingRefImage: false
+    movingRefImage: false,
   });
-  let session: SessionState = defaultSessionState();
-  selectLayer(session.activeLayer);
+
+  let ds: DocumentState = defaultDocumentState();
+  const baseLayer = createLayer(); // Base layer
+  let session: SessionState = defaultSessionState(baseLayer);
+  selectLayer(baseLayer);
 
   // MARK: Elements
   const refImage = document.createElement('img');
@@ -172,6 +177,7 @@ export async function Workspace(config: {
   layersWrapper.appendChild(draftScreen.canvas);
   drawboard.appendChild(layersWrapper);
 
+  const paletteScale = 2;
   const paletteSelector = document.createElement('div');
   paletteSelector.style = 'position: relative;';
   const paletteOverlay = document.createElement('canvas');
@@ -320,17 +326,67 @@ export async function Workspace(config: {
 
   selectColorType('fg');
 
-  function setReferenceImage(base64: string) {
-    if (!refImagePanzoom) {
-      console.error(
-        'setReferenceImage error: No refImagePanzoom. Did you startPanzoom()?',
-      );
-      return;
-    }
+  const panzoomConfiguration = {
+    minScale: 0.15,
+    maxScale: 10,
+    noBind: true,
+    relative: true,
+    cursor: 'default',
+    startX: 0,
+    startY: 0,
+    startScale: 1,
+  };
+  let scale = panzoomConfiguration.startScale;
+  const hammer = new Hammer(drawboard);
 
+  const refImagePanzoomConfig = { ...panzoomConfiguration };
+  let refImageScale = refImagePanzoomConfig.startScale;
+
+  let panzoom: PanzoomObject | null = null;
+  let refImagePanzoom: PanzoomObject | null = null;
+
+  /** Can only be done once drawboard is in the DOM */
+  function startPanzoom() {
+    panzoom = Panzoom(layersWrapper, panzoomConfiguration);
+    refImagePanzoom = Panzoom(refImage, refImagePanzoomConfig);
+
+    if(data) {
+      refImagePanzoom.pan(data.refImage.config.panX, data.refImage.config.panY);
+      refImagePanzoom.zoom(data.refImage.config.scale);
+    }
+  }
+
+  function setReferenceImage(base64: string) {
     refImage.src = base64;
     refImageScale = 1;
-    refImagePanzoom.reset();
+    refImagePanzoom?.reset();
+  }
+
+  function getReferenceImageConfig() {
+    return {
+      src: refImage.src ?? '',
+      config: {
+        panX: refImagePanzoom?.getPan().x ?? 0,
+        panY: refImagePanzoom?.getPan().y ?? 0,
+        scale: refImagePanzoom?.getScale() ?? 1,
+      },
+    };
+  }
+
+  // MARK: Load data variable if present. Create defaults if not
+  if (data) {
+    phoxelis.importPhoxelis(data.phoxelis);
+
+    ds.layers = _.mapValues(data.layers, (l, k) => {
+      const target = createLayerTarget();
+      layersTargets[k] = target;
+
+      return {
+        ...l,
+      };
+    });
+    selectLayer(phoxelis.layers[0].id);
+    setReferenceImage(data.refImage.src);
   }
 
   // MARK: Layers
@@ -339,7 +395,7 @@ export async function Workspace(config: {
 
     const lid = layerId ?? phoxelis.addLayer();
 
-    doc.layers[lid] = {
+    ds.layers[lid] = {
       name: `Layer #${phoxelis.layers.length}`,
       opacity: 100,
       visible: true,
@@ -358,7 +414,7 @@ export async function Workspace(config: {
 
     const layerPosition = phoxelis.layerPositions[layerId];
     phoxelis.removeLayer(layerId);
-    delete doc.layers[layerId];
+    delete ds.layers[layerId];
 
     const newSelectPos = Math.max(0, Math.min(phoxelis.layers.length - 1, layerPosition));
     const layerBeforeId = phoxelis.layers[newSelectPos].id;
@@ -642,32 +698,6 @@ export async function Workspace(config: {
   });
 
   // MARK: Drawboard interactions
-
-  const panzoomConfiguration = {
-    minScale: 0.15,
-    maxScale: 10,
-    noBind: true,
-    relative: true,
-    cursor: 'default',
-    startX: 0,
-    startY: 0,
-    startScale: 1,
-  };
-  let scale = panzoomConfiguration.startScale;
-  const hammer = new Hammer(drawboard);
-
-  const refImagePanzoomConfig = { ...panzoomConfiguration };
-  let refImageScale = refImagePanzoomConfig.startScale;
-
-  let panzoom: PanzoomObject | null = null;
-  let refImagePanzoom: PanzoomObject | null = null;
-
-  /** Can only be done once drawboard is in the DOM */
-  function startPanzoom() {
-    panzoom = Panzoom(layersWrapper, panzoomConfiguration);
-    refImagePanzoom = Panzoom(refImage, refImagePanzoomConfig);
-  }
-
   hammer.get('pinch').set({ enable: true });
   hammer.on('pinchstart', (e) => {
     setTool(panzoomTool.name);
@@ -1380,98 +1410,32 @@ export async function Workspace(config: {
   });
 
   // MARK: File management
-
-  async function saveFile(data: string, filename: string) {
-    const root = await navigator.storage.getDirectory();
-    const fileHandle = await root.getFileHandle(filename, { create: true });
-    const accessHandle = await fileHandle.createWritable();
-
-    accessHandle.write(data);
-    accessHandle.close();
-  }
-
-  async function loadFile(filename: string) {
-    const root = await navigator.storage.getDirectory();
-    try {
-      const fileHandle = await root.getFileHandle(filename);
-      const file = await fileHandle.getFile();
-      const fileDataString = await file.text();
-      return fileDataString;
-    } catch (error) {
-      console.error('loadFile Error:', error);
-    }
-  }
-
-  async function createDocument() {
-    const phoxelisData = phoxelis.exportPhoxelis(name);
+  function exportData(): WorkspaceConfig {
+    const phoxelisData = phoxelis.exportPhoxelis();
 
     const documentData = {
-      name,
+      size,
+      fontName,
       phoxelis: phoxelisData,
-      layers: doc.layers,
+      layers: ds.layers,
       refImage: {
-        base64: refImage.src ?? '',
+        src: refImage.src ?? '',
         config: {
           panX: refImagePanzoom?.getPan().x ?? 0,
           panY: refImagePanzoom?.getPan().y ?? 0,
           scale: refImagePanzoom?.getScale() ?? 1,
-        }
-      }
+        },
+      },
     };
 
     return documentData;
   }
 
-  async function saveDocument(name: string){
-    const document = createDocument();
-    const dataStr = JSON.stringify(document);
-    await saveFile(dataStr, `${name}.phx`);
-  }
 
-  // TODO start document?
-  async function loadDocument(name: string) {
-    if(!refImagePanzoom) {
-      console.error('loadDocument error: refImagePanzoom is null. Did you startPanzoom()?');
-      return;
-    }
-   
-    const fileDataString = await loadFile(`${name}.${ext}`);
-    if (!fileDataString) {
-      console.error(`loadPhoxelis error: Could not load file "${`${name}.${ext}`}"`);
-      return;
-    }
-
-    const fileData = JSON.parse(fileDataString) as Awaited<
-      ReturnType<typeof createDocument>
-    >;
-
-    // Reset
-    doc = defaultDocumentState();
-    session = defaultSessionState();
-    layersTargets = {};
-
-    name = fileData.name;
-    phoxelis.importPhoxelis(fileData.phoxelis);
-
-    doc.layers = _.mapValues(fileData.layers, (l, k) => {
-      const target = createLayerTarget();
-      layersTargets[k] = target;
-
-      return {
-        ...l
-      };
-    });
-    selectLayer(phoxelis.layers[0].id);
-
-    setReferenceImage(fileData.refImage.base64);
-    refImagePanzoom.pan(fileData.refImage.config.panX, fileData.refImage.config.panX);
-    refImagePanzoom.zoom(fileData.refImage.config.scale);
-
-    console.log(`${filename} imported.`);
-  }
+  // // TODO start document?
 
   function exportPhoxelis() {
-    return phoxelis.exportPhoxelis(name);
+    return phoxelis.exportPhoxelis();
   }
 
   // MARK: Rendering
@@ -1479,7 +1443,7 @@ export async function Workspace(config: {
     phoxelis.renderFrame(
       phoxelis.layers.map((l) => ({
         additionalTarget: layersTargets[l.id],
-        opacity: doc.layers[l.id].visible ? doc.layers[l.id].opacity / 100 : 0,
+        opacity: ds.layers[l.id].visible ? ds.layers[l.id].opacity / 100 : 0,
       })),
     );
     window.requestAnimationFrame(renderLoop);
@@ -1493,8 +1457,10 @@ export async function Workspace(config: {
   window.requestAnimationFrame(renderDraftScreen);
 
   return {
-    filename,
-    doc,
+    size,
+    fontName,
+    phoxelis,
+    ds,
     session,
     drawboard,
     paletteSelector,
@@ -1513,12 +1479,11 @@ export async function Workspace(config: {
     commitPhoxels,
     setReferenceImage,
     setTool,
-    createDocument,
-    saveDocument,
-    loadDocument,
     selectColorType,
     startPanzoom,
     getSortedLayers,
     exportPhoxelis,
+    getReferenceImageConfig,
+    exportData
   };
 }
