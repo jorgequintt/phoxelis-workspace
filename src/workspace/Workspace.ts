@@ -295,7 +295,7 @@ export async function Workspace(config: WorkspaceInputConfig) {
       },
     ],
   });
-  colorPicker.on('color:change', (color: any) => {
+  const handleColorPickeChange = (color: any) => {
     session.dp[session.selectedColorType] = color.hexString;
 
     if (session.paletteData.modifyingPhox && session.paletteData.selectedPhox > 0) {
@@ -316,7 +316,8 @@ export async function Workspace(config: WorkspaceInputConfig) {
         });
       }
     }
-  });
+  }
+  colorPicker.on('color:change', handleColorPickeChange);
   const fgColorButton = document.createElement('button');
   fgColorButton.innerHTML = 'Foreground';
   fgColorButton.addEventListener('click', () => selectColorType('fg'));
@@ -381,7 +382,6 @@ export async function Workspace(config: WorkspaceInputConfig) {
 
   // MARK: Load data variable if present. Create defaults if not
   if (data) {
-    console.log('There is data. Loading into phoxelis');
     phoxelis.importPhoxelis(data.phoxelis);
 
     ds.layers = _.mapValues(data.layers, (l, k) => {
@@ -624,7 +624,7 @@ export async function Workspace(config: WorkspaceInputConfig) {
   ];
   const downHotkeys: Hotkey[] = [];
 
-  window.addEventListener('keydown', (e) => {
+  const handleHotkeyKeydown = (e: KeyboardEvent) => {
     const matchingHotkey = hotkeys.find(
       (h) =>
         !!h.ctrl === e.ctrlKey &&
@@ -636,8 +636,8 @@ export async function Workspace(config: WorkspaceInputConfig) {
       matchingHotkey.onHotkeyStart?.(e);
       downHotkeys.push(matchingHotkey);
     }
-  });
-  window.addEventListener('keyup', (e) => {
+  };
+  const handleHotkeyKeyup = (e: KeyboardEvent) => {
     const matchinDownHotkey = downHotkeys.find(
       (h) => e.key.toLocaleLowerCase() === h.key,
     );
@@ -658,7 +658,9 @@ export async function Workspace(config: WorkspaceInputConfig) {
     } else if (matchingHotkey) {
       matchingHotkey.onHotkeyEnd?.(e);
     }
-  });
+  };
+  window.addEventListener('keydown', handleHotkeyKeydown);
+  window.addEventListener('keyup', handleHotkeyKeyup);
   drawboard.addEventListener('pointerdown', (e) => {
     const matchingHotkey = hotkeys.find(
       (h) =>
@@ -723,14 +725,12 @@ export async function Workspace(config: WorkspaceInputConfig) {
 
   // MARK: Tools
 
-  const abortActiveTool = () => {
-    currTool?.tool.abort?.();
-  };
-  window.addEventListener('mouseout', (e) => {
+  const handleWindowMouseOut = (e: MouseEvent) => {
     if (e.relatedTarget === null) {
-      abortActiveTool();
+      currTool?.tool.abort?.();
     }
-  });
+  };
+  window.addEventListener('mouseout', handleWindowMouseOut);
 
   interface Tool {
     name: string;
@@ -1373,7 +1373,7 @@ export async function Workspace(config: WorkspaceInputConfig) {
     };
     drawboard.addEventListener('pointerdown', currTool.handlers.onPointerDown);
     drawboard.addEventListener('pointermove', currTool.handlers.onPointerMove);
-    window.addEventListener('pointerup', currTool.handlers.onPointerUp);
+    drawboard.addEventListener('pointerup', currTool.handlers.onPointerUp);
     hammer.on('pinchstart', currTool.handlers.onPinchStart);
     hammer.on('pinchmove', currTool.handlers.onPinchMove);
     hammer.on('pinchend', currTool.handlers.onPinchEnd);
@@ -1436,6 +1436,8 @@ export async function Workspace(config: WorkspaceInputConfig) {
   }
 
   // MARK: Rendering
+  let continueRenderLoop = true;
+  let lastAnimationFrame: number = -1;
   const renderLoop = () => {
     phoxelis.renderFrame(
       phoxelis.layers.map((l) => ({
@@ -1443,15 +1445,29 @@ export async function Workspace(config: WorkspaceInputConfig) {
         opacity: ds.layers[l.id].visible ? ds.layers[l.id].opacity / 100 : 0,
       })),
     );
-    window.requestAnimationFrame(renderLoop);
-  };
-  window.requestAnimationFrame(renderLoop);
-
-  function renderDraftScreen() {
     draftScreen.renderFrame();
-    window.requestAnimationFrame(renderDraftScreen);
+    if(continueRenderLoop) {
+      lastAnimationFrame = window.requestAnimationFrame(renderLoop);
+    };
+  };
+  lastAnimationFrame = window.requestAnimationFrame(renderLoop);
+  
+
+  function dispose() {
+    // TODO There is some memory leak when creating many new documents. what else can we dispose of? 
+    window.removeEventListener('keydown', handleHotkeyKeydown);
+    window.removeEventListener('keyup', handleHotkeyKeyup);
+    window.removeEventListener('mouseout', handleWindowMouseOut);
+
+    continueRenderLoop = false;
+    window.cancelAnimationFrame(lastAnimationFrame);
+
+    hammer.destroy();
+    panzoom?.destroy();
+    refImagePanzoom?.destroy();
+    colorPicker.off('color:change', handleColorPickeChange);
+    colorPickerEl.remove();
   }
-  window.requestAnimationFrame(renderDraftScreen);
 
   return {
     size,
@@ -1483,5 +1499,6 @@ export async function Workspace(config: WorkspaceInputConfig) {
     exportPhoxelis,
     getReferenceImageConfig,
     exportData,
+    dispose,
   };
 }
