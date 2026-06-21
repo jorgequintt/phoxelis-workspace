@@ -125,7 +125,6 @@ async function Editor() {
     startSession(documentData, name);
   }
 
-
   async function startSession(
     config: WorkspaceInputConfig = {
       size: { rows: 37, cols: 152 },
@@ -182,6 +181,13 @@ async function Editor() {
 
     async function newDocumentCommand() {
       await startSession();
+    }
+
+    async function exportPhoxelisCommand() {
+      downloadAsFile(
+        JSON.stringify(workspace.exportPhoxelis()),
+        `${documentName ?? 'untitled'}.phoxelis`,
+      );
     }
 
     function renderLayerList() {
@@ -333,8 +339,7 @@ async function Editor() {
 
     const exportButton = document.createElement('button');
     exportButton.innerHTML = 'Export';
-    exportButton.onclick = () =>
-      downloadAsFile(JSON.stringify(workspace.exportPhoxelis()), `${name}.${ext}`);
+    exportButton.onclick = () => exportPhoxelisCommand();
     navBar.appendChild(exportButton);
 
     const referenceImageButton = document.createElement('input');
@@ -368,7 +373,7 @@ async function Editor() {
     const moveRefImageToggle = document.createElement('input');
     moveRefImageToggle.type = 'checkbox';
     moveRefImageToggle.addEventListener('change', (e) => {
-      const checked = (e.target as HTMLInputElement).checked
+      const checked = (e.target as HTMLInputElement).checked;
       session.movingRefImage = checked;
     });
     navBar.appendChild(moveRefImageToggle);
@@ -773,7 +778,6 @@ async function Editor() {
     content.appendChild(leftSidebar);
     content.appendChild(workspace.drawboard);
     content.appendChild(sidebar);
-
 
     footer.appendChild(workspace.paletteSelector);
 
