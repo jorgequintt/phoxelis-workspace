@@ -1,10 +1,10 @@
 import './style.css';
-import { Editor } from './workspace/Editor';
+import { HtmlEditor } from './workspace/HtmlEditor';
 
-const editor = new Editor();
-const lastDoc = localStorage.getItem('last_doc');
-if (lastDoc) {
-  editor.loadDocument(lastDoc);
+const editor = new HtmlEditor();
+const lastDocId = localStorage.getItem('last_doc');
+if (lastDocId) {
+  editor.loadDocument(lastDocId);
 } else {
   editor.startSession();
 }
