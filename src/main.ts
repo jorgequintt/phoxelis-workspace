@@ -72,7 +72,10 @@ layerList.style.cssText = `
 const ext = 'phx';
 
 async function Editor() {
-  let currentWorkspace: WorkspaceObj | null = null;
+  let editorSession: {
+    currentWorkspace: WorkspaceObj;
+    documentName?: string
+  } | null = null;
 
   async function saveFile(data: string, filename: string) {
     const root = await navigator.storage.getDirectory();
@@ -125,16 +128,7 @@ async function Editor() {
     startSession(documentData, name);
   }
 
-  async function startSession(
-    config: WorkspaceInputConfig = {
-      size: { rows: 37, cols: 152 },
-      fontName: '1_Trithemius8x16',
-    },
-    name?: string,
-  ) {
-    if (currentWorkspace) {
-      currentWorkspace.dispose();
-    }
+  function cleanLayout() {
     leftSidebar.replaceChildren();
     secondLeftSidebar.replaceChildren();
     layerList.replaceChildren();
@@ -143,61 +137,25 @@ async function Editor() {
     footer.replaceChildren();
     appContainer.replaceChildren();
     document.body.replaceChildren();
+  }
 
-    const workspace = await Workspace(config);
-    currentWorkspace = workspace;
-    let documentName = name;
-
-    const { ds, session } = workspace;
-
-    async function saveDocumentCommand() {
-      if (!documentName) {
-        const docName = prompt();
-
-        if (!docName) {
-          alert('No name provided. Not saving');
-          return;
-        }
-
-        documentName = docName;
-      }
-      await saveDocument(documentName, workspace);
+  function mountLayout() {
+    if(!editorSession) {
+      console.error('Editor.mountLayout: No active editorSession.');
+      return;
     }
 
-    async function loadDocumentCommand() {
-      const docName = prompt();
+    cleanLayout();
 
-      if (!docName) {
-        alert('No name provided. Not saving');
-        return;
-      }
-
-      try {
-        await loadDocument(docName);
-      } catch (error) {
-        console.error(error);
-      }
-    }
-
-    async function newDocumentCommand() {
-      await startSession();
-    }
-
-    async function exportPhoxelisCommand() {
-      downloadAsFile(
-        JSON.stringify(workspace.exportPhoxelis()),
-        `${documentName ?? 'untitled'}.phoxelis`,
-      );
-    }
+    const {currentWorkspace: w} = editorSession;
 
     function renderLayerList() {
-      workspace
-        .getSortedLayers()
+      w.getSortedLayers()
         .toReversed()
         .forEach((lid) => {
           let layerEl = layerList.querySelector(`#layer-${lid}`);
           if (!layerEl) {
-            layerEl = createLayerElement(lid, ds.layers[lid]);
+            layerEl = createLayerElement(lid, w.ds.layers[lid]);
           }
           layerList.appendChild(layerEl);
         });
@@ -211,15 +169,14 @@ async function Editor() {
         return;
       }
 
-      // workspace.selectLayer(layerId);
-      session.activeLayer = layerId;
+      w.session.activeLayer = layerId;
 
       layerList
         .querySelectorAll('.layer-row')
         .forEach((el) => ((el as HTMLDivElement).style.background = '#2a2a2a'));
       (layerRow as HTMLDivElement).style.background = '#7a7a7a';
     }
-    selectLayer(session.activeLayer);
+    selectLayer(w.session.activeLayer);
 
     const drawModeButtons: HTMLButtonElement[] = [];
 
@@ -245,7 +202,7 @@ async function Editor() {
         btn.style.background = '#555';
       });
       btn.addEventListener('mouseleave', () => {
-        btn.style.background = session.drawMode === def.name ? '#666' : '#444';
+        btn.style.background = w.session.drawMode === def.name ? '#666' : '#444';
       });
       btn.addEventListener('click', () => {
         drawModeButtons.forEach((b) => {
@@ -254,7 +211,7 @@ async function Editor() {
         });
         btn.style.background = '#666';
         btn.style.borderColor = '#888';
-        session.drawMode = def.name;
+        w.session.drawMode = def.name;
       });
       return btn;
     }
@@ -295,7 +252,7 @@ async function Editor() {
       btn.addEventListener('mouseleave', () => {
         // TODO fix currTool type
         btn.style.background =
-          (workspace.currTool as any).tool.name === def.name ? '#666' : '#444';
+          (w.currTool as any).tool.name === def.name ? '#666' : '#444';
       });
       btn.addEventListener('click', () => {
         leftSidebar.querySelectorAll('button').forEach((b) => {
@@ -304,7 +261,7 @@ async function Editor() {
         });
         btn.style.background = '#666';
         btn.style.borderColor = '#888';
-        workspace.setTool(def.name);
+        w.setTool(def.name);
       });
       return btn;
     }
@@ -362,7 +319,7 @@ async function Editor() {
               throw new Error('Failed converting image to base64');
             }
 
-            workspace.setReferenceImage(base64);
+            w.setReferenceImage(base64);
           } catch (err) {
             console.error('Failed to load reference image:', err);
           }
@@ -374,18 +331,18 @@ async function Editor() {
     moveRefImageToggle.type = 'checkbox';
     moveRefImageToggle.addEventListener('change', (e) => {
       const checked = (e.target as HTMLInputElement).checked;
-      session.movingRefImage = checked;
+      w.session.movingRefImage = checked;
     });
     navBar.appendChild(moveRefImageToggle);
 
     const modifyPalettePhoxButton = document.createElement('button');
     modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
     modifyPalettePhoxButton.onclick = () => {
-      if (!session.paletteData.modifyingPhox) {
-        session.paletteData.modifyingPhox = true;
+      if (!w.session.paletteData.modifyingPhox) {
+        w.session.paletteData.modifyingPhox = true;
         modifyPalettePhoxButton.innerHTML = 'UPDATING PALETTE PHOX';
       } else {
-        session.paletteData.modifyingPhox = false;
+        w.session.paletteData.modifyingPhox = false;
         modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
       }
     };
@@ -393,12 +350,12 @@ async function Editor() {
 
     const undoButton = document.createElement('button');
     undoButton.innerHTML = 'Undo';
-    undoButton.onclick = () => workspace.undoLastChange();
+    undoButton.onclick = () => w.undoLastChange();
     navBar.appendChild(undoButton);
 
     const redoButton = document.createElement('button');
     redoButton.innerHTML = 'Redo';
-    redoButton.onclick = () => workspace.redoLastChange();
+    redoButton.onclick = () => w.redoLastChange();
     navBar.appendChild(redoButton);
 
     const layerPanel = document.createElement('div');
@@ -440,8 +397,8 @@ async function Editor() {
   cursor: pointer;
 `;
     addLayerBtn.addEventListener('click', () => {
-      const layerId = workspace.createLayer();
-      createLayerElement(layerId, ds.layers[layerId]);
+      const layerId = w.createLayer();
+      createLayerElement(layerId, w.ds.layers[layerId]);
       selectLayer(layerId);
       renderLayerList();
     });
@@ -460,8 +417,8 @@ async function Editor() {
   cursor: pointer;
 `;
     removeLayerBtn.addEventListener('click', () => {
-      const layerId = session.activeLayer;
-      workspace.removeLayer(session.activeLayer);
+      const layerId = w.session.activeLayer;
+      w.removeLayer(w.session.activeLayer);
       layerList.removeChild(layerList.querySelector(`#layer-${layerId}`)!);
       renderLayerList();
     });
@@ -521,7 +478,7 @@ async function Editor() {
     align-items: center;
     justify-content: center;
   `;
-      previewContainer.appendChild(workspace.layersTargets[layerId]);
+      previewContainer.appendChild(w.layersTargets[layerId]);
       layerRow.appendChild(previewContainer);
 
       const nameInput = document.createElement('input');
@@ -622,7 +579,7 @@ async function Editor() {
         const adjustedTarget = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
         const insertIdx = insertAbove ? adjustedTarget : adjustedTarget + 1;
 
-        workspace.moveLayer(workspace.getSortedLayers()[dragIdx], insertIdx);
+        w.moveLayer(w.getSortedLayers()[dragIdx], insertIdx);
 
         renderLayerList();
       }
@@ -770,21 +727,92 @@ async function Editor() {
 
     // layerList.replaceChildren();
     layerPanel.appendChild(layerList);
-    sidebar.appendChild(workspace.alphabet);
-    sidebar.appendChild(workspace.colorPicker);
+    sidebar.appendChild(w.alphabet);
+    sidebar.appendChild(w.colorPicker);
     sidebar.appendChild(layerPanel);
 
     content.appendChild(secondLeftSidebar);
     content.appendChild(leftSidebar);
-    content.appendChild(workspace.drawboard);
+    content.appendChild(w.drawboard);
     content.appendChild(sidebar);
 
-    footer.appendChild(workspace.paletteSelector);
+    footer.appendChild(w.paletteSelector);
 
     appContainer.appendChild(navBar);
     appContainer.appendChild(content);
     appContainer.appendChild(footer);
     document.body.appendChild(appContainer);
+  }
+
+  async function saveDocumentCommand() {
+    if (!editorSession) {
+      console.error('exportPhoxelisCommand: No active editor session.');
+      return;
+    }
+    
+    if (!editorSession.documentName) {
+      const docName = prompt();
+
+      if (!docName) {
+        alert('No name provided. Not saving');
+        return;
+      }
+
+      editorSession.documentName = docName;
+    }
+    await saveDocument(editorSession.documentName, editorSession.currentWorkspace);
+  }
+
+  async function loadDocumentCommand() {
+    const docName = prompt();
+
+    if (!docName) {
+      alert('No name provided. Not saving');
+      return;
+    }
+
+    try {
+      await loadDocument(docName);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function newDocumentCommand() {
+    await startSession();
+  }
+
+  async function exportPhoxelisCommand() {
+    if (!editorSession) {
+      console.error('exportPhoxelisCommand: No active editor session.');
+      return;
+    }
+
+    downloadAsFile(
+      JSON.stringify(editorSession.currentWorkspace.exportPhoxelis()),
+      `${editorSession.documentName ?? 'untitled'}.phoxelis`,
+    );
+  }
+
+  async function startSession(
+    config: WorkspaceInputConfig = {
+      size: { rows: 37, cols: 152 },
+      fontName: '1_Trithemius8x16',
+    },
+    name?: string,
+  ) {
+    if (editorSession) {
+      editorSession.currentWorkspace.dispose();
+    }
+
+    const workspace = await Workspace(config);
+    
+    editorSession = {
+      currentWorkspace: workspace,
+      documentName: name,
+    };
+
+    mountLayout();
 
     workspace.startPanzoom();
 
