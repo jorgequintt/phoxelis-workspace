@@ -1,5 +1,5 @@
 import './style.css';
-import { HtmlEditor } from './workspace/HtmlEditor';
+import { HtmlEditor } from './editor/HtmlEditor';
 
 const editor = new HtmlEditor();
 const lastDocId = localStorage.getItem('last_doc');

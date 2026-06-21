@@ -12,6 +12,8 @@ import {
 } from '../workspace/Workspace';
 import { Editor } from './Editor';
 
+const appRoot = document.querySelector('#app')!;
+
 // MARK: Elements
 const appContainer = document.createElement('div');
 appContainer.style = 'width: 100%; height: 100%; display: flex; flex-direction: column;';
@@ -73,7 +75,7 @@ export class HtmlEditor extends Editor {
     content.replaceChildren();
     footer.replaceChildren();
     appContainer.replaceChildren();
-    document.body.replaceChildren();
+    appRoot.replaceChildren();
   }
 
   protected override mountLayout() {
@@ -677,6 +679,6 @@ transition: opacity 0.1s;
     appContainer.appendChild(navBar);
     appContainer.appendChild(content);
     appContainer.appendChild(footer);
-    document.body.appendChild(appContainer);
+    appRoot.appendChild(appContainer);
   }
 }
