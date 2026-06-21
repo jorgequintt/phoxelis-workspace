@@ -1,4 +1,3 @@
-import './style.css';
 import _ from 'lodash';
 import {
   fileToBase64,
@@ -71,10 +70,13 @@ layerList.style.cssText = `
 
 const ext = 'phx';
 
-export async function Editor() {
-  let currentWorkspace: WorkspaceObj | null = null;
+export class Editor {
+  private editorSession: {
+    currentWorkspace: WorkspaceObj;
+    documentName?: string;
+  } | null = null;
 
-  async function saveFile(data: string, filename: string) {
+  async saveFile(data: string, filename: string) {
     const root = await navigator.storage.getDirectory();
     const fileHandle = await root.getFileHandle(filename, { create: true });
     const accessHandle = await fileHandle.createWritable();
@@ -83,7 +85,7 @@ export async function Editor() {
     accessHandle.close();
   }
 
-  async function loadFile(filename: string) {
+  async loadFile(filename: string) {
     const root = await navigator.storage.getDirectory();
     const fileHandle = await root.getFileHandle(filename);
     const file = await fileHandle.getFile();
@@ -91,11 +93,11 @@ export async function Editor() {
     return fileDataString;
   }
 
-  async function saveDocument(name: string, workspace: WorkspaceObj) {
+  async saveDocument(name: string, workspace: WorkspaceObj) {
     try {
       const workspaceData = workspace.exportData();
       const dataString = JSON.stringify(workspaceData);
-      await saveFile(dataString, `${name}.${ext}`);
+      await this.saveFile(dataString, `${name}.${ext}`);
       localStorage.setItem('last_doc', name);
       alert('Document saved');
     } catch (error) {
@@ -103,13 +105,13 @@ export async function Editor() {
     }
   }
 
-  async function loadDocument(name: string) {
+  public async loadDocument(name: string) {
     if (!name) {
       throw new Error('Editor.loadDocument error: Empty name provided.');
     }
 
     const filename = `${name}.${ext}`;
-    const fileData = await loadFile(filename);
+    const fileData = await this.loadFile(filename);
 
     if (!fileData) {
       throw new Error(
@@ -122,19 +124,10 @@ export async function Editor() {
     // TODO check if valid structure
     // TODO How to handle versions of documents?
 
-    startSession(documentData, name);
+    await this.startSession(documentData, name);
   }
 
-  async function startSession(
-    config: WorkspaceInputConfig = {
-      size: { rows: 37, cols: 152 },
-      fontName: '1_Trithemius8x16',
-    },
-    name?: string,
-  ) {
-    if (currentWorkspace) {
-      currentWorkspace.dispose();
-    }
+  private cleanLayout() {
     leftSidebar.replaceChildren();
     secondLeftSidebar.replaceChildren();
     layerList.replaceChildren();
@@ -143,61 +136,25 @@ export async function Editor() {
     footer.replaceChildren();
     appContainer.replaceChildren();
     document.body.replaceChildren();
+  }
 
-    const workspace = await Workspace(config);
-    currentWorkspace = workspace;
-    let documentName = name;
-
-    const { ds, session } = workspace;
-
-    async function saveDocumentCommand() {
-      if (!documentName) {
-        const docName = prompt();
-
-        if (!docName) {
-          alert('No name provided. Not saving');
-          return;
-        }
-
-        documentName = docName;
-      }
-      await saveDocument(documentName, workspace);
+  private mountLayout() {
+    if (!this.editorSession) {
+      console.error('Editor.mountLayout: No active editorSession.');
+      return;
     }
 
-    async function loadDocumentCommand() {
-      const docName = prompt();
+    this.cleanLayout();
 
-      if (!docName) {
-        alert('No name provided. Not saving');
-        return;
-      }
-
-      try {
-        await loadDocument(docName);
-      } catch (error) {
-        console.error(error);
-      }
-    }
-
-    async function newDocumentCommand() {
-      await startSession();
-    }
-
-    async function exportPhoxelisCommand() {
-      downloadAsFile(
-        JSON.stringify(workspace.exportPhoxelis()),
-        `${documentName ?? 'untitled'}.phoxelis`,
-      );
-    }
+    const { currentWorkspace: w } = this.editorSession;
 
     function renderLayerList() {
-      workspace
-        .getSortedLayers()
+      w.getSortedLayers()
         .toReversed()
         .forEach((lid) => {
           let layerEl = layerList.querySelector(`#layer-${lid}`);
           if (!layerEl) {
-            layerEl = createLayerElement(lid, ds.layers[lid]);
+            layerEl = createLayerElement(lid, w.ds.layers[lid]);
           }
           layerList.appendChild(layerEl);
         });
@@ -211,14 +168,14 @@ export async function Editor() {
         return;
       }
 
-      session.activeLayer = layerId;
+      w.session.activeLayer = layerId;
 
       layerList
         .querySelectorAll('.layer-row')
         .forEach((el) => ((el as HTMLDivElement).style.background = '#2a2a2a'));
       (layerRow as HTMLDivElement).style.background = '#7a7a7a';
     }
-    selectLayer(session.activeLayer);
+    selectLayer(w.session.activeLayer);
 
     const drawModeButtons: HTMLButtonElement[] = [];
 
@@ -227,24 +184,24 @@ export async function Editor() {
       btn.textContent = def.icon;
       btn.title = def.tooltip;
       btn.style.cssText = `
-    background: #444;
-    color: #ccc;
-    border: 1px solid #555;
-    border-radius: 3px;
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s;
-  `;
+  background: #444;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 3px;
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+`;
       btn.addEventListener('mouseenter', () => {
         btn.style.background = '#555';
       });
       btn.addEventListener('mouseleave', () => {
-        btn.style.background = session.drawMode === def.name ? '#666' : '#444';
+        btn.style.background = w.session.drawMode === def.name ? '#666' : '#444';
       });
       btn.addEventListener('click', () => {
         drawModeButtons.forEach((b) => {
@@ -253,7 +210,7 @@ export async function Editor() {
         });
         btn.style.background = '#666';
         btn.style.borderColor = '#888';
-        session.drawMode = def.name;
+        w.session.drawMode = def.name;
       });
       return btn;
     }
@@ -270,31 +227,30 @@ export async function Editor() {
       drawModeButtons[0].style.borderColor = '#888';
     }
 
-    function createToolButton(def: ToolDefinition): HTMLButtonElement {
+    const createToolButton = (def: ToolDefinition): HTMLButtonElement => {
       const btn = document.createElement('button');
       btn.textContent = def.icon;
       btn.title = def.tooltip;
       btn.style.cssText = `
-    background: #444;
-    color: #ccc;
-    border: 1px solid #555;
-    border-radius: 3px;
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s;
-  `;
+  background: #444;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 3px;
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+`;
       btn.addEventListener('mouseenter', () => {
         btn.style.background = '#555';
       });
       btn.addEventListener('mouseleave', () => {
-        // TODO fix currTool type
         btn.style.background =
-          (workspace.currTool as any).tool.name === def.name ? '#666' : '#444';
+          (w.currTool as any)?.tool?.name === def.name ? '#666' : '#444';
       });
       btn.addEventListener('click', () => {
         leftSidebar.querySelectorAll('button').forEach((b) => {
@@ -303,7 +259,7 @@ export async function Editor() {
         });
         btn.style.background = '#666';
         btn.style.borderColor = '#888';
-        workspace.setTool(def.name);
+        w.setTool(def.name);
       });
       return btn;
     }
@@ -317,18 +273,18 @@ export async function Editor() {
     const newButton = document.createElement('button');
     newButton.innerHTML = 'New';
     newButton.onclick = async () => {
-      await newDocumentCommand();
+      await this.newDocumentCommand();
     };
     navBar.appendChild(newButton);
 
     const saveButton = document.createElement('button');
     saveButton.innerHTML = 'Save';
-    saveButton.onclick = saveDocumentCommand;
+    saveButton.onclick = () => this.saveDocumentCommand();
     navBar.appendChild(saveButton);
 
     const loadButton = document.createElement('button');
     loadButton.innerHTML = 'Load';
-    loadButton.onclick = loadDocumentCommand;
+    loadButton.onclick = () => this.loadDocumentCommand();
     navBar.appendChild(loadButton);
 
     const fullscreenButton = document.createElement('button');
@@ -338,7 +294,7 @@ export async function Editor() {
 
     const exportButton = document.createElement('button');
     exportButton.innerHTML = 'Export';
-    exportButton.onclick = () => exportPhoxelisCommand();
+    exportButton.onclick = () => this.exportPhoxelisCommand();
     navBar.appendChild(exportButton);
 
     const referenceImageButton = document.createElement('input');
@@ -361,7 +317,7 @@ export async function Editor() {
               throw new Error('Failed converting image to base64');
             }
 
-            workspace.setReferenceImage(base64);
+            w.setReferenceImage(base64);
           } catch (err) {
             console.error('Failed to load reference image:', err);
           }
@@ -373,18 +329,18 @@ export async function Editor() {
     moveRefImageToggle.type = 'checkbox';
     moveRefImageToggle.addEventListener('change', (e) => {
       const checked = (e.target as HTMLInputElement).checked;
-      session.movingRefImage = checked;
+      w.session.movingRefImage = checked;
     });
     navBar.appendChild(moveRefImageToggle);
 
     const modifyPalettePhoxButton = document.createElement('button');
     modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
     modifyPalettePhoxButton.onclick = () => {
-      if (!session.paletteData.modifyingPhox) {
-        session.paletteData.modifyingPhox = true;
+      if (!w.session.paletteData.modifyingPhox) {
+        w.session.paletteData.modifyingPhox = true;
         modifyPalettePhoxButton.innerHTML = 'UPDATING PALETTE PHOX';
       } else {
-        session.paletteData.modifyingPhox = false;
+        w.session.paletteData.modifyingPhox = false;
         modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
       }
     };
@@ -392,55 +348,55 @@ export async function Editor() {
 
     const undoButton = document.createElement('button');
     undoButton.innerHTML = 'Undo';
-    undoButton.onclick = () => workspace.undoLastChange();
+    undoButton.onclick = () => w.undoLastChange();
     navBar.appendChild(undoButton);
 
     const redoButton = document.createElement('button');
     redoButton.innerHTML = 'Redo';
-    redoButton.onclick = () => workspace.redoLastChange();
+    redoButton.onclick = () => w.redoLastChange();
     navBar.appendChild(redoButton);
 
     const layerPanel = document.createElement('div');
     layerPanel.style.cssText = `
-  padding: 8px;
-  border-top: 1px solid #444;
-  background: #1e1e1e;
+padding: 8px;
+border-top: 1px solid #444;
+background: #1e1e1e;
 `;
 
     const layerPanelTitle = document.createElement('div');
     layerPanelTitle.textContent = 'Layers';
     layerPanelTitle.style.cssText = `
-  font-size: 12px;
-  font-weight: bold;
-  color: #aaa;
-  margin-bottom: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+font-size: 12px;
+font-weight: bold;
+color: #aaa;
+margin-bottom: 6px;
+text-transform: uppercase;
+letter-spacing: 0.5px;
 `;
     layerPanel.appendChild(layerPanelTitle);
 
     const layerActions = document.createElement('div');
     layerActions.style.cssText = `
-  display: flex;
-  gap: 4px;
-  margin-bottom: 8px;
+display: flex;
+gap: 4px;
+margin-bottom: 8px;
 `;
 
     const addLayerBtn = document.createElement('button');
     addLayerBtn.textContent = '+ Add';
     addLayerBtn.style.cssText = `
-  flex: 1;
-  padding: 4px 8px;
-  background: #444;
-  color: #ccc;
-  border: 1px solid #555;
-  border-radius: 3px;
-  font-size: 11px;
-  cursor: pointer;
+flex: 1;
+padding: 4px 8px;
+background: #444;
+color: #ccc;
+border: 1px solid #555;
+border-radius: 3px;
+font-size: 11px;
+cursor: pointer;
 `;
     addLayerBtn.addEventListener('click', () => {
-      const layerId = workspace.createLayer();
-      createLayerElement(layerId, ds.layers[layerId]);
+      const layerId = w.createLayer();
+      createLayerElement(layerId, w.ds.layers[layerId]);
       selectLayer(layerId);
       renderLayerList();
     });
@@ -449,18 +405,18 @@ export async function Editor() {
     const removeLayerBtn = document.createElement('button');
     removeLayerBtn.textContent = '− Remove';
     removeLayerBtn.style.cssText = `
-  flex: 1;
-  padding: 4px 8px;
-  background: #444;
-  color: #ccc;
-  border: 1px solid #555;
-  border-radius: 3px;
-  font-size: 11px;
-  cursor: pointer;
+flex: 1;
+padding: 4px 8px;
+background: #444;
+color: #ccc;
+border: 1px solid #555;
+border-radius: 3px;
+font-size: 11px;
+cursor: pointer;
 `;
     removeLayerBtn.addEventListener('click', () => {
-      const layerId = session.activeLayer;
-      workspace.removeLayer(session.activeLayer);
+      const layerId = w.session.activeLayer;
+      w.removeLayer(w.session.activeLayer);
       layerList.removeChild(layerList.querySelector(`#layer-${layerId}`)!);
       renderLayerList();
     });
@@ -473,70 +429,70 @@ export async function Editor() {
       layerRow.id = `layer-${layerId}`;
       layerRow.classList.add('layer-row');
       layerRow.style.cssText = `
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px;
-    background: #2a2a2a;
-    border: 1px solid #3a3a3a;
-    border-radius: 3px;
-    cursor: grab;
-    user-select: none;
-    transition: background 0.1s;
-  `;
+display: flex;
+align-items: center;
+gap: 4px;
+padding: 4px;
+background: #2a2a2a;
+border: 1px solid #3a3a3a;
+border-radius: 3px;
+cursor: grab;
+user-select: none;
+transition: background 0.1s;
+`;
       layerRow.addEventListener('click', () => {
         selectLayer(layerId);
       });
 
       const dragHandle = document.createElement('div');
       dragHandle.style.cssText = `
-    width: 16px;
-    height: 28px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    flex-shrink: 0;
-    cursor: grab;
-    touch-action: none;
-    user-select: none;
-  `;
+width: 16px;
+height: 28px;
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+gap: 2px;
+flex-shrink: 0;
+cursor: grab;
+touch-action: none;
+user-select: none;
+`;
       dragHandle.innerHTML = `
-    <span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
-    <span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
-  `;
+<span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
+<span style="font-size: 8px; line-height: 1; color: #666;">⠿</span>
+`;
       layerRow.appendChild(dragHandle);
 
       const previewContainer = document.createElement('div');
       previewContainer.style.cssText = `
-    width: 28px;
-    height: 28px;
-    background: #1a1a1a;
-    border: 1px solid #444;
-    border-radius: 2px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  `;
-      previewContainer.appendChild(workspace.layersTargets[layerId]);
+width: 28px;
+height: 28px;
+background: #1a1a1a;
+border: 1px solid #444;
+border-radius: 2px;
+flex-shrink: 0;
+display: flex;
+align-items: center;
+justify-content: center;
+`;
+      previewContainer.appendChild(w.layersTargets[layerId]);
       layerRow.appendChild(previewContainer);
 
       const nameInput = document.createElement('input');
       nameInput.type = 'text';
       nameInput.value = layer.name;
       nameInput.style.cssText = `
-    flex: 1;
-    min-width: 0;
-    padding: 2px 4px;
-    background: #1a1a1a;
-    border: 1px solid #444;
-    border-radius: 2px;
-    color: #ccc;
-    font-size: 11px;
-    outline: none;
-  `;
+flex: 1;
+min-width: 0;
+padding: 2px 4px;
+background: #1a1a1a;
+border: 1px solid #444;
+border-radius: 2px;
+color: #ccc;
+font-size: 11px;
+outline: none;
+`;
       nameInput.addEventListener('change', (e) => {
         if (e.target instanceof HTMLInputElement) {
           layer.name = e.target.value;
@@ -550,11 +506,11 @@ export async function Editor() {
       opacitySlider.max = '100';
       opacitySlider.value = String(layer.opacity);
       opacitySlider.style.cssText = `
-    width: 50px;
-    height: 4px;
-    accent-color: #666;
-    flex-shrink: 0;
-  `;
+width: 50px;
+height: 4px;
+accent-color: #666;
+flex-shrink: 0;
+`;
       opacitySlider.addEventListener('change', (e) => {
         if (e.target instanceof HTMLInputElement) {
           layer.opacity = parseInt(e.target.value);
@@ -565,19 +521,19 @@ export async function Editor() {
       const eyeBtn = document.createElement('button');
       eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
       eyeBtn.style.cssText = `
-    width: 24px;
-    height: 24px;
-    background: transparent;
-    border: 1px solid #444;
-    border-radius: 2px;
-    font-size: 14px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    opacity: layer.visible ? 1 : 0.4;
-  `;
+width: 24px;
+height: 24px;
+background: transparent;
+border: 1px solid #444;
+border-radius: 2px;
+font-size: 14px;
+cursor: pointer;
+display: flex;
+align-items: center;
+justify-content: center;
+flex-shrink: 0;
+opacity: layer.visible ? 1 : 0.4;
+`;
       eyeBtn.addEventListener('click', (e) => {
         layer.visible = !layer.visible;
         eyeBtn.textContent = layer.visible ? '👁‍🗨' : '👁';
@@ -588,16 +544,16 @@ export async function Editor() {
       const dropIndicator = document.createElement('div');
       dropIndicator.setAttribute('data-drop-indicator', 'line');
       dropIndicator.style.cssText = `
-    position: absolute;
-    left: -4px;
-    right: -4px;
-    height: 3px;
-    background: #4a9eff;
-    border-radius: 2px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.1s;
-  `;
+position: absolute;
+left: -4px;
+right: -4px;
+height: 3px;
+background: #4a9eff;
+border-radius: 2px;
+pointer-events: none;
+opacity: 0;
+transition: opacity 0.1s;
+`;
       layerRow.style.position = 'relative';
       layerRow.appendChild(dropIndicator);
 
@@ -621,7 +577,7 @@ export async function Editor() {
         const adjustedTarget = dragIdx < targetIdx ? targetIdx - 1 : targetIdx;
         const insertIdx = insertAbove ? adjustedTarget : adjustedTarget + 1;
 
-        workspace.moveLayer(workspace.getSortedLayers()[dragIdx], insertIdx);
+        w.moveLayer(w.getSortedLayers()[dragIdx], insertIdx);
 
         renderLayerList();
       }
@@ -769,21 +725,95 @@ export async function Editor() {
 
     // layerList.replaceChildren();
     layerPanel.appendChild(layerList);
-    sidebar.appendChild(workspace.alphabet);
-    sidebar.appendChild(workspace.colorPicker);
+    sidebar.appendChild(w.alphabet);
+    sidebar.appendChild(w.colorPicker);
     sidebar.appendChild(layerPanel);
 
     content.appendChild(secondLeftSidebar);
     content.appendChild(leftSidebar);
-    content.appendChild(workspace.drawboard);
+    content.appendChild(w.drawboard);
     content.appendChild(sidebar);
 
-    footer.appendChild(workspace.paletteSelector);
+    footer.appendChild(w.paletteSelector);
 
     appContainer.appendChild(navBar);
     appContainer.appendChild(content);
     appContainer.appendChild(footer);
     document.body.appendChild(appContainer);
+  }
+
+  async saveDocumentCommand() {
+    if (!this.editorSession) {
+      console.error('exportPhoxelisCommand: No active editor session.');
+      return;
+    }
+
+    if (!this.editorSession.documentName) {
+      const docName = prompt();
+
+      if (!docName) {
+        alert('No name provided. Not saving');
+        return;
+      }
+
+      this.editorSession.documentName = docName;
+    }
+    await this.saveDocument(
+      this.editorSession.documentName,
+      this.editorSession.currentWorkspace,
+    );
+  }
+
+  async loadDocumentCommand() {
+    const docName = prompt();
+
+    if (!docName) {
+      alert('No name provided. Not saving');
+      return;
+    }
+
+    try {
+      await this.loadDocument(docName);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async newDocumentCommand() {
+    await this.startSession();
+  }
+
+  exportPhoxelisCommand() {
+    if (!this.editorSession) {
+      console.error('exportPhoxelisCommand: No active editor session.');
+      return;
+    }
+
+    downloadAsFile(
+      JSON.stringify(this.editorSession.currentWorkspace.exportPhoxelis()),
+      `${this.editorSession.documentName ?? 'untitled'}.phoxelis`,
+    );
+  }
+
+  public async startSession(
+    config: WorkspaceInputConfig = {
+      size: { rows: 37, cols: 152 },
+      fontName: '1_Trithemius8x16',
+    },
+    name?: string,
+  ) {
+    if (this.editorSession) {
+      this.editorSession.currentWorkspace.dispose();
+    }
+
+    const workspace = await Workspace(config);
+
+    this.editorSession = {
+      currentWorkspace: workspace,
+      documentName: name,
+    };
+
+    this.mountLayout();
 
     workspace.startPanzoom();
 
@@ -794,8 +824,8 @@ export async function Editor() {
       onHotkeyStart: (e) => {
         e.preventDefault();
       },
-      onHotkeyEnd() {
-        saveDocumentCommand();
+      onHotkeyEnd: () => {
+        this.saveDocumentCommand();
       },
     });
     workspace.hotkeys.push({
@@ -804,8 +834,8 @@ export async function Editor() {
       onHotkeyStart: (e) => {
         e.preventDefault();
       },
-      onHotkeyEnd() {
-        loadDocumentCommand();
+      onHotkeyEnd: () => {
+        this.loadDocumentCommand();
       },
     });
     workspace.hotkeys.push({
@@ -815,14 +845,9 @@ export async function Editor() {
       onHotkeyStart: (e) => {
         e.preventDefault();
       },
-      onHotkeyEnd() {
-        newDocumentCommand();
+      onHotkeyEnd: () => {
+        this.newDocumentCommand();
       },
     });
   }
-
-  return {
-    loadDocument,
-    startSession,
-  };
 }
