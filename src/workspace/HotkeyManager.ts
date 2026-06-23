@@ -19,16 +19,16 @@ export function createHotkeyManager(ws: Workspace) {
       ctrl: true,
       mouse: 1,
       onHotkeyStart: (e) => {
-        ws.setTool(ws.tools.panzoom);
-        ws.currTool?.handlers.onPointerDown(e as PointerEvent);
+        ws.toolbox.setTool(ws.toolbox.tools.panzoom);
+        ws.toolbox.currentTool?.handlers.onPointerDown(e as PointerEvent);
       },
     },
     {
       shift: true,
       mouse: 1,
       onHotkeyStart: (e) => {
-        ws.setTool(ws.tools.panzoom);
-        ws.currTool?.handlers.onPointerDown(e as PointerEvent);
+        ws.toolbox.setTool(ws.toolbox.tools.panzoom);
+        ws.toolbox.currentTool?.handlers.onPointerDown(e as PointerEvent);
       },
     },
   ];
@@ -71,7 +71,7 @@ export function createHotkeyManager(ws: Workspace) {
   };
   window.addEventListener('keydown', handleHotkeyKeydown);
   window.addEventListener('keyup', handleHotkeyKeyup);
-  ws.drawboard.addEventListener('pointerdown', (e) => {
+  ws.drawboard.element.addEventListener('pointerdown', (e) => {
     const matchingHotkey = hotkeys.find(
       (h) =>
         !!h.ctrl === e.ctrlKey &&
@@ -84,7 +84,7 @@ export function createHotkeyManager(ws: Workspace) {
       downHotkeys.push(matchingHotkey);
     }
   });
-  ws.drawboard.addEventListener('pointerup', (e) => {
+  ws.drawboard.element.addEventListener('pointerup', (e) => {
     const matchinDownHotkey = downHotkeys.find((h) => e.button === h.mouse);
     if (matchinDownHotkey) {
       matchinDownHotkey.onHotkeyEnd?.(e);

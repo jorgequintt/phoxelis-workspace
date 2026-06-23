@@ -1,13 +1,13 @@
 import type { CharShape } from 'phoxelis';
 import type { Workspace } from '../Workspace';
 
-export function createAlphabetSelector(this: Workspace) {
+export function createAlphabetSelector(ws: Workspace) {
   const alphabetCanvas = document.createElement('canvas');
   const alphabetWidth = 100;
-  const alphabetCols = Math.ceil(alphabetWidth / this.font.width);
-  const alphabetRows = Math.ceil(this.font.length / alphabetCols);
-  alphabetCanvas.width = alphabetCols * this.font.width;
-  alphabetCanvas.height = alphabetRows * this.font.height;
+  const alphabetCols = Math.ceil(alphabetWidth / ws.font.width);
+  const alphabetRows = Math.ceil(ws.font.length / alphabetCols);
+  alphabetCanvas.width = alphabetCols * ws.font.width;
+  alphabetCanvas.height = alphabetRows * ws.font.height;
   const alphabetViewScale = 2;
   alphabetCanvas.style = `width: ${alphabetCanvas.width * alphabetViewScale}px; image-rendering: pixelated;`;
   const alphabetCtx = alphabetCanvas.getContext('2d')!;
@@ -21,8 +21,8 @@ export function createAlphabetSelector(this: Workspace) {
     fg: string,
     bg: string,
   ) => {
-    const yOffset = Math.floor(index / alphabetCols) * this.font.height;
-    const xOffset = (index % alphabetCols) * this.font.width;
+    const yOffset = Math.floor(index / alphabetCols) * ws.font.height;
+    const xOffset = (index % alphabetCols) * ws.font.width;
     for (let y = 0; y < charShape.length; y++) {
       for (let x = 0; x < charShape[0].length; x++) {
         const pixelVal = charShape[y][x];
@@ -32,29 +32,29 @@ export function createAlphabetSelector(this: Workspace) {
     }
   };
 
-  this.font.charactersList.forEach((char, i) => {
+  ws.font.charactersList.forEach((char, i) => {
     drawCharShapeInAlphabet(i, char.shape, '#FFFFFF', '#000000');
   });
 
   alphabetCanvas.addEventListener('click', (e) => {
-    const r = Math.floor(e.offsetY / alphabetViewScale / this.font.height);
-    const c = Math.floor(e.offsetX / alphabetViewScale / this.font.width);
+    const r = Math.floor(e.offsetY / alphabetViewScale / ws.font.height);
+    const c = Math.floor(e.offsetX / alphabetViewScale / ws.font.width);
     const index = r * alphabetCols + c;
-    const char = this.font.charactersList[index];
+    const char = ws.font.charactersList[index];
     if (!char) throw new Error(`No char found for position y${r},x${c}`);
 
     selectCharInAlphabet(index);
 
     if (
-      this.session.paletteData.modifyingPhox &&
-      this.session.paletteData.selectedPhox > 0
+      ws.session.paletteData.modifyingPhox &&
+      ws.session.paletteData.selectedPhox > 0
     ) {
-      const selectedPalettePhox = this.phoxelis.getPhoxFromPaletteIndex(
-        this.session.paletteData.selectedPhox,
+      const selectedPalettePhox = ws.phoxelis.getPhoxFromPaletteIndex(
+        ws.session.paletteData.selectedPhox,
       );
       if (selectedPalettePhox) {
-        this.phoxelis.storePhoxInPalette(this.session.paletteData.selectedPhox, {
-          char: this.session.dp.char,
+        ws.phoxelis.storePhoxInPalette(ws.session.paletteData.selectedPhox, {
+          char: ws.session.dp.char,
           fg: selectedPalettePhox.fg,
           bg: selectedPalettePhox.bg,
         });
@@ -63,23 +63,23 @@ export function createAlphabetSelector(this: Workspace) {
   });
 
   const selectCharInAlphabet = (index: number) => {
-    const char = this.font.charactersList[index];
+    const char = ws.font.charactersList[index];
 
     drawCharShapeInAlphabet(
-      this.session.alphabetData.selectedChar,
-      this.font.charactersList[this.session.alphabetData.selectedChar].shape,
+      ws.session.alphabetData.selectedChar,
+      ws.font.charactersList[ws.session.alphabetData.selectedChar].shape,
       '#FFFFFF',
       '#000000',
     );
-    this.session.dp.char = String.fromCodePoint(char.codepoint);
+    ws.session.dp.char = String.fromCodePoint(char.codepoint);
     drawCharShapeInAlphabet(
       index,
-      this.font.charactersList[index].shape,
+      ws.font.charactersList[index].shape,
       '#000000',
       '#00FFFF',
     );
 
-    this.session.alphabetData.selectedChar = index;
+    ws.session.alphabetData.selectedChar = index;
   };
 
   return { alphabet: alphabetContainer, selectCharInAlphabet };

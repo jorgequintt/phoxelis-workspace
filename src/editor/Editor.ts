@@ -70,7 +70,7 @@ export class Editor {
   /* To be implemented by users extending the Editor class */
   protected mountLayout() {
     if(this.editorSession) {   
-      document.body.appendChild(this.editorSession.currentWorkspace.drawboard)
+      document.body.appendChild(this.editorSession.currentWorkspace.drawboard.element)
     }
   }
 

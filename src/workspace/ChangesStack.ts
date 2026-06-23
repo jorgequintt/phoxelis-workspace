@@ -1,7 +1,7 @@
 import type { PhoxelPosition, Workspace } from "./Workspace";
 
-export function createChangesStack(this: Workspace){
-  const {session, phoxelis} = this;
+export function createChangesStack(ws: Workspace){
+  const {session, phoxelis} = ws;
 
   type ChangesStack = Array<() => void>;
   let changesHistory: Array<{ changes: ChangesStack; undoChanges: ChangesStack }> = [];
@@ -31,7 +31,7 @@ export function createChangesStack(this: Workspace){
         );
       }
 
-      this.renderDpWithMode(phoxelis, r, c, session.activeLayer);
+      ws.renderDpWithMode(phoxelis, r, c, session.activeLayer);
 
       const newPhox = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
       if (!newPhox) {

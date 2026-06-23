@@ -1,7 +1,6 @@
 import { getFont, Phoxelis, type Phox, type Font, type PhoxelisObj } from 'phoxelis';
 import '../style.css';
 import Panzoom, { type PanzoomObject } from '@panzoom/panzoom';
-import Hammer from 'hammerjs';
 import _ from 'lodash';
 import { createRefImage } from './elements/refImage';
 import { createDrawboard } from './elements/drawboard';
@@ -9,8 +8,8 @@ import { createAlphabetSelector } from './elements/alphabet';
 import { createColorPicker } from './elements/colorPicker';
 import { createPaletteSelector } from './elements/palette';
 import { createChangesStack } from './ChangesStack';
-import { createTools } from './Tools';
 import { createHotkeyManager } from './HotkeyManager';
+import { Toolbox } from './Tools/Toolbox';
 
 export type Phoxel = {
   phox: Phox;
@@ -59,72 +58,7 @@ export const drawModeDefs: DrawModeDefinition[] = [
   { name: 'erase', icon: '✕', tooltip: 'Erase' },
 ];
 
-export interface Tool {
-  name: string;
-  onPointerDown?: (e: PointerEvent) => void;
-  onPointerMove?: (e: PointerEvent) => void;
-  onPointerUp?: (e: PointerEvent) => void;
-  onPinchStart?: (e: HammerInput) => void;
-  onPinchMove?: (e: HammerInput) => void;
-  onPinchEnd?: (e: HammerInput) => void;
-  submit?: () => void;
-  abort?: () => void;
-  resetTool?: () => void;
-  data?: Record<string, any>;
-}
-
-export type CurrentTool = {
-  tool: Tool;
-  handlers: {
-    onPointerDown: (e: PointerEvent) => void;
-    onPointerUp: (e: PointerEvent) => void;
-    onPointerMove: (e: PointerEvent) => void;
-    onPinchStart: (e: HammerInput) => void;
-    onPinchMove: (e: HammerInput) => void;
-    onPinchEnd: (e: HammerInput) => void;
-  };
-};
-
-export type ToolDefinition = {
-  name: string;
-  icon: string;
-  tooltip: string;
-};
-
-export const toolDefs: ToolDefinition[] = [
-  {
-    name: 'draw',
-    icon: '✏',
-    tooltip: 'Draw (freehand)',
-  },
-  {
-    name: 'rect',
-    icon: '□',
-    tooltip: 'Rectangle (outline)',
-  },
-  {
-    name: 'filledRect',
-    icon: '■',
-    tooltip: 'Filled Rectangle',
-  },
-  {
-    name: 'line',
-    icon: '╱',
-    tooltip: 'Line',
-  },
-  {
-    name: 'ellipse',
-    icon: '⬭',
-    tooltip: 'Ellipse (outline)',
-  },
-  {
-    name: 'filledEllipse',
-    icon: '●',
-    tooltip: 'Filled Ellipse',
-  },
-];
-
-const panzoomConfiguration = {
+export const panzoomConfiguration = {
   minScale: 0.15,
   maxScale: 10,
   noBind: true,
@@ -169,22 +103,21 @@ export class Workspace {
   layersTargets: Record<string, HTMLCanvasElement> = {};
   ds: DocumentState;
   session: SessionState;
+  drawboard: ReturnType<typeof createDrawboard>;
   refImage: { img: HTMLImageElement; wrapper: HTMLDivElement };
-  drawboard: HTMLDivElement;
+  scale = panzoomConfiguration.startScale;
+  refImageScale = panzoomConfiguration.startScale;
+  panzoom: PanzoomObject | null = null;
+  refImagePanzoom: PanzoomObject | null = null;
   colorPicker: ReturnType<typeof createColorPicker>;
   alphabet: ReturnType<typeof createAlphabetSelector>;
   palette: ReturnType<typeof createPaletteSelector>;
-  panzoom: PanzoomObject | null = null;
-  refImagePanzoom: PanzoomObject | null = null;
-  scale = panzoomConfiguration.startScale;
-  refImageScale = panzoomConfiguration.startScale;
   changesStack: ReturnType<typeof createChangesStack>;
-  hammer: HammerManager;
-  currTool: null | CurrentTool;
-  previousTool: null | Tool;
+  toolbox: Toolbox;
   mousePos: { x: number; y: number } = { x: -1, y: -1 };
-  tools: ReturnType<typeof createTools>;
   hotkeyManager: ReturnType<typeof createHotkeyManager>;
+  lastAnimationFrame: number = -1;
+  continueRenderLoop: boolean = true;
 
   static async create(config: WorkspaceInputConfig) {
     const font = await getFont(config.fontName);
@@ -227,19 +160,11 @@ export class Workspace {
     };
 
     // MARK: Elements
-
     this.refImage = createRefImage();
-    this.drawboard = createDrawboard(
-      this.phoxelis.canvas,
-      this.draftScreen.canvas,
-      this.refImage.wrapper,
-    );
-    this.colorPicker = this.createColorPicker();
-    this.selectColorType('fg');
-    this.alphabet = this.createAlphabetSelector();
-    this.palette = this.createPaletteSelector();
-
-    this.hammer = new Hammer(this.drawboard);
+    this.drawboard = createDrawboard(this);
+    this.colorPicker = createColorPicker(this);
+    this.alphabet = createAlphabetSelector(this);
+    this.palette = createPaletteSelector(this);
 
     // MARK: Load data variable if present. Create defaults if not
     if (this.config.data) {
@@ -258,34 +183,30 @@ export class Workspace {
       this.setReferenceImage(data.refImage.src);
     }
 
-    // TODO: This should be a class (new ChangesStack(this));
-    this.changesStack = this.createChangesStack();
+    this.changesStack = createChangesStack(this);
+    this.toolbox = new Toolbox(this);
+    this.hotkeyManager = createHotkeyManager(this);
 
-    this.tools = createTools(this);
-    this.currTool = null;
-    this.previousTool = null;
-    this.mousePos = { x: -1, y: -1 };
-    this.setTool(this.tools.draw);
+    this.startRenderLoop();
 
-    this.hammer.get('pinch').set({ enable: true });
-    this.hammer.on('pinchstart', (e) => {
-      this.setTool(this.tools.panzoom);
-      this.currTool?.handlers.onPinchStart(e);
-    });
+    return this;
+  }
+  dispose() {
+    // TODO There is some memory leak when creating many new documents. what else can we dispose of?
+    window.removeEventListener('keydown', this.hotkeyManager.handleHotkeyKeydown);
+    window.removeEventListener('keyup', this.hotkeyManager.handleHotkeyKeyup);
 
-    this.drawboard.addEventListener('pointerdown', this.setMousePos);
-    this.drawboard.addEventListener('pointermove', this.setMousePos);
-    this.drawboard.addEventListener('pointerup', this.setMousePos);
-    const handleWindowMouseOut = (e: MouseEvent) => {
-      if (e.relatedTarget === null) {
-        this.currTool?.tool.abort?.();
-      }
-    };
-    window.addEventListener('mouseout', handleWindowMouseOut);
+    this.continueRenderLoop = false;
+    window.cancelAnimationFrame(this.lastAnimationFrame);
 
-    // MARK: Rendering
+    this.panzoom?.destroy();
+    this.refImagePanzoom?.destroy();
+    this.colorPicker.dispose();
+    this.drawboard.dispose();
+  }
+
+  startRenderLoop() {
     let continueRenderLoop = true;
-    let lastAnimationFrame: number = -1;
     const renderLoop = () => {
       this.phoxelis.renderFrame(
         this.phoxelis.layers.map((l) => ({
@@ -295,39 +216,15 @@ export class Workspace {
       );
       this.draftScreen.renderFrame();
       if (continueRenderLoop) {
-        lastAnimationFrame = window.requestAnimationFrame(renderLoop);
+        this.lastAnimationFrame = window.requestAnimationFrame(renderLoop);
       }
     };
-    lastAnimationFrame = window.requestAnimationFrame(renderLoop);
+    this.lastAnimationFrame = window.requestAnimationFrame(renderLoop);
+  }
 
-    this.hotkeyManager = createHotkeyManager(this);
-
-    this.dispose = () => {
-      // TODO There is some memory leak when creating many new documents. what else can we dispose of?
-      window.removeEventListener('keydown', this.hotkeyManager.handleHotkeyKeydown);
-      window.removeEventListener('keyup', this.hotkeyManager.handleHotkeyKeyup);
-      window.removeEventListener('mouseout', handleWindowMouseOut);
-
-      continueRenderLoop = false;
-      window.cancelAnimationFrame(lastAnimationFrame);
-
-      this.hammer.destroy();
-      this.panzoom?.destroy();
-      this.refImagePanzoom?.destroy();
-      this.colorPicker.picker.off(
-        'color:change',
-        this.colorPicker.handleColorPickeChange,
-      );
-      this.colorPicker.el.remove();
-    };
-
-    return this;
-  } // MARK: WIP
   exportPhoxelis() {
     return this.phoxelis.exportPhoxelis();
   }
-
-  dispose: () => void;
 
   exportData(): WorkspaceExportConfig {
     const {
@@ -358,29 +255,6 @@ export class Workspace {
 
     return documentData;
   }
-  
-  // Arrow func to prevent addEventListener to re-assigning this
-  private setMousePos = (event: PointerEvent) => {
-    const {
-      config: { size },
-      mousePos,
-      font,
-    } = this;
-    const { width, top, left } = this.phoxelis.canvas.getBoundingClientRect();
-    const scale = width / (size.cols * font.width);
-    const mouseScreenPosX = event.clientX - left;
-    const mouseScreenPosY = event.clientY - top;
-    mousePos.x = Math.min(
-      size.cols - 1,
-      Math.max(0, Math.floor(mouseScreenPosX / (font.width * scale))),
-    );
-    mousePos.y = Math.min(
-      size.rows - 1,
-      Math.max(0, Math.floor(mouseScreenPosY / (font.height * scale))),
-    );
-  }
-
-  createChangesStack = createChangesStack;
 
   setReferenceImage(base64: string) {
     this.refImage.img.src = base64;
@@ -407,7 +281,7 @@ export class Workspace {
       drawboard,
     } = this;
     this.panzoom = Panzoom(
-      drawboard.firstElementChild as HTMLElement,
+      drawboard.element.firstElementChild as HTMLElement,
       panzoomConfiguration,
     );
     this.refImagePanzoom = Panzoom(refImage.img, { ...panzoomConfiguration });
@@ -417,12 +291,7 @@ export class Workspace {
       this.refImagePanzoom.zoom(data.refImage.config.scale);
     }
   }
-  createPaletteSelector = createPaletteSelector;
-  createColorPicker = createColorPicker;
-  private createAlphabetSelector = createAlphabetSelector;
-  public createRefImage = createRefImage;
 
-  // Later
   public getDraftBaseLayer() {
     return this.draftScreen.layers[0].id;
   }
@@ -479,11 +348,6 @@ export class Workspace {
     target.height = this.font.height * this.config.size.rows;
     target.style = `height: 100%; width: 100%; object-fit: contain;`;
     return target;
-  }
-
-  selectColorType(type: 'fg' | 'bg') {
-    this.session.selectedColorType = type;
-    this.colorPicker.picker.color.hexString = this.session.dp[type];
   }
 
   renderDpWithMode(
@@ -548,59 +412,5 @@ export class Workspace {
         target.removePhoxel(r, c, layerId);
       }
     }
-  }
-
-  setTool(tool: Tool | string) {
-    const { currTool, drawboard, hammer } = this;
-
-    if (typeof tool === 'string') {
-      // TODO redo this
-      tool = this.tools[tool as keyof ReturnType<typeof createTools>];
-      if (!tool) throw new Error(`No tool by name ${tool}`);
-    }
-
-    if (currTool) {
-      currTool.tool.abort?.();
-      drawboard.removeEventListener('pointerdown', currTool.handlers.onPointerDown);
-      drawboard.removeEventListener('pointermove', currTool.handlers.onPointerMove);
-      drawboard.removeEventListener('pointerup', currTool.handlers.onPointerUp);
-      hammer.off('pinchstart', currTool.handlers.onPinchStart);
-      hammer.off('pinchmove', currTool.handlers.onPinchMove);
-      hammer.off('pinchend', currTool.handlers.onPinchEnd);
-      this.previousTool = currTool.tool;
-    }
-
-    this.currTool = {
-      tool,
-      handlers: {
-        onPointerDown: (e) => {
-          drawboard.setPointerCapture(e.pointerId);
-          tool.onPointerDown!(e);
-        },
-        onPointerMove: (e) => {
-          tool.onPointerMove!(e);
-        },
-        onPointerUp: (e) => {
-          try {
-            drawboard.releasePointerCapture(e.pointerId);
-          } catch {}
-          tool.onPointerUp!(e);
-        },
-        onPinchStart: (e) => tool.onPinchStart!(e),
-        onPinchMove: (e) => tool.onPinchMove!(e),
-        onPinchEnd: (e) => tool.onPinchEnd!(e),
-      },
-    };
-
-    // TODO fix currTOol type?
-    drawboard.addEventListener('pointerdown', this.currTool!.handlers.onPointerDown);
-    drawboard.addEventListener('pointermove', this.currTool!.handlers.onPointerMove);
-    drawboard.addEventListener('pointerup', this.currTool!.handlers.onPointerUp);
-    hammer.on('pinchstart', this.currTool!.handlers.onPinchStart);
-    hammer.on('pinchmove', this.currTool!.handlers.onPinchMove);
-    hammer.on('pinchend', this.currTool!.handlers.onPinchEnd);
-  }
-  setPreviousTool() {
-    if (this.previousTool) this.setTool(this.previousTool);
   }
 }

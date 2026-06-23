@@ -1,16 +1,170 @@
-import { Workspace, type Phoxel, type PhoxelPosition, type Tool } from "./Workspace";
+import { Workspace, type Phoxel, type PhoxelPosition } from '../Workspace';
 
-interface PanzoomTool extends Tool {
-  data: {
-    panzooming: boolean;
-    zooming: boolean;
-    panning: boolean;
-  };
+export interface Tool {
+  name: string;
+  onPointerDown?: (e: PointerEvent) => void;
+  onPointerMove?: (e: PointerEvent) => void;
+  onPointerUp?: (e: PointerEvent) => void;
+  onPinchStart?: (e: HammerInput) => void;
+  onPinchMove?: (e: HammerInput) => void;
+  onPinchEnd?: (e: HammerInput) => void;
+  submit?: () => void;
+  abort?: () => void;
+  resetTool?: () => void;
+  data?: Record<string, any>;
 }
 
-export function createTools(ws: Workspace){
-  const {session, refImagePanzoom, panzoom, config: { size },draftScreen } = ws;
+export type CurrentTool = {
+  tool: Tool;
+  handlers: {
+    onPointerDown: (e: PointerEvent) => void;
+    onPointerUp: (e: PointerEvent) => void;
+    onPointerMove: (e: PointerEvent) => void;
+    onPinchStart: (e: HammerInput) => void;
+    onPinchMove: (e: HammerInput) => void;
+    onPinchEnd: (e: HammerInput) => void;
+  };
+};
 
+export type ToolDefinition = {
+  name: string;
+  icon: string;
+  tooltip: string;
+};
+
+export const toolDefs: ToolDefinition[] = [
+  {
+    name: 'draw',
+    icon: '✏',
+    tooltip: 'Draw (freehand)',
+  },
+  {
+    name: 'rect',
+    icon: '□',
+    tooltip: 'Rectangle (outline)',
+  },
+  {
+    name: 'filledRect',
+    icon: '■',
+    tooltip: 'Filled Rectangle',
+  },
+  {
+    name: 'line',
+    icon: '╱',
+    tooltip: 'Line',
+  },
+  {
+    name: 'ellipse',
+    icon: '⬭',
+    tooltip: 'Ellipse (outline)',
+  },
+  {
+    name: 'filledEllipse',
+    icon: '●',
+    tooltip: 'Filled Ellipse',
+  },
+];
+
+export class Toolbox {
+  currentTool: null | CurrentTool;
+  previousTool: null | Tool;
+  tools: ReturnType<typeof createTools>;
+  ws: Workspace;
+
+  constructor(ws: Workspace) {
+    this.currentTool = null;
+    this.previousTool = null;
+    this.ws = ws;
+    this.tools = createTools(ws, this);
+    this.setTool(this.tools.draw);
+  }
+
+  setTool(tool: Tool | string) {
+    const { currentTool: currTool } = this;
+    const { drawboard } = this.ws;
+
+    if (typeof tool === 'string') {
+      // TODO redo this
+      tool = this.tools[tool as keyof ReturnType<typeof createTools>];
+      if (!tool) throw new Error(`No tool by name ${tool}`);
+    }
+
+    if (currTool) {
+      currTool.tool.abort?.();
+      drawboard.element.removeEventListener(
+        'pointerdown',
+        currTool.handlers.onPointerDown,
+      );
+      drawboard.element.removeEventListener(
+        'pointermove',
+        currTool.handlers.onPointerMove,
+      );
+      drawboard.element.removeEventListener('pointerup', currTool.handlers.onPointerUp);
+      drawboard.hammer.off('pinchstart', currTool.handlers.onPinchStart);
+      drawboard.hammer.off('pinchmove', currTool.handlers.onPinchMove);
+      drawboard.hammer.off('pinchend', currTool.handlers.onPinchEnd);
+      this.previousTool = currTool.tool;
+    }
+
+    this.currentTool = {
+      tool,
+      handlers: {
+        onPointerDown: (e) => {
+          drawboard.element.setPointerCapture(e.pointerId);
+          tool.onPointerDown!(e);
+        },
+        onPointerMove: (e) => {
+          tool.onPointerMove!(e);
+        },
+        onPointerUp: (e) => {
+          try {
+            drawboard.element.releasePointerCapture(e.pointerId);
+          } catch {}
+          tool.onPointerUp!(e);
+        },
+        onPinchStart: (e) => tool.onPinchStart!(e),
+        onPinchMove: (e) => tool.onPinchMove!(e),
+        onPinchEnd: (e) => tool.onPinchEnd!(e),
+      },
+    };
+
+    drawboard.element.addEventListener(
+      'pointerdown',
+      this.currentTool.handlers.onPointerDown,
+    );
+    drawboard.element.addEventListener(
+      'pointermove',
+      this.currentTool.handlers.onPointerMove,
+    );
+    drawboard.element.addEventListener(
+      'pointerup',
+      this.currentTool.handlers.onPointerUp,
+    );
+    drawboard.hammer.on('pinchstart', this.currentTool.handlers.onPinchStart);
+    drawboard.hammer.on('pinchmove', this.currentTool.handlers.onPinchMove);
+    drawboard.hammer.on('pinchend', this.currentTool.handlers.onPinchEnd);
+  }
+  setPreviousTool() {
+    if (this.previousTool) this.setTool(this.previousTool);
+  }
+}
+
+export function createTools(ws: Workspace, tb: Toolbox) {
+  const {
+    session,
+    refImagePanzoom,
+    panzoom,
+    config: { size },
+    draftScreen,
+  } = ws;
+
+  interface PanzoomTool extends Tool {
+    data: {
+      panzooming: boolean;
+      zooming: boolean;
+      panning: boolean;
+    };
+  }
   const panzoomTool: PanzoomTool = {
     name: 'panzoom',
     data: {
@@ -47,7 +201,7 @@ export function createTools(ws: Workspace){
       if (!this.data.panzooming) return;
       this.resetTool!();
       this.submit!();
-      ws.setPreviousTool();
+      tb.setPreviousTool();
     },
     onPinchStart() {
       this.data.panzooming = true;
@@ -92,7 +246,7 @@ export function createTools(ws: Workspace){
       this.submit!();
     },
     submit() {
-      ws.setPreviousTool();
+      tb.setPreviousTool();
     },
     resetTool() {
       this.data.panzooming = false;
@@ -471,7 +625,6 @@ export function createTools(ws: Workspace){
     },
   };
 
-
   // ─── Ellipse helper functions ────────────────────────────────────────────────
 
   /** Draw ellipse outline using midpoint ellipse algorithm */
@@ -575,5 +728,5 @@ export function createTools(ws: Workspace){
     filledRect: filledRectTool,
     ellipse: ellipseTool,
     filledEllipse: filledEllipseTool,
-  }
+  };
 }

@@ -5,12 +5,11 @@ import {
 } from '../utils';
 import {
   drawModeDefs,
-  toolDefs,
   type DocumentLayer,
   type DrawModeDefinition,
-  type ToolDefinition,
 } from '../workspace/Workspace';
 import { Editor } from './Editor';
+import { toolDefs, type ToolDefinition } from '../workspace/Tools/Toolbox';
 
 const appRoot = document.querySelector('#app')!;
 
@@ -190,7 +189,7 @@ export class HtmlEditor extends Editor {
       });
       btn.addEventListener('mouseleave', () => {
         btn.style.background =
-          (w.currTool as any)?.tool?.name === def.name ? '#666' : '#444';
+          (w.toolbox.currentTool as any)?.tool?.name === def.name ? '#666' : '#444';
       });
       btn.addEventListener('click', () => {
         leftSidebar.querySelectorAll('button').forEach((b) => {
@@ -199,7 +198,7 @@ export class HtmlEditor extends Editor {
         });
         btn.style.background = '#666';
         btn.style.borderColor = '#888';
-        w.setTool(def.name);
+        w.toolbox.setTool(def.name);
       });
       return btn;
     };
@@ -671,7 +670,7 @@ transition: opacity 0.1s;
 
     content.appendChild(secondLeftSidebar);
     content.appendChild(leftSidebar);
-    content.appendChild(w.drawboard);
+    content.appendChild(w.drawboard.element);
     content.appendChild(sidebar);
 
     footer.appendChild(w.palette);

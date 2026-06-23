@@ -1,14 +1,14 @@
 import type { Workspace } from '../Workspace';
 
-export function createPaletteSelector(this: Workspace) {
+export function createPaletteSelector(ws: Workspace) {
   const paletteScale = 2;
   const paletteSelector = document.createElement('div');
   paletteSelector.style = 'position: relative;';
   const paletteOverlay = document.createElement('canvas');
-  paletteOverlay.width = this.phoxelis.palette.width;
-  paletteOverlay.height = this.phoxelis.palette.height;
-  const paletteScaledHeight = this.font.height * paletteScale;
-  this.phoxelis.palette.style = `height: ${paletteScaledHeight}px; image-rendering: pixelated; border: 1px solid black;`;
+  paletteOverlay.width = ws.phoxelis.palette.width;
+  paletteOverlay.height = ws.phoxelis.palette.height;
+  const paletteScaledHeight = ws.font.height * paletteScale;
+  ws.phoxelis.palette.style = `height: ${paletteScaledHeight}px; image-rendering: pixelated; border: 1px solid black;`;
   paletteOverlay.style = `height: ${paletteScaledHeight}px; border: 1px solid black; position: absolute; top: 0; left: 0; image-rendering: pixelated;`;
   const onPaletteOverlayClick = (e: MouseEvent) => {
     if (!paletteOverlay) {
@@ -18,31 +18,31 @@ export function createPaletteSelector(this: Workspace) {
       return;
     }
     const x = e.offsetX;
-    const paletteMaxCells = this.phoxelis.palette.width / this.font.width;
+    const paletteMaxCells = ws.phoxelis.palette.width / ws.font.width;
     const pos = Math.floor(
-      (x / (paletteScale * this.phoxelis.palette.width)) * paletteMaxCells,
+      (x / (paletteScale * ws.phoxelis.palette.width)) * paletteMaxCells,
     );
-    const phox = this.phoxelis.getPhoxFromPaletteIndex(pos);
+    const phox = ws.phoxelis.getPhoxFromPaletteIndex(pos);
     if (!phox) {
       console.warn('Null Phox selected. Omitting selection');
       return;
     }
-    this.session.dp = phox;
-    this.session.paletteData.selectedPhox = pos;
-    this.colorPicker.picker.color.hexString = this.session.dp[this.session.selectedColorType];
-    this.alphabet.selectCharInAlphabet(
-      this.font.charactersList.findIndex(
-        (c) => c.codepoint === this.session.dp.char.codePointAt(0),
+    ws.session.dp = phox;
+    ws.session.paletteData.selectedPhox = pos;
+    ws.colorPicker.picker.color.hexString = ws.session.dp[ws.session.selectedColorType];
+    ws.alphabet.selectCharInAlphabet(
+      ws.font.charactersList.findIndex(
+        (c) => c.codepoint === ws.session.dp.char.codePointAt(0),
       ),
     );
     const ctx = paletteOverlay.getContext('2d');
     ctx!.reset();
     ctx!.strokeStyle = 'green';
     ctx!.lineWidth = 2;
-    ctx!.strokeRect(pos * this.font.width, 0, this.font.width, this.font.height);
+    ctx!.strokeRect(pos * ws.font.width, 0, ws.font.width, ws.font.height);
   };
   paletteOverlay.addEventListener('click', onPaletteOverlayClick);
-  paletteSelector.append(this.phoxelis.palette);
+  paletteSelector.append(ws.phoxelis.palette);
   paletteSelector.append(paletteOverlay);
 
   return paletteSelector;
