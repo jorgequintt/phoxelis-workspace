@@ -1,15 +1,14 @@
 import { getFont, Phoxelis, type Phox, type Font, type PhoxelisObj } from 'phoxelis';
 import '../style.css';
-import Panzoom, { type PanzoomObject } from '@panzoom/panzoom';
 import _ from 'lodash';
-import { createRefImage } from './elements/refImage';
-import { createDrawboard } from './elements/drawboard';
+import { Drawboard } from './elements/drawboard';
 import { createAlphabetSelector } from './elements/alphabet';
 import { createColorPicker } from './elements/colorPicker';
 import { createPaletteSelector } from './elements/palette';
 import { createChangesStack } from './ChangesStack';
 import { createHotkeyManager } from './HotkeyManager';
-import { Toolbox } from './Tools/Toolbox';
+import { Toolbox } from './Toolbox';
+import { DrawManager } from './DrawManager';
 
 export type Phoxel = {
   phox: Phox;
@@ -43,34 +42,8 @@ interface SessionState {
   movingRefImage: boolean;
 }
 
-export type DrawModeDefinition = {
-  name: 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase';
-  icon: string;
-  tooltip: string;
-};
-
-export const drawModeDefs: DrawModeDefinition[] = [
-  { name: 'draw', icon: '✏', tooltip: 'Draw (char + fg + bg)' },
-  { name: 'char', icon: 'A', tooltip: 'Char only' },
-  { name: 'fg', icon: 'F', tooltip: 'Foreground color only' },
-  { name: 'bg', icon: 'B', tooltip: 'Background color only' },
-  { name: 'color', icon: '◉', tooltip: 'Color (fg + bg) only' },
-  { name: 'erase', icon: '✕', tooltip: 'Erase' },
-];
-
-export const panzoomConfiguration = {
-  minScale: 0.15,
-  maxScale: 10,
-  noBind: true,
-  relative: true,
-  cursor: 'default',
-  startX: 0,
-  startY: 0,
-  startScale: 1,
-};
-
 export interface WorkspaceData {
-  phoxelis: ReturnType<ReturnType<typeof Phoxelis>['exportPhoxelis']>; // TODO export type in phoxelis for this
+  phoxelis: ReturnType<PhoxelisObj['exportPhoxelis']>;
   layers: DocumentState['layers'];
   refImage: {
     src: string;
@@ -103,18 +76,13 @@ export class Workspace {
   layersTargets: Record<string, HTMLCanvasElement> = {};
   ds: DocumentState;
   session: SessionState;
-  drawboard: ReturnType<typeof createDrawboard>;
-  refImage: { img: HTMLImageElement; wrapper: HTMLDivElement };
-  scale = panzoomConfiguration.startScale;
-  refImageScale = panzoomConfiguration.startScale;
-  panzoom: PanzoomObject | null = null;
-  refImagePanzoom: PanzoomObject | null = null;
+  drawboard: Drawboard;
   colorPicker: ReturnType<typeof createColorPicker>;
   alphabet: ReturnType<typeof createAlphabetSelector>;
   palette: ReturnType<typeof createPaletteSelector>;
   changesStack: ReturnType<typeof createChangesStack>;
   toolbox: Toolbox;
-  mousePos: { x: number; y: number } = { x: -1, y: -1 };
+  drawManager: DrawManager;
   hotkeyManager: ReturnType<typeof createHotkeyManager>;
   lastAnimationFrame: number = -1;
   continueRenderLoop: boolean = true;
@@ -125,7 +93,6 @@ export class Workspace {
   }
 
   private constructor(config: WorkspaceInputConfig, font: Font) {
-    console.log('config', config);
     this.config = config;
     const { size } = this.config;
 
@@ -160,11 +127,14 @@ export class Workspace {
     };
 
     // MARK: Elements
-    this.refImage = createRefImage();
-    this.drawboard = createDrawboard(this);
+    this.drawboard = new Drawboard(this);
     this.colorPicker = createColorPicker(this);
     this.alphabet = createAlphabetSelector(this);
     this.palette = createPaletteSelector(this);
+    this.drawManager = new DrawManager(this);
+    this.changesStack = createChangesStack(this);
+    this.toolbox = new Toolbox(this);
+    this.hotkeyManager = createHotkeyManager(this);
 
     // MARK: Load data variable if present. Create defaults if not
     if (this.config.data) {
@@ -180,29 +150,13 @@ export class Workspace {
         };
       });
       this.selectLayer(this.phoxelis.layers[0].id);
-      this.setReferenceImage(data.refImage.src);
+      this.drawboard.setReferenceImage(data.refImage.src);
     }
 
-    this.changesStack = createChangesStack(this);
-    this.toolbox = new Toolbox(this);
-    this.hotkeyManager = createHotkeyManager(this);
 
     this.startRenderLoop();
 
     return this;
-  }
-  dispose() {
-    // TODO There is some memory leak when creating many new documents. what else can we dispose of?
-    window.removeEventListener('keydown', this.hotkeyManager.handleHotkeyKeydown);
-    window.removeEventListener('keyup', this.hotkeyManager.handleHotkeyKeyup);
-
-    this.continueRenderLoop = false;
-    window.cancelAnimationFrame(this.lastAnimationFrame);
-
-    this.panzoom?.destroy();
-    this.refImagePanzoom?.destroy();
-    this.colorPicker.dispose();
-    this.drawboard.dispose();
   }
 
   startRenderLoop() {
@@ -230,10 +184,11 @@ export class Workspace {
     const {
       phoxelis,
       ds,
-      refImagePanzoom,
-      refImage,
+      drawboard,
       config: { size, fontName },
     } = this;
+    const { refImagePanzoom, refImage } = drawboard;
+
     const phoxelisData = phoxelis.exportPhoxelis();
 
     const documentData = {
@@ -254,42 +209,6 @@ export class Workspace {
     };
 
     return documentData;
-  }
-
-  setReferenceImage(base64: string) {
-    this.refImage.img.src = base64;
-    this.refImageScale = 1;
-    this.refImagePanzoom?.reset();
-  }
-
-  getReferenceImageConfig() {
-    return {
-      src: this.refImage.img.src ?? '',
-      config: {
-        panX: this.refImagePanzoom?.getPan().x ?? 0,
-        panY: this.refImagePanzoom?.getPan().y ?? 0,
-        scale: this.refImagePanzoom?.getScale() ?? 1,
-      },
-    };
-  }
-
-  /** Can only be done once drawboard is in the DOM */
-  startPanzoom() {
-    const {
-      refImage,
-      config: { data },
-      drawboard,
-    } = this;
-    this.panzoom = Panzoom(
-      drawboard.element.firstElementChild as HTMLElement,
-      panzoomConfiguration,
-    );
-    this.refImagePanzoom = Panzoom(refImage.img, { ...panzoomConfiguration });
-
-    if (data) {
-      this.refImagePanzoom.pan(data.refImage.config.panX, data.refImage.config.panY);
-      this.refImagePanzoom.zoom(data.refImage.config.scale);
-    }
   }
 
   public getDraftBaseLayer() {
@@ -350,67 +269,12 @@ export class Workspace {
     return target;
   }
 
-  renderDpWithMode(
-    target: ReturnType<typeof Phoxelis>,
-    r: number,
-    c: number,
-    layerId: string,
-    options: { draftErasure: boolean } = { draftErasure: false },
-  ) {
-    const { session, phoxelis } = this;
-    if (session.drawMode === 'draw') {
-      target.renderPhoxel(session.dp.char, session.dp.fg, session.dp.bg, r, c, layerId);
-      return;
-    } else if (session.drawMode === 'char') {
-      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
-      if (!underlyingPhoxel) return;
-      target.renderPhoxel(
-        session.dp.char,
-        underlyingPhoxel.fg,
-        underlyingPhoxel.bg,
-        r,
-        c,
-        layerId,
-      );
-    } else if (session.drawMode === 'color') {
-      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
-      if (!underlyingPhoxel) return;
-      target.renderPhoxel(
-        underlyingPhoxel.char,
-        session.dp.fg,
-        session.dp.bg,
-        r,
-        c,
-        layerId,
-      );
-    } else if (session.drawMode === 'fg') {
-      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
-      if (!underlyingPhoxel) return;
-      target.renderPhoxel(
-        underlyingPhoxel.char,
-        session.dp.fg,
-        underlyingPhoxel.bg,
-        r,
-        c,
-        layerId,
-      );
-    } else if (session.drawMode === 'bg') {
-      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
-      if (!underlyingPhoxel) return;
-      target.renderPhoxel(
-        underlyingPhoxel.char,
-        underlyingPhoxel.fg,
-        session.dp.bg,
-        r,
-        c,
-        layerId,
-      );
-    } else if (session.drawMode === 'erase') {
-      if (options.draftErasure) {
-        target.renderPhoxel('D', '#FF0000', '#FF000055', r, c, layerId);
-      } else {
-        target.removePhoxel(r, c, layerId);
-      }
-    }
+  
+  dispose() {
+    this.continueRenderLoop = false;
+    window.cancelAnimationFrame(this.lastAnimationFrame);
+    this.hotkeyManager.dispose();
+    this.colorPicker.dispose();
+    this.drawboard.dispose();
   }
 }

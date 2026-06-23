@@ -69,9 +69,8 @@ export function createHotkeyManager(ws: Workspace) {
       matchingHotkey.onHotkeyEnd?.(e);
     }
   };
-  window.addEventListener('keydown', handleHotkeyKeydown);
-  window.addEventListener('keyup', handleHotkeyKeyup);
-  ws.drawboard.element.addEventListener('pointerdown', (e) => {
+
+  const handlePointerDown = (e: PointerEvent) => {
     const matchingHotkey = hotkeys.find(
       (h) =>
         !!h.ctrl === e.ctrlKey &&
@@ -83,8 +82,9 @@ export function createHotkeyManager(ws: Workspace) {
       matchingHotkey.onHotkeyStart?.(e);
       downHotkeys.push(matchingHotkey);
     }
-  });
-  ws.drawboard.element.addEventListener('pointerup', (e) => {
+  };
+
+  const handlePointerUp = (e: PointerEvent) => {
     const matchinDownHotkey = downHotkeys.find((h) => e.button === h.mouse);
     if (matchinDownHotkey) {
       matchinDownHotkey.onHotkeyEnd?.(e);
@@ -103,7 +103,19 @@ export function createHotkeyManager(ws: Workspace) {
     } else if (matchingHotkey) {
       matchingHotkey.onHotkeyEnd?.(e);
     }
-  });
+  };
 
-  return { hotkeys, handleHotkeyKeydown, handleHotkeyKeyup };
+  window.addEventListener('keydown', handleHotkeyKeydown);
+  window.addEventListener('keyup', handleHotkeyKeyup);
+  ws.drawboard.element.addEventListener('pointerdown', handlePointerDown);
+  ws.drawboard.element.addEventListener('pointerup', handlePointerUp);
+
+  const dispose = () => {
+    window.removeEventListener('keydown', handleHotkeyKeydown);
+    window.removeEventListener('keyup', handleHotkeyKeyup);
+    ws.drawboard.element.removeEventListener('pointerdown', handlePointerDown);
+    ws.drawboard.element.removeEventListener('pointerup', handlePointerUp);
+  };
+
+  return { hotkeys, handleHotkeyKeydown, handleHotkeyKeyup, dispose };
 }

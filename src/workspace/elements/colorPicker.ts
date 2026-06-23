@@ -59,9 +59,9 @@ export function createColorPicker(ws: Workspace) {
   selectColorType('fg');
 
   const dispose = () => {
-    colorPicker.off('color:change', ws.colorPicker.handleColorPickeChange);
+    colorPicker.off('color:change', handleColorPickeChange);
     colorPickerEl.remove();
   };
 
-  return { picker: colorPicker, el: colorPickerEl, handleColorPickeChange, dispose };
+  return { picker: colorPicker, el: colorPickerEl, dispose };
 }

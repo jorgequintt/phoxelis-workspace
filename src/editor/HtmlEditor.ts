@@ -4,12 +4,11 @@ import {
   toggleFullScreen,
 } from '../utils';
 import {
-  drawModeDefs,
   type DocumentLayer,
-  type DrawModeDefinition,
 } from '../workspace/Workspace';
 import { Editor } from './Editor';
-import { toolDefs, type ToolDefinition } from '../workspace/Tools/Toolbox';
+import { toolDefs, type ToolDefinition } from '../workspace/Toolbox';
+import { drawModeDefs, type DrawModeDefinition } from '../workspace/DrawManager';
 
 const appRoot = document.querySelector('#app')!;
 
@@ -256,7 +255,7 @@ export class HtmlEditor extends Editor {
               throw new Error('Failed converting image to base64');
             }
 
-            w.setReferenceImage(base64);
+            w.drawboard.setReferenceImage(base64);
           } catch (err) {
             console.error('Failed to load reference image:', err);
           }

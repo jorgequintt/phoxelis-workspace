@@ -147,7 +147,7 @@ export class Editor {
 
     this.mountLayout();
 
-    ws.startPanzoom();
+    ws.drawboard.startPanzoom();
 
     // Hotkeys
     ws.hotkeyManager.hotkeys.push({

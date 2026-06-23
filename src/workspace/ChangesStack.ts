@@ -31,7 +31,7 @@ export function createChangesStack(ws: Workspace){
         );
       }
 
-      ws.renderDpWithMode(phoxelis, r, c, session.activeLayer);
+      ws.drawManager.draw(phoxelis, r, c, session.activeLayer);
 
       const newPhox = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
       if (!newPhox) {

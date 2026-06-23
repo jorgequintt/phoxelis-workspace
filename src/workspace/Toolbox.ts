@@ -1,4 +1,4 @@
-import { Workspace, type Phoxel, type PhoxelPosition } from '../Workspace';
+import { Workspace, type Phoxel, type PhoxelPosition } from './Workspace';
 
 export interface Tool {
   name: string;
@@ -152,11 +152,12 @@ export class Toolbox {
 export function createTools(ws: Workspace, tb: Toolbox) {
   const {
     session,
-    refImagePanzoom,
-    panzoom,
+    drawboard,
     config: { size },
     draftScreen,
+    drawManager
   } = ws;
+  const { refImagePanzoom, panzoom, mousePos } = drawboard;
 
   interface PanzoomTool extends Tool {
     data: {
@@ -215,9 +216,9 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       }
 
       if (session.movingRefImage) {
-        ws.refImageScale = targetZoom.getScale();
+        ws.drawboard.refImageScale = targetZoom.getScale();
       } else {
-        ws.scale = targetZoom.getScale();
+        ws.drawboard.scale = targetZoom.getScale();
       }
     },
     onPinchMove(e) {
@@ -231,7 +232,9 @@ export function createTools(ws: Workspace, tb: Toolbox) {
           return;
         }
 
-        const s = session.movingRefImage ? ws.refImageScale : ws.scale;
+        const s = session.movingRefImage
+          ? ws.drawboard.refImageScale
+          : ws.drawboard.scale;
         const newZoomVal = s * e.scale;
         targetZoom.zoom(newZoomVal);
         targetZoom.pan(
@@ -273,17 +276,17 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     addPhoxelToDraft(p: Phoxel) {
       this.data!.draftPhoxels.set(`${p.r};${p.c}`, p);
-      ws.renderDpWithMode(draftScreen, p.r, p.c, ws.getDraftBaseLayer(), {
+      drawManager.draw(draftScreen, p.r, p.c, ws.getDraftBaseLayer(), {
         draftErasure: true,
       });
     },
     onPointerDown() {
       this.data.drawing = true;
-      this.addPhoxelToDraft({ phox: session.dp, r: ws.mousePos.y, c: ws.mousePos.x });
+      this.addPhoxelToDraft({ phox: session.dp, r: mousePos.y, c: mousePos.x });
     },
     onPointerMove() {
       if (this.data.drawing) {
-        this.addPhoxelToDraft({ phox: session.dp, r: ws.mousePos.y, c: ws.mousePos.x });
+        this.addPhoxelToDraft({ phox: session.dp, r: mousePos.y, c: mousePos.x });
       }
     },
     onPointerUp() {
@@ -314,8 +317,8 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     name: 'rect',
     data: { startR: -1, startC: -1, drawing: false },
     onPointerDown(_e: PointerEvent) {
-      this.data!.startR = ws.mousePos.y;
-      this.data!.startC = ws.mousePos.x;
+      this.data!.startR = mousePos.y;
+      this.data!.startC = mousePos.x;
       this.data!.drawing = true;
     },
     onPointerMove(_e: PointerEvent) {
@@ -323,25 +326,25 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       // Clear draft and redraw preview rectangle
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
-      const r1 = Math.min(startR, ws.mousePos.y);
-      const r2 = Math.max(startR, ws.mousePos.y);
-      const c1 = Math.min(startC, ws.mousePos.x);
-      const c2 = Math.max(startC, ws.mousePos.x);
+      const r1 = Math.min(startR, mousePos.y);
+      const r2 = Math.max(startR, mousePos.y);
+      const c1 = Math.min(startC, mousePos.x);
+      const c2 = Math.max(startC, mousePos.x);
       // Top & bottom edges
       for (let c = c1; c <= c2; c++) {
-        ws.renderDpWithMode(draftScreen, r1, c, ws.getDraftBaseLayer(), {
+        drawManager.draw(draftScreen, r1, c, ws.getDraftBaseLayer(), {
           draftErasure: true,
         });
-        ws.renderDpWithMode(draftScreen, r2, c, ws.getDraftBaseLayer(), {
+        drawManager.draw(draftScreen, r2, c, ws.getDraftBaseLayer(), {
           draftErasure: true,
         });
       }
       // Left & right edges
       for (let r = r1; r <= r2; r++) {
-        ws.renderDpWithMode(draftScreen, r, c1, ws.getDraftBaseLayer(), {
+        drawManager.draw(draftScreen, r, c1, ws.getDraftBaseLayer(), {
           draftErasure: true,
         });
-        ws.renderDpWithMode(draftScreen, r, c2, ws.getDraftBaseLayer(), {
+        drawManager.draw(draftScreen, r, c2, ws.getDraftBaseLayer(), {
           draftErasure: true,
         });
       }
@@ -354,10 +357,10 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     submit() {
       const { startR, startC } = this.data!;
       if (startR === -1 || startC === -1) return;
-      const r1 = Math.min(startR, ws.mousePos.y);
-      const r2 = Math.max(startR, ws.mousePos.y);
-      const c1 = Math.min(startC, ws.mousePos.x);
-      const c2 = Math.max(startC, ws.mousePos.x);
+      const r1 = Math.min(startR, mousePos.y);
+      const r2 = Math.max(startR, mousePos.y);
+      const c1 = Math.min(startC, mousePos.x);
+      const c2 = Math.max(startC, mousePos.x);
 
       const phoxelsPositions: Array<PhoxelPosition> = [];
 
@@ -391,21 +394,21 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     name: 'filledRect',
     data: { startR: -1, startC: -1, drawing: false },
     onPointerDown(_e: PointerEvent) {
-      this.data!.startR = ws.mousePos.y;
-      this.data!.startC = ws.mousePos.x;
+      this.data!.startR = mousePos.y;
+      this.data!.startC = mousePos.x;
       this.data!.drawing = true;
     },
     onPointerMove(_e: PointerEvent) {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
-      const r1 = Math.min(startR, ws.mousePos.y);
-      const r2 = Math.max(startR, ws.mousePos.y);
-      const c1 = Math.min(startC, ws.mousePos.x);
-      const c2 = Math.max(startC, ws.mousePos.x);
+      const r1 = Math.min(startR, mousePos.y);
+      const r2 = Math.max(startR, mousePos.y);
+      const c1 = Math.min(startC, mousePos.x);
+      const c2 = Math.max(startC, mousePos.x);
       for (let r = r1; r <= r2; r++) {
         for (let c = c1; c <= c2; c++) {
-          ws.renderDpWithMode(draftScreen, r, c, ws.getDraftBaseLayer(), {
+          drawManager.draw(draftScreen, r, c, ws.getDraftBaseLayer(), {
             draftErasure: true,
           });
         }
@@ -419,10 +422,10 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     submit() {
       const { startR, startC } = this.data!;
       if (startR === -1 || startC === -1) return;
-      const r1 = Math.min(startR, ws.mousePos.y);
-      const r2 = Math.max(startR, ws.mousePos.y);
-      const c1 = Math.min(startC, ws.mousePos.x);
-      const c2 = Math.max(startC, ws.mousePos.x);
+      const r1 = Math.min(startR, mousePos.y);
+      const r2 = Math.max(startR, mousePos.y);
+      const c1 = Math.min(startC, mousePos.x);
+      const c2 = Math.max(startC, mousePos.x);
 
       const phoxelsPositions: Array<PhoxelPosition> = [];
       for (let r = r1; r <= r2; r++) {
@@ -479,17 +482,17 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     name: 'line',
     data: { startR: -1, startC: -1, drawing: false },
     onPointerDown(_e: PointerEvent) {
-      this.data!.startR = ws.mousePos.y;
-      this.data!.startC = ws.mousePos.x;
+      this.data!.startR = mousePos.y;
+      this.data!.startC = mousePos.x;
       this.data!.drawing = true;
     },
     onPointerMove(_e: PointerEvent) {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
-      const cells = bresenhamCells(startR, startC, ws.mousePos.y, ws.mousePos.x);
+      const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
       for (const { r, c } of cells) {
-        ws.renderDpWithMode(draftScreen, r, c, ws.getDraftBaseLayer(), {
+        drawManager.draw(draftScreen, r, c, ws.getDraftBaseLayer(), {
           draftErasure: true,
         });
       }
@@ -502,7 +505,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     submit() {
       const { startR, startC } = this.data!;
       if (startR === -1 || startC === -1) return;
-      const cells = bresenhamCells(startR, startC, ws.mousePos.y, ws.mousePos.x);
+      const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
       const phoxelsPositions: Array<PhoxelPosition> = [];
       for (const { r, c } of cells) {
         phoxelsPositions.push([r, c]);
@@ -527,19 +530,19 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     name: 'ellipse',
     data: { startR: -1, startC: -1, drawing: false },
     onPointerDown(_e: PointerEvent) {
-      this.data!.startR = ws.mousePos.y;
-      this.data!.startC = ws.mousePos.x;
+      this.data!.startR = mousePos.y;
+      this.data!.startC = mousePos.x;
       this.data!.drawing = true;
     },
     onPointerMove(_e: PointerEvent) {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
-      const rx = Math.abs(ws.mousePos.x - startC);
-      const ry = Math.abs(ws.mousePos.y - startR);
+      const rx = Math.abs(mousePos.x - startC);
+      const ry = Math.abs(mousePos.y - startR);
       drawEllipseOutline(
         (r, c) =>
-          ws.renderDpWithMode(draftScreen, r, c, ws.getDraftBaseLayer(), {
+          drawManager.draw(draftScreen, r, c, ws.getDraftBaseLayer(), {
             draftErasure: true,
           }),
         startR,
@@ -556,8 +559,8 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     submit() {
       const { startR, startC } = this.data!;
       if (startR === -1 || startC === -1) return;
-      const rx = Math.abs(ws.mousePos.x - startC);
-      const ry = Math.abs(ws.mousePos.y - startR);
+      const rx = Math.abs(mousePos.x - startC);
+      const ry = Math.abs(mousePos.y - startR);
       const phoxelsPositions: Array<PhoxelPosition> = [];
       drawEllipseOutline((r, c) => phoxelsPositions.push([r, c]), startR, startC, rx, ry);
       ws.changesStack.commitPhoxels(phoxelsPositions);
@@ -579,19 +582,19 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     name: 'filledEllipse',
     data: { startR: -1, startC: -1, drawing: false },
     onPointerDown(_e: PointerEvent) {
-      this.data!.startR = ws.mousePos.y;
-      this.data!.startC = ws.mousePos.x;
+      this.data!.startR = mousePos.y;
+      this.data!.startC = mousePos.x;
       this.data!.drawing = true;
     },
     onPointerMove(_e: PointerEvent) {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
-      const rx = Math.abs(ws.mousePos.x - startC);
-      const ry = Math.abs(ws.mousePos.y - startR);
+      const rx = Math.abs(mousePos.x - startC);
+      const ry = Math.abs(mousePos.y - startR);
       drawEllipseFill(
         (r, c) =>
-          ws.renderDpWithMode(draftScreen, r, c, ws.getDraftBaseLayer(), {
+          drawManager.draw(draftScreen, r, c, ws.getDraftBaseLayer(), {
             draftErasure: true,
           }),
         startR,
@@ -608,8 +611,8 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     submit() {
       const { startR, startC } = this.data!;
       if (startR === -1 || startC === -1) return;
-      const rx = Math.abs(ws.mousePos.x - startC);
-      const ry = Math.abs(ws.mousePos.y - startR);
+      const rx = Math.abs(mousePos.x - startC);
+      const ry = Math.abs(mousePos.y - startR);
       const phoxelsPositions: Array<PhoxelPosition> = [];
       drawEllipseFill((r, c) => phoxelsPositions.push([r, c]), startR, startC, rx, ry);
       ws.changesStack.commitPhoxels(phoxelsPositions);
