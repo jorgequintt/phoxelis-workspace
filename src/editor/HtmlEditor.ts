@@ -9,7 +9,7 @@ import {
   type DocumentLayer,
   type DrawModeDefinition,
   type ToolDefinition,
-} from '../workspace/_Workspace';
+} from '../workspace/Workspace';
 import { Editor } from './Editor';
 
 const appRoot = document.querySelector('#app')!;
