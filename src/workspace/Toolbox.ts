@@ -80,30 +80,31 @@ export class Toolbox {
   }
 
   setTool(tool: Tool | string) {
-    const { currentTool: currTool } = this;
     const { drawboard } = this.ws;
 
     if (typeof tool === 'string') {
-      // TODO redo this
       tool = this.tools[tool as keyof ReturnType<typeof createTools>];
       if (!tool) throw new Error(`No tool by name ${tool}`);
     }
 
-    if (currTool) {
-      currTool.tool.abort?.();
+    if (this.currentTool) {
+      this.currentTool.tool.abort?.();
       drawboard.element.removeEventListener(
         'pointerdown',
-        currTool.handlers.onPointerDown,
+        this.currentTool.handlers.onPointerDown,
       );
       drawboard.element.removeEventListener(
         'pointermove',
-        currTool.handlers.onPointerMove,
+        this.currentTool.handlers.onPointerMove,
       );
-      drawboard.element.removeEventListener('pointerup', currTool.handlers.onPointerUp);
-      drawboard.hammer.off('pinchstart', currTool.handlers.onPinchStart);
-      drawboard.hammer.off('pinchmove', currTool.handlers.onPinchMove);
-      drawboard.hammer.off('pinchend', currTool.handlers.onPinchEnd);
-      this.previousTool = currTool.tool;
+      drawboard.element.removeEventListener(
+        'pointerup',
+        this.currentTool.handlers.onPointerUp,
+      );
+      drawboard.hammer.off('pinchstart', this.currentTool.handlers.onPinchStart);
+      drawboard.hammer.off('pinchmove', this.currentTool.handlers.onPinchMove);
+      drawboard.hammer.off('pinchend', this.currentTool.handlers.onPinchEnd);
+      this.previousTool = this.currentTool.tool;
     }
 
     this.currentTool = {
@@ -151,13 +152,13 @@ export class Toolbox {
 
 export function createTools(ws: Workspace, tb: Toolbox) {
   const {
-    session,
     drawboard,
     config: { size },
     draftScreen,
-    drawManager
+    drawManager,
   } = ws;
-  const { refImagePanzoom, panzoom, mousePos } = drawboard;
+
+  const dbd = drawboard;
 
   interface PanzoomTool extends Tool {
     data: {
@@ -180,7 +181,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     onPointerMove(e) {
       if (!this.data.panzooming) return;
-      const targetZoom = session.movingRefImage ? refImagePanzoom : panzoom;
+      const targetZoom = ws.state.movingRefImage ? dbd.refImagePanzoom : dbd.panzoom;
 
       if (!targetZoom) {
         console.error(
@@ -206,7 +207,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     onPinchStart() {
       this.data.panzooming = true;
-      const targetZoom = session.movingRefImage ? refImagePanzoom : panzoom;
+      const targetZoom = ws.state.movingRefImage ? dbd.refImagePanzoom : dbd.panzoom;
 
       if (!targetZoom) {
         console.error(
@@ -215,7 +216,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
         return;
       }
 
-      if (session.movingRefImage) {
+      if (ws.state.movingRefImage) {
         ws.drawboard.refImageScale = targetZoom.getScale();
       } else {
         ws.drawboard.scale = targetZoom.getScale();
@@ -223,7 +224,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     onPinchMove(e) {
       if (this.data.panzooming) {
-        const targetZoom = session.movingRefImage ? refImagePanzoom : panzoom;
+        const targetZoom = ws.state.movingRefImage ? dbd.refImagePanzoom : dbd.panzoom;
 
         if (!targetZoom) {
           console.error(
@@ -232,7 +233,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
           return;
         }
 
-        const s = session.movingRefImage
+        const s = ws.state.movingRefImage
           ? ws.drawboard.refImageScale
           : ws.drawboard.scale;
         const newZoomVal = s * e.scale;
@@ -282,11 +283,11 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     onPointerDown() {
       this.data.drawing = true;
-      this.addPhoxelToDraft({ phox: session.dp, r: mousePos.y, c: mousePos.x });
+      this.addPhoxelToDraft({ phox: ws.state.dp, r: dbd.mousePos.y, c: dbd.mousePos.x });
     },
     onPointerMove() {
       if (this.data.drawing) {
-        this.addPhoxelToDraft({ phox: session.dp, r: mousePos.y, c: mousePos.x });
+        this.addPhoxelToDraft({ phox: ws.state.dp, r: dbd.mousePos.y, c: dbd.mousePos.x });
       }
     },
     onPointerUp() {
@@ -317,8 +318,8 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     name: 'rect',
     data: { startR: -1, startC: -1, drawing: false },
     onPointerDown(_e: PointerEvent) {
-      this.data!.startR = mousePos.y;
-      this.data!.startC = mousePos.x;
+      this.data!.startR = dbd.mousePos.y;
+      this.data!.startC = dbd.mousePos.x;
       this.data!.drawing = true;
     },
     onPointerMove(_e: PointerEvent) {
@@ -326,10 +327,10 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       // Clear draft and redraw preview rectangle
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
-      const r1 = Math.min(startR, mousePos.y);
-      const r2 = Math.max(startR, mousePos.y);
-      const c1 = Math.min(startC, mousePos.x);
-      const c2 = Math.max(startC, mousePos.x);
+      const r1 = Math.min(startR, dbd.mousePos.y);
+      const r2 = Math.max(startR, dbd.mousePos.y);
+      const c1 = Math.min(startC, dbd.mousePos.x);
+      const c2 = Math.max(startC, dbd.mousePos.x);
       // Top & bottom edges
       for (let c = c1; c <= c2; c++) {
         drawManager.draw(draftScreen, r1, c, ws.getDraftBaseLayer(), {
@@ -357,10 +358,10 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     submit() {
       const { startR, startC } = this.data!;
       if (startR === -1 || startC === -1) return;
-      const r1 = Math.min(startR, mousePos.y);
-      const r2 = Math.max(startR, mousePos.y);
-      const c1 = Math.min(startC, mousePos.x);
-      const c2 = Math.max(startC, mousePos.x);
+      const r1 = Math.min(startR, dbd.mousePos.y);
+      const r2 = Math.max(startR, dbd.mousePos.y);
+      const c1 = Math.min(startC, dbd.mousePos.x);
+      const c2 = Math.max(startC, dbd.mousePos.x);
 
       const phoxelsPositions: Array<PhoxelPosition> = [];
 
@@ -394,18 +395,18 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     name: 'filledRect',
     data: { startR: -1, startC: -1, drawing: false },
     onPointerDown(_e: PointerEvent) {
-      this.data!.startR = mousePos.y;
-      this.data!.startC = mousePos.x;
+      this.data!.startR = dbd.mousePos.y;
+      this.data!.startC = dbd.mousePos.x;
       this.data!.drawing = true;
     },
     onPointerMove(_e: PointerEvent) {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
-      const r1 = Math.min(startR, mousePos.y);
-      const r2 = Math.max(startR, mousePos.y);
-      const c1 = Math.min(startC, mousePos.x);
-      const c2 = Math.max(startC, mousePos.x);
+      const r1 = Math.min(startR, dbd.mousePos.y);
+      const r2 = Math.max(startR, dbd.mousePos.y);
+      const c1 = Math.min(startC, dbd.mousePos.x);
+      const c2 = Math.max(startC, dbd.mousePos.x);
       for (let r = r1; r <= r2; r++) {
         for (let c = c1; c <= c2; c++) {
           drawManager.draw(draftScreen, r, c, ws.getDraftBaseLayer(), {
@@ -422,10 +423,10 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     submit() {
       const { startR, startC } = this.data!;
       if (startR === -1 || startC === -1) return;
-      const r1 = Math.min(startR, mousePos.y);
-      const r2 = Math.max(startR, mousePos.y);
-      const c1 = Math.min(startC, mousePos.x);
-      const c2 = Math.max(startC, mousePos.x);
+      const r1 = Math.min(startR, dbd.mousePos.y);
+      const r2 = Math.max(startR, dbd.mousePos.y);
+      const c1 = Math.min(startC, dbd.mousePos.x);
+      const c2 = Math.max(startC, dbd.mousePos.x);
 
       const phoxelsPositions: Array<PhoxelPosition> = [];
       for (let r = r1; r <= r2; r++) {
@@ -482,15 +483,15 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     name: 'line',
     data: { startR: -1, startC: -1, drawing: false },
     onPointerDown(_e: PointerEvent) {
-      this.data!.startR = mousePos.y;
-      this.data!.startC = mousePos.x;
+      this.data!.startR = dbd.mousePos.y;
+      this.data!.startC = dbd.mousePos.x;
       this.data!.drawing = true;
     },
     onPointerMove(_e: PointerEvent) {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
-      const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
+      const cells = bresenhamCells(startR, startC, dbd.mousePos.y, dbd.mousePos.x);
       for (const { r, c } of cells) {
         drawManager.draw(draftScreen, r, c, ws.getDraftBaseLayer(), {
           draftErasure: true,
@@ -505,7 +506,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     submit() {
       const { startR, startC } = this.data!;
       if (startR === -1 || startC === -1) return;
-      const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
+      const cells = bresenhamCells(startR, startC, dbd.mousePos.y, dbd.mousePos.x);
       const phoxelsPositions: Array<PhoxelPosition> = [];
       for (const { r, c } of cells) {
         phoxelsPositions.push([r, c]);
@@ -530,16 +531,16 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     name: 'ellipse',
     data: { startR: -1, startC: -1, drawing: false },
     onPointerDown(_e: PointerEvent) {
-      this.data!.startR = mousePos.y;
-      this.data!.startC = mousePos.x;
+      this.data!.startR = dbd.mousePos.y;
+      this.data!.startC = dbd.mousePos.x;
       this.data!.drawing = true;
     },
     onPointerMove(_e: PointerEvent) {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
-      const rx = Math.abs(mousePos.x - startC);
-      const ry = Math.abs(mousePos.y - startR);
+      const rx = Math.abs(dbd.mousePos.x - startC);
+      const ry = Math.abs(dbd.mousePos.y - startR);
       drawEllipseOutline(
         (r, c) =>
           drawManager.draw(draftScreen, r, c, ws.getDraftBaseLayer(), {
@@ -559,8 +560,8 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     submit() {
       const { startR, startC } = this.data!;
       if (startR === -1 || startC === -1) return;
-      const rx = Math.abs(mousePos.x - startC);
-      const ry = Math.abs(mousePos.y - startR);
+      const rx = Math.abs(dbd.mousePos.x - startC);
+      const ry = Math.abs(dbd.mousePos.y - startR);
       const phoxelsPositions: Array<PhoxelPosition> = [];
       drawEllipseOutline((r, c) => phoxelsPositions.push([r, c]), startR, startC, rx, ry);
       ws.changesStack.commitPhoxels(phoxelsPositions);
@@ -582,16 +583,16 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     name: 'filledEllipse',
     data: { startR: -1, startC: -1, drawing: false },
     onPointerDown(_e: PointerEvent) {
-      this.data!.startR = mousePos.y;
-      this.data!.startC = mousePos.x;
+      this.data!.startR = dbd.mousePos.y;
+      this.data!.startC = dbd.mousePos.x;
       this.data!.drawing = true;
     },
     onPointerMove(_e: PointerEvent) {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
-      const rx = Math.abs(mousePos.x - startC);
-      const ry = Math.abs(mousePos.y - startR);
+      const rx = Math.abs(dbd.mousePos.x - startC);
+      const ry = Math.abs(dbd.mousePos.y - startR);
       drawEllipseFill(
         (r, c) =>
           drawManager.draw(draftScreen, r, c, ws.getDraftBaseLayer(), {
@@ -611,8 +612,8 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     submit() {
       const { startR, startC } = this.data!;
       if (startR === -1 || startC === -1) return;
-      const rx = Math.abs(mousePos.x - startC);
-      const ry = Math.abs(mousePos.y - startR);
+      const rx = Math.abs(dbd.mousePos.x - startC);
+      const ry = Math.abs(dbd.mousePos.y - startR);
       const phoxelsPositions: Array<PhoxelPosition> = [];
       drawEllipseFill((r, c) => phoxelsPositions.push([r, c]), startR, startC, rx, ry);
       ws.changesStack.commitPhoxels(phoxelsPositions);

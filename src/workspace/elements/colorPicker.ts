@@ -2,7 +2,7 @@ import iro from '@jaames/iro';
 import type { Workspace } from '../Workspace';
 
 export function createColorPicker(ws: Workspace) {
-  const { session, phoxelis } = ws;
+  const { state: session, phoxelis } = ws;
 
   const colorPickerEl = document.createElement('div');
   colorPickerEl.id = '#colorpicker';
@@ -43,8 +43,8 @@ export function createColorPicker(ws: Workspace) {
   colorPicker.on('color:change', handleColorPickeChange);
 
   const selectColorType = (type: 'fg' | 'bg') => {
-    ws.session.selectedColorType = type;
-    colorPicker.color.hexString = ws.session.dp[type];
+    ws.state.selectedColorType = type;
+    colorPicker.color.hexString = ws.state.dp[type];
   }
 
   const fgColorButton = document.createElement('button');

@@ -27,12 +27,12 @@ export function createPaletteSelector(ws: Workspace) {
       console.warn('Null Phox selected. Omitting selection');
       return;
     }
-    ws.session.dp = phox;
-    ws.session.paletteData.selectedPhox = pos;
-    ws.colorPicker.picker.color.hexString = ws.session.dp[ws.session.selectedColorType];
+    ws.state.dp = phox;
+    ws.state.paletteData.selectedPhox = pos;
+    ws.colorPicker.picker.color.hexString = ws.state.dp[ws.state.selectedColorType];
     ws.alphabet.selectCharInAlphabet(
       ws.font.charactersList.findIndex(
-        (c) => c.codepoint === ws.session.dp.char.codePointAt(0),
+        (c) => c.codepoint === ws.state.dp.char.codePointAt(0),
       ),
     );
     const ctx = paletteOverlay.getContext('2d');

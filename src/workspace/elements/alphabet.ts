@@ -46,15 +46,15 @@ export function createAlphabetSelector(ws: Workspace) {
     selectCharInAlphabet(index);
 
     if (
-      ws.session.paletteData.modifyingPhox &&
-      ws.session.paletteData.selectedPhox > 0
+      ws.state.paletteData.modifyingPhox &&
+      ws.state.paletteData.selectedPhox > 0
     ) {
       const selectedPalettePhox = ws.phoxelis.getPhoxFromPaletteIndex(
-        ws.session.paletteData.selectedPhox,
+        ws.state.paletteData.selectedPhox,
       );
       if (selectedPalettePhox) {
-        ws.phoxelis.storePhoxInPalette(ws.session.paletteData.selectedPhox, {
-          char: ws.session.dp.char,
+        ws.phoxelis.storePhoxInPalette(ws.state.paletteData.selectedPhox, {
+          char: ws.state.dp.char,
           fg: selectedPalettePhox.fg,
           bg: selectedPalettePhox.bg,
         });
@@ -66,12 +66,12 @@ export function createAlphabetSelector(ws: Workspace) {
     const char = ws.font.charactersList[index];
 
     drawCharShapeInAlphabet(
-      ws.session.alphabetData.selectedChar,
-      ws.font.charactersList[ws.session.alphabetData.selectedChar].shape,
+      ws.state.alphabetData.selectedChar,
+      ws.font.charactersList[ws.state.alphabetData.selectedChar].shape,
       '#FFFFFF',
       '#000000',
     );
-    ws.session.dp.char = String.fromCodePoint(char.codepoint);
+    ws.state.dp.char = String.fromCodePoint(char.codepoint);
     drawCharShapeInAlphabet(
       index,
       ws.font.charactersList[index].shape,
@@ -79,8 +79,10 @@ export function createAlphabetSelector(ws: Workspace) {
       '#00FFFF',
     );
 
-    ws.session.alphabetData.selectedChar = index;
+    ws.state.alphabetData.selectedChar = index;
   };
+
+  selectCharInAlphabet(1);
 
   return { alphabet: alphabetContainer, selectCharInAlphabet };
 }

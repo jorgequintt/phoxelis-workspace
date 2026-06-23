@@ -30,7 +30,7 @@ export class DrawManager {
     layerId: string,
     options: { draftErasure: boolean } = { draftErasure: false },
   ) {
-    const { session, phoxelis } = this.ws;
+    const { state: session, phoxelis } = this.ws;
     if (session.drawMode === 'draw') {
       target.renderPhoxel(session.dp.char, session.dp.fg, session.dp.bg, r, c, layerId);
       return;

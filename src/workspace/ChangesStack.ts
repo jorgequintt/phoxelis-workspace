@@ -1,7 +1,7 @@
 import type { PhoxelPosition, Workspace } from "./Workspace";
 
 export function createChangesStack(ws: Workspace){
-  const {session, phoxelis} = ws;
+  const {state: session, phoxelis} = ws;
 
   type ChangesStack = Array<() => void>;
   let changesHistory: Array<{ changes: ChangesStack; undoChanges: ChangesStack }> = [];

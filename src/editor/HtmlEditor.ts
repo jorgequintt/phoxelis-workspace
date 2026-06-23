@@ -92,7 +92,7 @@ export class HtmlEditor extends Editor {
         .forEach((lid) => {
           let layerEl = layerList.querySelector(`#layer-${lid}`);
           if (!layerEl) {
-            layerEl = createLayerElement(lid, w.ds.layers[lid]);
+            layerEl = createLayerElement(lid, w.data.layers[lid]);
           }
           layerList.appendChild(layerEl);
         });
@@ -106,14 +106,14 @@ export class HtmlEditor extends Editor {
         return;
       }
 
-      w.session.activeLayer = layerId;
+      w.state.activeLayer = layerId;
 
       layerList
         .querySelectorAll('.layer-row')
         .forEach((el) => ((el as HTMLDivElement).style.background = '#2a2a2a'));
       (layerRow as HTMLDivElement).style.background = '#7a7a7a';
     }
-    selectLayer(w.session.activeLayer);
+    selectLayer(w.state.activeLayer);
 
     const drawModeButtons: HTMLButtonElement[] = [];
 
@@ -139,7 +139,7 @@ export class HtmlEditor extends Editor {
         btn.style.background = '#555';
       });
       btn.addEventListener('mouseleave', () => {
-        btn.style.background = w.session.drawMode === def.name ? '#666' : '#444';
+        btn.style.background = w.state.drawMode === def.name ? '#666' : '#444';
       });
       btn.addEventListener('click', () => {
         drawModeButtons.forEach((b) => {
@@ -148,7 +148,7 @@ export class HtmlEditor extends Editor {
         });
         btn.style.background = '#666';
         btn.style.borderColor = '#888';
-        w.session.drawMode = def.name;
+        w.state.drawMode = def.name;
       });
       return btn;
     }
@@ -267,18 +267,18 @@ export class HtmlEditor extends Editor {
     moveRefImageToggle.type = 'checkbox';
     moveRefImageToggle.addEventListener('change', (e) => {
       const checked = (e.target as HTMLInputElement).checked;
-      w.session.movingRefImage = checked;
+      w.state.movingRefImage = checked;
     });
     navBar.appendChild(moveRefImageToggle);
 
     const modifyPalettePhoxButton = document.createElement('button');
     modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
     modifyPalettePhoxButton.onclick = () => {
-      if (!w.session.paletteData.modifyingPhox) {
-        w.session.paletteData.modifyingPhox = true;
+      if (!w.state.paletteData.modifyingPhox) {
+        w.state.paletteData.modifyingPhox = true;
         modifyPalettePhoxButton.innerHTML = 'UPDATING PALETTE PHOX';
       } else {
-        w.session.paletteData.modifyingPhox = false;
+        w.state.paletteData.modifyingPhox = false;
         modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
       }
     };
@@ -334,7 +334,7 @@ cursor: pointer;
 `;
     addLayerBtn.addEventListener('click', () => {
       const layerId = w.createLayer();
-      createLayerElement(layerId, w.ds.layers[layerId]);
+      createLayerElement(layerId, w.data.layers[layerId]);
       selectLayer(layerId);
       renderLayerList();
     });
@@ -353,8 +353,8 @@ font-size: 11px;
 cursor: pointer;
 `;
     removeLayerBtn.addEventListener('click', () => {
-      const layerId = w.session.activeLayer;
-      w.removeLayer(w.session.activeLayer);
+      const layerId = w.state.activeLayer;
+      w.removeLayer(w.state.activeLayer);
       layerList.removeChild(layerList.querySelector(`#layer-${layerId}`)!);
       renderLayerList();
     });
@@ -678,5 +678,7 @@ transition: opacity 0.1s;
     appContainer.appendChild(content);
     appContainer.appendChild(footer);
     appRoot.appendChild(appContainer);
+
+    w.drawboard.startPanzoom();
   }
 }
