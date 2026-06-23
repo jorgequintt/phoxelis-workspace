@@ -48,6 +48,7 @@ export class Drawboard {
     this.hammer = new Hammer(drawboard);
     this.hammer.get('pinch').set({ enable: true });
     this.hammer.on('pinchstart', (e) => {
+      ws.toolbox.abortCurrentTool();
       ws.toolbox.setTool(ws.toolbox.tools.panzoom);
       ws.toolbox.currentTool?.handlers.onPinchStart(e);
     });
@@ -77,6 +78,7 @@ export class Drawboard {
     window.addEventListener('mouseout', this.handleWindowMouseOut);
   
   }
+
   handleWindowMouseOut = (e: MouseEvent) => {
     if (e.relatedTarget === null) {
       this.ws.toolbox.currentTool?.tool.abort?.();
@@ -100,7 +102,7 @@ export class Drawboard {
     };
   }
 
-  /** Can only be done once drawboard is in the DOM */
+  /** Should only be executed once drawboard is in the DOM */
   startPanzoom() {
     const {
       config: { data },

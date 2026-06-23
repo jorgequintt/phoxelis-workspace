@@ -112,20 +112,20 @@ export class Toolbox {
       handlers: {
         onPointerDown: (e) => {
           drawboard.element.setPointerCapture(e.pointerId);
-          tool.onPointerDown!(e);
+          tool.onPointerDown?.(e);
         },
         onPointerMove: (e) => {
-          tool.onPointerMove!(e);
+          tool.onPointerMove?.(e);
         },
         onPointerUp: (e) => {
           try {
             drawboard.element.releasePointerCapture(e.pointerId);
+            tool.onPointerUp?.(e);
           } catch {}
-          tool.onPointerUp!(e);
         },
-        onPinchStart: (e) => tool.onPinchStart!(e),
-        onPinchMove: (e) => tool.onPinchMove!(e),
-        onPinchEnd: (e) => tool.onPinchEnd!(e),
+        onPinchStart: (e) => tool.onPinchStart?.(e),
+        onPinchMove: (e) => tool.onPinchMove?.(e),
+        onPinchEnd: (e) => tool.onPinchEnd?.(e),
       },
     };
 
@@ -145,8 +145,13 @@ export class Toolbox {
     drawboard.hammer.on('pinchmove', this.currentTool.handlers.onPinchMove);
     drawboard.hammer.on('pinchend', this.currentTool.handlers.onPinchEnd);
   }
+
   setPreviousTool() {
     if (this.previousTool) this.setTool(this.previousTool);
+  }
+
+  abortCurrentTool() {
+    this.currentTool?.tool.abort?.();
   }
 }
 
