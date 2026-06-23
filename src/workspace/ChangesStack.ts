@@ -1,7 +1,7 @@
-import type { PhoxelPosition, Workspace } from "./Workspace";
+import type { PhoxelPosition, Workspace } from './Workspace';
 
-export function createChangesStack(ws: Workspace){
-  const {state: session, phoxelis} = ws;
+export function createChangesStack(ws: Workspace) {
+  const { phoxelis } = ws;
 
   type ChangesStack = Array<() => void>;
   let changesHistory: Array<{ changes: ChangesStack; undoChanges: ChangesStack }> = [];
@@ -11,12 +11,12 @@ export function createChangesStack(ws: Workspace){
   const commitPhoxels = (phoxelPositions: Array<PhoxelPosition>) => {
     const undoChanges: ChangesStack = [];
     const changes: ChangesStack = [];
-    const currentLayerId = session.activeLayer; // Captured for undo/redo funcs
+    const currentLayerId = ws.state.activeLayer; // Captured for undo/redo funcs
 
     phoxelPositions.forEach(([r, c]) => {
-      const origPhox = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
+      const origPhox = phoxelis.getPhoxFromPosition(r, c, ws.state.activeLayer);
       if (!origPhox) {
-        // Note: Pass currentLayerId, not session.activeLayer to funcs
+        // Note: Pass currentLayerId, not ws.state.activeLayer to funcs
         undoChanges.push(() => phoxelis.removePhoxel(r, c, currentLayerId));
       } else {
         undoChanges.push(() =>
@@ -31,9 +31,9 @@ export function createChangesStack(ws: Workspace){
         );
       }
 
-      ws.drawManager.draw(phoxelis, r, c, session.activeLayer);
+      ws.drawManager.draw(phoxelis, r, c, ws.state.activeLayer);
 
-      const newPhox = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
+      const newPhox = phoxelis.getPhoxFromPosition(r, c, ws.state.activeLayer);
       if (!newPhox) {
         changes.push(() => phoxelis.removePhoxel(r, c, currentLayerId));
       } else {
@@ -53,7 +53,7 @@ export function createChangesStack(ws: Workspace){
     if (changesHistory.length === maxChangesHistory) changesHistory.shift();
     changesHistory.push({ changes, undoChanges });
     redoHistory = [];
-  }
+  };
 
   const undoLastChange = () => {
     const lastChange = changesHistory.pop();
@@ -65,7 +65,7 @@ export function createChangesStack(ws: Workspace){
 
     lastChange.undoChanges.forEach((fn) => fn());
     redoHistory.push(lastChange);
-  }
+  };
 
   const redoLastChange = () => {
     const lastChange = redoHistory.pop();
@@ -77,7 +77,7 @@ export function createChangesStack(ws: Workspace){
 
     lastChange.changes.forEach((fn) => fn());
     changesHistory.push(lastChange);
-  }
+  };
 
-  return {undoLastChange, redoLastChange, commitPhoxels}
+  return { undoLastChange, redoLastChange, commitPhoxels };
 }

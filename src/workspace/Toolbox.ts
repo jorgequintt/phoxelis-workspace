@@ -10,7 +10,7 @@ export interface Tool {
   onPinchEnd?: (e: HammerInput) => void;
   submit?: () => void;
   abort?: () => void;
-  resetTool?: () => void;
+  reset?: () => void;
   data?: Record<string, any>;
 }
 
@@ -206,7 +206,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     onPointerUp() {
       if (!this.data.panzooming) return;
-      this.resetTool!();
+      this.reset!();
       this.submit!();
       tb.setPreviousTool();
     },
@@ -251,19 +251,19 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     onPinchEnd() {
       if (!this.data!.panzooming) return;
-      this.resetTool!();
+      this.reset!();
       this.submit!();
     },
     submit() {
       tb.setPreviousTool();
     },
-    resetTool() {
+    reset() {
       this.data.panzooming = false;
       this.data.panning = false;
       this.data.zooming = false;
     },
     abort() {
-      this.resetTool!();
+      this.reset!();
     },
   };
 
@@ -306,15 +306,15 @@ export function createTools(ws: Workspace, tb: Toolbox) {
         phoxelsPositions.push([p.r, p.c]);
       });
       ws.changesStack.commitPhoxels(phoxelsPositions);
-      this.resetTool!();
+      this.reset!();
     },
-    resetTool() {
+    reset() {
       this.data.draftPhoxels = new Map();
       draftScreen.reset(true);
       this.data.drawing = false;
     },
     abort() {
-      this.resetTool!();
+      this.reset!();
     },
   };
 
@@ -382,16 +382,16 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       }
 
       ws.changesStack.commitPhoxels(phoxelsPositions);
-      this.resetTool!();
+      this.reset!();
     },
-    resetTool() {
+    reset() {
       draftScreen.reset(true);
       this.data!.startR = -1;
       this.data!.startC = -1;
       this.data!.drawing = false;
     },
     abort() {
-      this.resetTool!();
+      this.reset!();
     },
   };
 
@@ -440,16 +440,16 @@ export function createTools(ws: Workspace, tb: Toolbox) {
         }
       }
       ws.changesStack.commitPhoxels(phoxelsPositions);
-      this.resetTool!();
+      this.reset!();
     },
-    resetTool() {
+    reset() {
       draftScreen.reset(true);
       this.data!.startR = -1;
       this.data!.startC = -1;
       this.data!.drawing = false;
     },
     abort() {
-      this.resetTool!();
+      this.reset!();
     },
   };
 
@@ -517,16 +517,16 @@ export function createTools(ws: Workspace, tb: Toolbox) {
         phoxelsPositions.push([r, c]);
       }
       ws.changesStack.commitPhoxels(phoxelsPositions);
-      this.resetTool!();
+      this.reset!();
     },
-    resetTool() {
+    reset() {
       draftScreen.reset(true);
       this.data!.startR = -1;
       this.data!.startC = -1;
       this.data!.drawing = false;
     },
     abort() {
-      this.resetTool!();
+      this.reset!();
     },
   };
 
@@ -570,16 +570,16 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const phoxelsPositions: Array<PhoxelPosition> = [];
       drawEllipseOutline((r, c) => phoxelsPositions.push([r, c]), startR, startC, rx, ry);
       ws.changesStack.commitPhoxels(phoxelsPositions);
-      this.resetTool!();
+      this.reset!();
     },
-    resetTool() {
+    reset() {
       draftScreen.reset(true);
       this.data!.startR = -1;
       this.data!.startC = -1;
       this.data!.drawing = false;
     },
     abort() {
-      this.resetTool!();
+      this.reset!();
     },
   };
 
@@ -622,15 +622,15 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const phoxelsPositions: Array<PhoxelPosition> = [];
       drawEllipseFill((r, c) => phoxelsPositions.push([r, c]), startR, startC, rx, ry);
       ws.changesStack.commitPhoxels(phoxelsPositions);
-      this.resetTool!();
+      this.reset!();
     },
-    resetTool() {
+    reset() {
       draftScreen.reset(true);
       this.data!.startR = -1;
       this.data!.startC = -1;
     },
     abort() {
-      this.resetTool!();
+      this.reset!();
     },
   };
 

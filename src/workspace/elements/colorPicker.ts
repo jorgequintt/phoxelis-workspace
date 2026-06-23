@@ -2,8 +2,6 @@ import iro from '@jaames/iro';
 import type { Workspace } from '../Workspace';
 
 export function createColorPicker(ws: Workspace) {
-  const { state: session, phoxelis } = ws;
-
   const colorPickerEl = document.createElement('div');
   colorPickerEl.id = '#colorpicker';
   const colorPicker = iro.ColorPicker(colorPickerEl, {
@@ -19,22 +17,22 @@ export function createColorPicker(ws: Workspace) {
   });
 
   const handleColorPickeChange = (color: any) => {
-    session.dp[session.selectedColorType] = color.hexString;
+    ws.state.dp[ws.state.selectedColorType] = color.hexString;
 
-    if (session.paletteData.modifyingPhox && session.paletteData.selectedPhox > 0) {
-      const selectedPalettePhox = phoxelis.getPhoxFromPaletteIndex(
-        session.paletteData.selectedPhox,
+    if (ws.state.paletteData.modifyingPhox && ws.state.paletteData.selectedPhox > 0) {
+      const selectedPalettePhox = ws.phoxelis.getPhoxFromPaletteIndex(
+        ws.state.paletteData.selectedPhox,
       );
       if (selectedPalettePhox) {
-        phoxelis.storePhoxInPalette(session.paletteData.selectedPhox, {
+        ws.phoxelis.storePhoxInPalette(ws.state.paletteData.selectedPhox, {
           char: selectedPalettePhox.char,
           fg:
-            session.selectedColorType === 'fg'
-              ? session.dp[session.selectedColorType]
+            ws.state.selectedColorType === 'fg'
+              ? ws.state.dp[ws.state.selectedColorType]
               : selectedPalettePhox.fg,
           bg:
-            session.selectedColorType === 'bg'
-              ? session.dp[session.selectedColorType]
+            ws.state.selectedColorType === 'bg'
+              ? ws.state.dp[ws.state.selectedColorType]
               : selectedPalettePhox.bg,
         });
       }
