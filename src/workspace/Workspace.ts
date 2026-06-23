@@ -1,16 +1,23 @@
-import { getFont, Phoxelis, type Phox, type CharShape } from 'phoxelis';
+import { getFont, Phoxelis, type Phox, type Font, type PhoxelisObj } from 'phoxelis';
 import '../style.css';
 import Panzoom, { type PanzoomObject } from '@panzoom/panzoom';
 import Hammer from 'hammerjs';
 import _ from 'lodash';
-import iro from '@jaames/iro';
+import { createRefImage } from './elements/refImage';
+import { createDrawboard } from './elements/drawboard';
+import { createAlphabetSelector } from './elements/alphabet';
+import { createColorPicker } from './elements/colorPicker';
+import { createPaletteSelector } from './elements/palette';
+import { createChangesStack } from './ChangesStack';
+import { createTools } from './Tools';
+import { createHotkeyManager } from './HotkeyManager';
 
-type Phoxel = {
+export type Phoxel = {
   phox: Phox;
   r: number;
   c: number;
 };
-type PhoxelPosition = [r: number, c: number];
+export type PhoxelPosition = [r: number, c: number];
 
 export type DocumentLayer = {
   name: string;
@@ -52,6 +59,32 @@ export const drawModeDefs: DrawModeDefinition[] = [
   { name: 'erase', icon: '✕', tooltip: 'Erase' },
 ];
 
+export interface Tool {
+  name: string;
+  onPointerDown?: (e: PointerEvent) => void;
+  onPointerMove?: (e: PointerEvent) => void;
+  onPointerUp?: (e: PointerEvent) => void;
+  onPinchStart?: (e: HammerInput) => void;
+  onPinchMove?: (e: HammerInput) => void;
+  onPinchEnd?: (e: HammerInput) => void;
+  submit?: () => void;
+  abort?: () => void;
+  resetTool?: () => void;
+  data?: Record<string, any>;
+}
+
+export type CurrentTool = {
+  tool: Tool;
+  handlers: {
+    onPointerDown: (e: PointerEvent) => void;
+    onPointerUp: (e: PointerEvent) => void;
+    onPointerMove: (e: PointerEvent) => void;
+    onPinchStart: (e: HammerInput) => void;
+    onPinchMove: (e: HammerInput) => void;
+    onPinchEnd: (e: HammerInput) => void;
+  };
+};
+
 export type ToolDefinition = {
   name: string;
   icon: string;
@@ -91,7 +124,16 @@ export const toolDefs: ToolDefinition[] = [
   },
 ];
 
-export type WorkspaceObj = Awaited<ReturnType<typeof Workspace>>;
+const panzoomConfiguration = {
+  minScale: 0.15,
+  maxScale: 10,
+  noBind: true,
+  relative: true,
+  cursor: 'default',
+  startX: 0,
+  startY: 0,
+  startScale: 1,
+};
 
 export interface WorkspaceData {
   phoxelis: ReturnType<ReturnType<typeof Phoxelis>['exportPhoxelis']>; // TODO export type in phoxelis for this
@@ -119,343 +161,339 @@ export interface WorkspaceExportConfig extends WorkspaceInputConfig {
   data: WorkspaceData;
 }
 
-// & Keep decoupling with the same method: Imperfect step in the right direction, not frozen planning the perfect step
-// MARK: Workspace
-export async function Workspace(config: WorkspaceInputConfig) {
-  let { size, fontName, data } = config;
+export class Workspace {
+  config: WorkspaceInputConfig;
+  font: Font;
+  phoxelis: PhoxelisObj;
+  draftScreen: PhoxelisObj;
+  layersTargets: Record<string, HTMLCanvasElement> = {};
+  ds: DocumentState;
+  session: SessionState;
+  refImage: { img: HTMLImageElement; wrapper: HTMLDivElement };
+  drawboard: HTMLDivElement;
+  colorPicker: ReturnType<typeof createColorPicker>;
+  alphabet: ReturnType<typeof createAlphabetSelector>;
+  palette: ReturnType<typeof createPaletteSelector>;
+  panzoom: PanzoomObject | null = null;
+  refImagePanzoom: PanzoomObject | null = null;
+  scale = panzoomConfiguration.startScale;
+  refImageScale = panzoomConfiguration.startScale;
+  changesStack: ReturnType<typeof createChangesStack>;
+  hammer: HammerManager;
+  currTool: null | CurrentTool;
+  previousTool: null | Tool;
+  mousePos: { x: number; y: number } = { x: -1, y: -1 };
+  tools: ReturnType<typeof createTools>;
+  hotkeyManager: ReturnType<typeof createHotkeyManager>;
 
-  const font = await getFont(fontName);
-  const phoxelis = Phoxelis(size.rows, size.cols, font, {
-    renderPalette: true,
-    createBaseLayer: false,
-  });
-  const draftScreen = Phoxelis(size.rows, size.cols, font);
-  const getDraftBaseLayer = () => {
-    return draftScreen.layers[0].id;
-  };
-
-  let layersTargets: Record<string, HTMLCanvasElement> = {};
-
-  // What outer users can set. To be persisted in document
-  const defaultDocumentState = () => ({
-    layers: {},
-  });
-
-  // What outer users can set. Should not persist
-  const defaultSessionState = (activeLayer: string): SessionState => ({
-    dp: { char: 'D', fg: '#00FF00', bg: '#FF00FF' },
-    drawMode: 'draw',
-    activeLayer: activeLayer,
-    paletteData: {
-      selectedPhox: -1,
-      modifyingPhox: false,
-    },
-    alphabetData: {
-      selectedChar: font.charactersList.findIndex(
-        (c) => c.codepoint === 'D'.codePointAt(0),
-      ),
-    },
-    selectedColorType: 'fg',
-    movingRefImage: false,
-  });
-
-  let ds: DocumentState = defaultDocumentState();
-  const baseLayer = createLayer(); // Base layer
-  let session: SessionState = defaultSessionState(baseLayer);
-  selectLayer(baseLayer);
-
-  // MARK: Elements
-  const refImage = document.createElement('img');
-  refImage.alt = ""; // removes broken icon
-  const refImageWrapper = document.createElement('div');
-  refImageWrapper.append(refImage);
-  refImageWrapper.style = `position: absolute; top: 0px; right: 0px; z-index: -999; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;`;
-
-  const drawboard = document.createElement('div');
-  drawboard.style =
-    'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
-  phoxelis.canvas.style = `position: relative; border: 1px solid black; image-rendering: pixelated;`;
-  draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black; image-rendering: pixelated;`;
-
-  const layersWrapper = document.createElement('div');
-  layersWrapper.style = 'position: relative';
-  layersWrapper.appendChild(phoxelis.canvas);
-  layersWrapper.appendChild(refImageWrapper);
-  layersWrapper.appendChild(draftScreen.canvas);
-  drawboard.appendChild(layersWrapper);
-
-  const paletteScale = 2;
-  const paletteSelector = document.createElement('div');
-  paletteSelector.style = 'position: relative;';
-  const paletteOverlay = document.createElement('canvas');
-  paletteOverlay.width = phoxelis.palette.width;
-  paletteOverlay.height = phoxelis.palette.height;
-  const paletteScaledHeight = font.height * paletteScale;
-  phoxelis.palette.style = `height: ${paletteScaledHeight}px; image-rendering: pixelated; border: 1px solid black;`;
-  paletteOverlay.style = `height: ${paletteScaledHeight}px; border: 1px solid black; position: absolute; top: 0; left: 0; image-rendering: pixelated;`;
-  const onPaletteOverlayClick = (e: MouseEvent) => {
-    if (!paletteOverlay) {
-      console.error(
-        'onPaletteOverlayClick error: null "paletteOverlay" was passed as param.',
-      );
-      return;
-    }
-    const x = e.offsetX;
-    const paletteMaxCells = phoxelis.palette.width / font.width;
-    const pos = Math.floor(
-      (x / (paletteScale * phoxelis.palette.width)) * paletteMaxCells,
-    );
-    const phox = phoxelis.getPhoxFromPaletteIndex(pos);
-    if (!phox) {
-      console.warn('Null Phox selected. Omitting selection');
-      return;
-    }
-    session.dp = phox;
-    session.paletteData.selectedPhox = pos;
-    colorPicker.color.hexString = session.dp[session.selectedColorType];
-    selectCharInAlphabet(
-      font.charactersList.findIndex(
-        (c) => c.codepoint === session.dp.char.codePointAt(0),
-      ),
-    );
-    const ctx = paletteOverlay.getContext('2d');
-    ctx!.reset();
-    ctx!.strokeStyle = 'green';
-    ctx!.lineWidth = 2;
-    ctx!.strokeRect(pos * font.width, 0, font.width, font.height);
-  };
-  paletteOverlay.addEventListener('click', onPaletteOverlayClick);
-  paletteSelector.append(phoxelis.palette);
-  paletteSelector.append(paletteOverlay);
-
-  const alphabetCanvas = document.createElement('canvas');
-  const alphabetWidth = 100;
-  const alphabetCols = Math.ceil(alphabetWidth / font.width);
-  const alphabetRows = Math.ceil(font.length / alphabetCols);
-  alphabetCanvas.width = alphabetCols * font.width;
-  alphabetCanvas.height = alphabetRows * font.height;
-  const alphabetViewScale = 2;
-  alphabetCanvas.style = `width: ${alphabetCanvas.width * alphabetViewScale}px; image-rendering: pixelated;`;
-  const alphabetCtx = alphabetCanvas.getContext('2d')!;
-  const alphabetContainer = document.createElement('div');
-  alphabetContainer.style = 'height: 250px; overflow-y: scroll;';
-  alphabetContainer.append(alphabetCanvas);
-
-  function selectCharInAlphabet(index: number) {
-    const char = font.charactersList[index];
-
-    drawCharShapeInAlphabet(
-      session.alphabetData.selectedChar,
-      font.charactersList[session.alphabetData.selectedChar].shape,
-      '#FFFFFF',
-      '#000000',
-    );
-    session.dp.char = String.fromCodePoint(char.codepoint);
-    drawCharShapeInAlphabet(
-      index,
-      font.charactersList[index].shape,
-      '#000000',
-      '#00FFFF',
-    );
-
-    session.alphabetData.selectedChar = index;
+  static async create(config: WorkspaceInputConfig) {
+    const font = await getFont(config.fontName);
+    return new Workspace(config, font);
   }
-  alphabetCanvas.addEventListener('click', (e) => {
-    const r = Math.floor(e.offsetY / alphabetViewScale / font.height);
-    const c = Math.floor(e.offsetX / alphabetViewScale / font.width);
-    const index = r * alphabetCols + c;
-    const char = font.charactersList[index];
-    if (!char) throw new Error(`No char found for position y${r},x${c}`);
 
-    selectCharInAlphabet(index);
+  private constructor(config: WorkspaceInputConfig, font: Font) {
+    console.log('config', config);
+    this.config = config;
+    const { size } = this.config;
 
-    if (session.paletteData.modifyingPhox && session.paletteData.selectedPhox > 0) {
-      const selectedPalettePhox = phoxelis.getPhoxFromPaletteIndex(
-        session.paletteData.selectedPhox,
-      );
-      if (selectedPalettePhox) {
-        phoxelis.storePhoxInPalette(session.paletteData.selectedPhox, {
-          char: session.dp.char,
-          fg: selectedPalettePhox.fg,
-          bg: selectedPalettePhox.bg,
-        });
-      }
-    }
-  });
+    // Experimental defaults to prevent asserting each time
+    this.font = font;
+    this.phoxelis = Phoxelis(size.rows, size.cols, font, {
+      renderPalette: true,
+      createBaseLayer: false,
+    });
+    this.draftScreen = Phoxelis(size.rows, size.cols, font);
 
-  const colorPickerEl = document.createElement('div');
-  colorPickerEl.id = '#colorpicker';
-  const colorPicker = iro.ColorPicker(colorPickerEl, {
-    width: 150,
-    layout: [
-      {
-        component: iro.ui.Wheel,
+    this.ds = {
+      layers: {},
+    };
+
+    const baseLayer = this.createLayer();
+    this.session = {
+      dp: { char: 'D', fg: '#00FF00', bg: '#FF00FF' },
+      drawMode: 'draw',
+      activeLayer: baseLayer,
+      paletteData: {
+        selectedPhox: -1,
+        modifyingPhox: false,
       },
-      {
-        component: iro.ui.Slider,
+      alphabetData: {
+        selectedChar: font.charactersList.findIndex(
+          (c) => c.codepoint === 'D'.codePointAt(0),
+        ),
       },
-    ],
-  });
-  const handleColorPickeChange = (color: any) => {
-    session.dp[session.selectedColorType] = color.hexString;
+      selectedColorType: 'fg',
+      movingRefImage: false,
+    };
 
-    if (session.paletteData.modifyingPhox && session.paletteData.selectedPhox > 0) {
-      const selectedPalettePhox = phoxelis.getPhoxFromPaletteIndex(
-        session.paletteData.selectedPhox,
-      );
-      if (selectedPalettePhox) {
-        phoxelis.storePhoxInPalette(session.paletteData.selectedPhox, {
-          char: selectedPalettePhox.char,
-          fg:
-            session.selectedColorType === 'fg'
-              ? session.dp[session.selectedColorType]
-              : selectedPalettePhox.fg,
-          bg:
-            session.selectedColorType === 'bg'
-              ? session.dp[session.selectedColorType]
-              : selectedPalettePhox.bg,
-        });
+    // MARK: Elements
+
+    this.refImage = createRefImage();
+    this.drawboard = createDrawboard(
+      this.phoxelis.canvas,
+      this.draftScreen.canvas,
+      this.refImage.wrapper,
+    );
+    this.colorPicker = this.createColorPicker();
+    this.selectColorType('fg');
+    this.alphabet = this.createAlphabetSelector();
+    this.palette = this.createPaletteSelector();
+
+    this.hammer = new Hammer(this.drawboard);
+
+    // MARK: Load data variable if present. Create defaults if not
+    if (this.config.data) {
+      const { data } = this.config;
+      this.phoxelis.importPhoxelis(data.phoxelis);
+
+      this.ds.layers = _.mapValues(data.layers, (l, k) => {
+        const target = this.createLayerTarget();
+        this.layersTargets[k] = target;
+
+        return {
+          ...l,
+        };
+      });
+      this.selectLayer(this.phoxelis.layers[0].id);
+      this.setReferenceImage(data.refImage.src);
+    }
+
+    // TODO: This should be a class (new ChangesStack(this));
+    this.changesStack = this.createChangesStack();
+
+    this.tools = createTools(this);
+    this.currTool = null;
+    this.previousTool = null;
+    this.mousePos = { x: -1, y: -1 };
+    this.setTool(this.tools.draw);
+
+    this.hammer.get('pinch').set({ enable: true });
+    this.hammer.on('pinchstart', (e) => {
+      this.setTool(this.tools.panzoom);
+      this.currTool?.handlers.onPinchStart(e);
+    });
+
+    this.drawboard.addEventListener('pointerdown', this.setMousePos);
+    this.drawboard.addEventListener('pointermove', this.setMousePos);
+    this.drawboard.addEventListener('pointerup', this.setMousePos);
+    const handleWindowMouseOut = (e: MouseEvent) => {
+      if (e.relatedTarget === null) {
+        this.currTool?.tool.abort?.();
       }
-    }
-  }
-  colorPicker.on('color:change', handleColorPickeChange);
-  const fgColorButton = document.createElement('button');
-  fgColorButton.innerHTML = 'Foreground';
-  fgColorButton.addEventListener('click', () => selectColorType('fg'));
-  colorPickerEl.append(fgColorButton);
-  const bgColorButton = document.createElement('button');
-  bgColorButton.innerHTML = 'Background';
-  bgColorButton.addEventListener('click', () => selectColorType('bg'));
-  colorPickerEl.append(bgColorButton);
-  function selectColorType(type: 'fg' | 'bg') {
-    session.selectedColorType = type;
-    colorPicker.color.hexString = session.dp[type];
-  }
+    };
+    window.addEventListener('mouseout', handleWindowMouseOut);
 
-  selectColorType('fg');
+    // MARK: Rendering
+    let continueRenderLoop = true;
+    let lastAnimationFrame: number = -1;
+    const renderLoop = () => {
+      this.phoxelis.renderFrame(
+        this.phoxelis.layers.map((l) => ({
+          additionalTarget: this.layersTargets[l.id],
+          opacity: this.ds.layers[l.id].visible ? this.ds.layers[l.id].opacity / 100 : 0,
+        })),
+      );
+      this.draftScreen.renderFrame();
+      if (continueRenderLoop) {
+        lastAnimationFrame = window.requestAnimationFrame(renderLoop);
+      }
+    };
+    lastAnimationFrame = window.requestAnimationFrame(renderLoop);
 
-  const panzoomConfiguration = {
-    minScale: 0.15,
-    maxScale: 10,
-    noBind: true,
-    relative: true,
-    cursor: 'default',
-    startX: 0,
-    startY: 0,
-    startScale: 1,
-  };
-  let scale = panzoomConfiguration.startScale;
-  const hammer = new Hammer(drawboard);
+    this.hotkeyManager = createHotkeyManager(this);
 
-  const refImagePanzoomConfig = { ...panzoomConfiguration };
-  let refImageScale = refImagePanzoomConfig.startScale;
+    this.dispose = () => {
+      // TODO There is some memory leak when creating many new documents. what else can we dispose of?
+      window.removeEventListener('keydown', this.hotkeyManager.handleHotkeyKeydown);
+      window.removeEventListener('keyup', this.hotkeyManager.handleHotkeyKeyup);
+      window.removeEventListener('mouseout', handleWindowMouseOut);
 
-  let panzoom: PanzoomObject | null = null;
-  let refImagePanzoom: PanzoomObject | null = null;
+      continueRenderLoop = false;
+      window.cancelAnimationFrame(lastAnimationFrame);
 
-  /** Can only be done once drawboard is in the DOM */
-  function startPanzoom() {
-    panzoom = Panzoom(layersWrapper, panzoomConfiguration);
-    refImagePanzoom = Panzoom(refImage, refImagePanzoomConfig);
+      this.hammer.destroy();
+      this.panzoom?.destroy();
+      this.refImagePanzoom?.destroy();
+      this.colorPicker.picker.off(
+        'color:change',
+        this.colorPicker.handleColorPickeChange,
+      );
+      this.colorPicker.el.remove();
+    };
 
-    if (data) {
-      refImagePanzoom.pan(data.refImage.config.panX, data.refImage.config.panY);
-      refImagePanzoom.zoom(data.refImage.config.scale);
-    }
-  }
-
-  function setReferenceImage(base64: string) {
-    refImage.src = base64;
-    refImageScale = 1;
-    refImagePanzoom?.reset();
+    return this;
+  } // MARK: WIP
+  exportPhoxelis() {
+    return this.phoxelis.exportPhoxelis();
   }
 
-  function getReferenceImageConfig() {
+  dispose: () => void;
+
+  exportData(): WorkspaceExportConfig {
+    const {
+      phoxelis,
+      ds,
+      refImagePanzoom,
+      refImage,
+      config: { size, fontName },
+    } = this;
+    const phoxelisData = phoxelis.exportPhoxelis();
+
+    const documentData = {
+      size,
+      fontName,
+      data: {
+        phoxelis: phoxelisData,
+        layers: ds.layers,
+        refImage: {
+          src: refImage.img.src ?? '',
+          config: {
+            panX: refImagePanzoom?.getPan().x ?? 0,
+            panY: refImagePanzoom?.getPan().y ?? 0,
+            scale: refImagePanzoom?.getScale() ?? 1,
+          },
+        },
+      },
+    };
+
+    return documentData;
+  }
+  
+  // Arrow func to prevent addEventListener to re-assigning this
+  private setMousePos = (event: PointerEvent) => {
+    const {
+      config: { size },
+      mousePos,
+      font,
+    } = this;
+    const { width, top, left } = this.phoxelis.canvas.getBoundingClientRect();
+    const scale = width / (size.cols * font.width);
+    const mouseScreenPosX = event.clientX - left;
+    const mouseScreenPosY = event.clientY - top;
+    mousePos.x = Math.min(
+      size.cols - 1,
+      Math.max(0, Math.floor(mouseScreenPosX / (font.width * scale))),
+    );
+    mousePos.y = Math.min(
+      size.rows - 1,
+      Math.max(0, Math.floor(mouseScreenPosY / (font.height * scale))),
+    );
+  }
+
+  createChangesStack = createChangesStack;
+
+  setReferenceImage(base64: string) {
+    this.refImage.img.src = base64;
+    this.refImageScale = 1;
+    this.refImagePanzoom?.reset();
+  }
+
+  getReferenceImageConfig() {
     return {
-      src: refImage.src ?? '',
+      src: this.refImage.img.src ?? '',
       config: {
-        panX: refImagePanzoom?.getPan().x ?? 0,
-        panY: refImagePanzoom?.getPan().y ?? 0,
-        scale: refImagePanzoom?.getScale() ?? 1,
+        panX: this.refImagePanzoom?.getPan().x ?? 0,
+        panY: this.refImagePanzoom?.getPan().y ?? 0,
+        scale: this.refImagePanzoom?.getScale() ?? 1,
       },
     };
   }
 
-  // MARK: Load data variable if present. Create defaults if not
-  if (data) {
-    phoxelis.importPhoxelis(data.phoxelis);
+  /** Can only be done once drawboard is in the DOM */
+  startPanzoom() {
+    const {
+      refImage,
+      config: { data },
+      drawboard,
+    } = this;
+    this.panzoom = Panzoom(
+      drawboard.firstElementChild as HTMLElement,
+      panzoomConfiguration,
+    );
+    this.refImagePanzoom = Panzoom(refImage.img, { ...panzoomConfiguration });
 
-    ds.layers = _.mapValues(data.layers, (l, k) => {
-      const target = createLayerTarget();
-      layersTargets[k] = target;
+    if (data) {
+      this.refImagePanzoom.pan(data.refImage.config.panX, data.refImage.config.panY);
+      this.refImagePanzoom.zoom(data.refImage.config.scale);
+    }
+  }
+  createPaletteSelector = createPaletteSelector;
+  createColorPicker = createColorPicker;
+  private createAlphabetSelector = createAlphabetSelector;
+  public createRefImage = createRefImage;
 
-      return {
-        ...l,
-      };
-    });
-    selectLayer(phoxelis.layers[0].id);
-    setReferenceImage(data.refImage.src);
+  // Later
+  public getDraftBaseLayer() {
+    return this.draftScreen.layers[0].id;
   }
 
-  // MARK: Layers
-  function createLayer(layerId?: string) {
-    const target = createLayerTarget();
+  public createLayer(layerId?: string) {
+    const target = this.createLayerTarget();
 
-    const lid = layerId ?? phoxelis.addLayer();
+    const lid = layerId ?? this.phoxelis.addLayer();
 
-    ds.layers[lid] = {
-      name: `Layer #${phoxelis.layers.length}`,
+    this.ds.layers[lid] = {
+      name: `Layer #${this.phoxelis.layers.length}`,
       opacity: 100,
       visible: true,
     };
 
-    layersTargets[lid] = target;
+    this.layersTargets[lid] = target;
 
     return lid;
   }
 
-  function removeLayer(layerId: string) {
-    if (phoxelis.layers.length === 1) {
+  public removeLayer(layerId: string) {
+    if (this.phoxelis.layers.length === 1) {
       console.warn("removeDocumentLayer error: You can't remove the base layer.");
       return;
     }
 
-    const layerPosition = phoxelis.layerPositions[layerId];
-    phoxelis.removeLayer(layerId);
-    delete ds.layers[layerId];
+    const layerPosition = this.phoxelis.layerPositions[layerId];
+    this.phoxelis.removeLayer(layerId);
+    delete this.ds.layers[layerId];
 
-    const newSelectPos = Math.max(0, Math.min(phoxelis.layers.length - 1, layerPosition));
-    const layerBeforeId = phoxelis.layers[newSelectPos].id;
-    selectLayer(layerBeforeId);
+    const newSelectPos = Math.max(
+      0,
+      Math.min(this.phoxelis.layers.length - 1, layerPosition),
+    );
+    const layerBeforeId = this.phoxelis.layers[newSelectPos].id;
+    this.selectLayer(layerBeforeId);
   }
 
-  function moveLayer(...args: Parameters<typeof phoxelis.moveLayer>) {
-    return phoxelis.moveLayer(...args);
+  public moveLayer(...args: Parameters<typeof this.phoxelis.moveLayer>) {
+    return this.phoxelis.moveLayer(...args);
   }
 
-  function selectLayer(layerId: string) {
-    session.activeLayer = layerId;
+  private selectLayer(layerId: string) {
+    this.session.activeLayer = layerId;
   }
 
-  function getSortedLayers() {
-    return phoxelis.layers.map((l) => l.id);
+  public getSortedLayers() {
+    return this.phoxelis.layers.map((l) => l.id);
   }
 
-  function createLayerTarget() {
+  private createLayerTarget() {
     const target = document.createElement('canvas');
-    target.width = font.width * size.cols;
-    target.height = font.height * size.rows;
+    target.width = this.font.width * this.config.size.cols;
+    target.height = this.font.height * this.config.size.rows;
     target.style = `height: 100%; width: 100%; object-fit: contain;`;
     return target;
   }
 
-  function renderDpWithMode(
+  selectColorType(type: 'fg' | 'bg') {
+    this.session.selectedColorType = type;
+    this.colorPicker.picker.color.hexString = this.session.dp[type];
+  }
+
+  renderDpWithMode(
     target: ReturnType<typeof Phoxelis>,
     r: number,
     c: number,
     layerId: string,
     options: { draftErasure: boolean } = { draftErasure: false },
   ) {
+    const { session, phoxelis } = this;
     if (session.drawMode === 'draw') {
       target.renderPhoxel(session.dp.char, session.dp.fg, session.dp.bg, r, c, layerId);
       return;
@@ -512,831 +550,13 @@ export async function Workspace(config: WorkspaceInputConfig) {
     }
   }
 
-  // MARK: Undo-Redo Stack Management
-  type ChangesStack = Array<() => void>;
-  let changesHistory: Array<{ changes: ChangesStack; undoChanges: ChangesStack }> = [];
-  let redoHistory: Array<{ changes: ChangesStack; undoChanges: ChangesStack }> = [];
-  const maxChangesHistory = 50;
+  setTool(tool: Tool | string) {
+    const { currTool, drawboard, hammer } = this;
 
-  function commitPhoxels(phoxelPositions: Array<PhoxelPosition>) {
-    const undoChanges: ChangesStack = [];
-    const changes: ChangesStack = [];
-    const currentLayerId = session.activeLayer; // Captured for undo/redo funcs
-
-    phoxelPositions.forEach(([r, c]) => {
-      const origPhox = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
-      if (!origPhox) {
-        // Note: Pass currentLayerId, not session.activeLayer to funcs
-        undoChanges.push(() => phoxelis.removePhoxel(r, c, currentLayerId));
-      } else {
-        undoChanges.push(() =>
-          phoxelis.renderPhoxel(
-            origPhox.char,
-            origPhox.fg,
-            origPhox.bg,
-            r,
-            c,
-            currentLayerId,
-          ),
-        );
-      }
-
-      renderDpWithMode(phoxelis, r, c, session.activeLayer);
-
-      const newPhox = phoxelis.getPhoxFromPosition(r, c, session.activeLayer);
-      if (!newPhox) {
-        changes.push(() => phoxelis.removePhoxel(r, c, currentLayerId));
-      } else {
-        changes.push(() =>
-          phoxelis.renderPhoxel(
-            newPhox.char,
-            newPhox.fg,
-            newPhox.bg,
-            r,
-            c,
-            currentLayerId,
-          ),
-        );
-      }
-    });
-
-    if (changesHistory.length === maxChangesHistory) changesHistory.shift();
-    changesHistory.push({ changes, undoChanges });
-    redoHistory = [];
-  }
-
-  function undoLastChange() {
-    const lastChange = changesHistory.pop();
-
-    if (!lastChange) {
-      console.warn('Nothing to undo');
-      return;
-    }
-
-    lastChange.undoChanges.forEach((fn) => fn());
-    redoHistory.push(lastChange);
-  }
-
-  function redoLastChange() {
-    const lastChange = redoHistory.pop();
-
-    if (!lastChange) {
-      console.warn('Nothing to redo');
-      return;
-    }
-
-    lastChange.changes.forEach((fn) => fn());
-    changesHistory.push(lastChange);
-  }
-
-  // sampleRenderContent(phoxelis, rows, cols);
-
-  // MARK: Hotkeys
-  interface Hotkey {
-    ctrl?: boolean;
-    alt?: boolean;
-    shift?: boolean;
-    key?: string;
-    mouse?: number;
-    onHotkeyStart?: (e: KeyboardEvent | PointerEvent) => void;
-    onHotkeyEnd?: (e: KeyboardEvent | PointerEvent) => void;
-  }
-
-  const hotkeys: Hotkey[] = [
-    { ctrl: true, key: 'z', onHotkeyEnd: () => undoLastChange() },
-    { ctrl: true, key: 'y', onHotkeyEnd: () => redoLastChange() },
-    {
-      ctrl: true,
-      mouse: 1,
-      onHotkeyStart(e) {
-        setTool(panzoomTool.name);
-        currTool?.handlers.onPointerDown(e as PointerEvent);
-      },
-    },
-    {
-      shift: true,
-      mouse: 1,
-      onHotkeyStart(e) {
-        setTool(panzoomTool.name);
-        currTool?.handlers.onPointerDown(e as PointerEvent);
-      },
-    },
-  ];
-  const downHotkeys: Hotkey[] = [];
-
-  const handleHotkeyKeydown = (e: KeyboardEvent) => {
-    const matchingHotkey = hotkeys.find(
-      (h) =>
-        !!h.ctrl === e.ctrlKey &&
-        !!h.alt === e.altKey &&
-        !!h.shift === e.shiftKey &&
-        e.key.toLocaleLowerCase() === h.key,
-    );
-    if (matchingHotkey) {
-      matchingHotkey.onHotkeyStart?.(e);
-      downHotkeys.push(matchingHotkey);
-    }
-  };
-  const handleHotkeyKeyup = (e: KeyboardEvent) => {
-    const matchinDownHotkey = downHotkeys.find(
-      (h) => e.key.toLocaleLowerCase() === h.key,
-    );
-    if (matchinDownHotkey) {
-      matchinDownHotkey.onHotkeyEnd?.(e);
-      downHotkeys.splice(downHotkeys.indexOf(matchinDownHotkey), 1);
-    }
-
-    const matchingHotkey = hotkeys.find(
-      (h) =>
-        !!h.ctrl === e.ctrlKey &&
-        !!h.alt === e.altKey &&
-        !!h.shift === e.shiftKey &&
-        e.key.toLocaleLowerCase() === h.key,
-    );
-    if (matchingHotkey == matchinDownHotkey) {
-      // do nothing as we already ended the hotkey
-    } else if (matchingHotkey) {
-      matchingHotkey.onHotkeyEnd?.(e);
-    }
-  };
-  window.addEventListener('keydown', handleHotkeyKeydown);
-  window.addEventListener('keyup', handleHotkeyKeyup);
-  drawboard.addEventListener('pointerdown', (e) => {
-    const matchingHotkey = hotkeys.find(
-      (h) =>
-        !!h.ctrl === e.ctrlKey &&
-        !!h.alt === e.altKey &&
-        !!h.shift === e.shiftKey &&
-        e.button === h.mouse,
-    );
-    if (matchingHotkey) {
-      matchingHotkey.onHotkeyStart?.(e);
-      downHotkeys.push(matchingHotkey);
-    }
-  });
-  drawboard.addEventListener('pointerup', (e) => {
-    const matchinDownHotkey = downHotkeys.find((h) => e.button === h.mouse);
-    if (matchinDownHotkey) {
-      matchinDownHotkey.onHotkeyEnd?.(e);
-      downHotkeys.splice(downHotkeys.indexOf(matchinDownHotkey), 1);
-    }
-
-    const matchingHotkey = hotkeys.find(
-      (h) =>
-        !!h.ctrl === e.ctrlKey &&
-        !!h.alt === e.altKey &&
-        !!h.shift === e.shiftKey &&
-        e.button === h.mouse,
-    );
-    if (matchingHotkey == matchinDownHotkey) {
-      // do nothing as we already ended the hotkey
-    } else if (matchingHotkey) {
-      matchingHotkey.onHotkeyEnd?.(e);
-    }
-  });
-
-  // MARK: Drawboard interactions
-  hammer.get('pinch').set({ enable: true });
-  hammer.on('pinchstart', (e) => {
-    setTool(panzoomTool.name);
-    currTool?.handlers.onPinchStart(e);
-  });
-
-  type CellPosition = { x: number; y: number };
-  const mousePos: CellPosition = { x: -1, y: -1 };
-
-  function setMousePos(event: PointerEvent) {
-    const { width, top, left } = phoxelis.canvas.getBoundingClientRect();
-    const scale = width / (size.cols * font.width);
-    const mouseScreenPosX = event.clientX - left;
-    const mouseScreenPosY = event.clientY - top;
-    mousePos.x = Math.min(
-      size.cols - 1,
-      Math.max(0, Math.floor(mouseScreenPosX / (font.width * scale))),
-    );
-    mousePos.y = Math.min(
-      size.rows - 1,
-      Math.max(0, Math.floor(mouseScreenPosY / (font.height * scale))),
-    );
-  }
-  drawboard.addEventListener('pointerdown', setMousePos);
-  drawboard.addEventListener('pointermove', setMousePos);
-  drawboard.addEventListener('pointerup', setMousePos);
-
-  // MARK: Tools
-
-  const handleWindowMouseOut = (e: MouseEvent) => {
-    if (e.relatedTarget === null) {
-      currTool?.tool.abort?.();
-    }
-  };
-  window.addEventListener('mouseout', handleWindowMouseOut);
-
-  interface Tool {
-    name: string;
-    onPointerDown?: (e: PointerEvent) => void;
-    onPointerMove?: (e: PointerEvent) => void;
-    onPointerUp?: (e: PointerEvent) => void;
-    onPinchStart?: (e: HammerInput) => void;
-    onPinchMove?: (e: HammerInput) => void;
-    onPinchEnd?: (e: HammerInput) => void;
-    submit?: () => void;
-    abort?: () => void;
-    resetTool?: () => void;
-    data?: Record<string, any>;
-  }
-
-  interface PanzoomTool extends Tool {
-    data: {
-      panzooming: boolean;
-      zooming: boolean;
-      panning: boolean;
-    };
-  }
-  const panzoomTool: PanzoomTool = {
-    name: 'panzoom',
-    data: {
-      panzooming: false,
-      zooming: false,
-      panning: false,
-    },
-    onPointerDown(e) {
-      this.data.panzooming = true;
-      this.data.panning = e.ctrlKey;
-      this.data.zooming = e.shiftKey;
-    },
-    onPointerMove(e) {
-      if (!this.data.panzooming) return;
-      const targetZoom = session.movingRefImage ? refImagePanzoom : panzoom;
-
-      if (!targetZoom) {
-        console.error(
-          'panzoomTool.onPointerMove error: No target panzoom object. Did you startPanzoom()?',
-        );
-        return;
-      }
-
-      if (this.data.panning) {
-        targetZoom.pan(
-          e.movementX / targetZoom.getScale(),
-          e.movementY / targetZoom.getScale(),
-        );
-      } else if (this.data.zooming) {
-        targetZoom.zoom(targetZoom.getScale() + (e.movementY / 35) * -1);
-      }
-    },
-    onPointerUp() {
-      if (!this.data.panzooming) return;
-      this.resetTool!();
-      this.submit!();
-      setPreviousTool();
-    },
-    onPinchStart() {
-      this.data.panzooming = true;
-      const targetZoom = session.movingRefImage ? refImagePanzoom : panzoom;
-
-      if (!targetZoom) {
-        console.error(
-          'panzoomTool.onPointerMove error: No target panzoom object. Did you startPanzoom()?',
-        );
-        return;
-      }
-
-      if (session.movingRefImage) {
-        refImageScale = targetZoom.getScale();
-      } else {
-        scale = targetZoom.getScale();
-      }
-    },
-    onPinchMove(e) {
-      if (this.data.panzooming) {
-        const targetZoom = session.movingRefImage ? refImagePanzoom : panzoom;
-
-        if (!targetZoom) {
-          console.error(
-            'panzoomTool.onPointerMove error: No target panzoom object. Did you startPanzoom()?',
-          );
-          return;
-        }
-
-        const s = session.movingRefImage ? refImageScale : scale;
-        const newZoomVal = s * e.scale;
-        targetZoom.zoom(newZoomVal);
-        targetZoom.pan(
-          (e.velocityX * 11) / targetZoom.getScale(),
-          (e.velocityY * 11) / targetZoom.getScale(),
-        );
-      }
-    },
-    onPinchEnd() {
-      if (!this.data!.panzooming) return;
-      this.resetTool!();
-      this.submit!();
-    },
-    submit() {
-      setPreviousTool();
-    },
-    resetTool() {
-      this.data.panzooming = false;
-      this.data.panning = false;
-      this.data.zooming = false;
-    },
-    abort() {
-      this.resetTool!();
-    },
-  };
-
-  interface DrawTool extends Tool {
-    data: {
-      draftPhoxels: Map<string, Phoxel>;
-      drawing: boolean;
-    };
-    addPhoxelToDraft: (p: Phoxel) => void;
-  }
-  const drawTool: DrawTool = {
-    name: 'draw',
-    data: {
-      draftPhoxels: new Map(),
-      drawing: false,
-    },
-    addPhoxelToDraft(p: Phoxel) {
-      this.data!.draftPhoxels.set(`${p.r};${p.c}`, p);
-      renderDpWithMode(draftScreen, p.r, p.c, getDraftBaseLayer(), {
-        draftErasure: true,
-      });
-    },
-    onPointerDown() {
-      this.data.drawing = true;
-      this.addPhoxelToDraft({ phox: session.dp, r: mousePos.y, c: mousePos.x });
-    },
-    onPointerMove() {
-      if (this.data.drawing) {
-        this.addPhoxelToDraft({ phox: session.dp, r: mousePos.y, c: mousePos.x });
-      }
-    },
-    onPointerUp() {
-      if (!this.data!.drawing) return;
-      this.data.drawing = false;
-      this.submit!();
-    },
-    submit() {
-      const phoxelsPositions: Array<PhoxelPosition> = [];
-      this.data.draftPhoxels.forEach((p) => {
-        phoxelsPositions.push([p.r, p.c]);
-      });
-      commitPhoxels(phoxelsPositions);
-      this.resetTool!();
-    },
-    resetTool() {
-      this.data.draftPhoxels = new Map();
-      draftScreen.reset(true);
-      this.data.drawing = false;
-    },
-    abort() {
-      this.resetTool!();
-    },
-  };
-
-  // ─── Rectangle (outline) Tool ────────────────────────────────────────────────
-  const rectTool: Tool = {
-    name: 'rect',
-    data: { startR: -1, startC: -1, drawing: false },
-    onPointerDown(_e: PointerEvent) {
-      this.data!.startR = mousePos.y;
-      this.data!.startC = mousePos.x;
-      this.data!.drawing = true;
-    },
-    onPointerMove(_e: PointerEvent) {
-      if (!this.data!.drawing) return;
-      // Clear draft and redraw preview rectangle
-      draftScreen.reset(true);
-      const { startR, startC } = this.data!;
-      const r1 = Math.min(startR, mousePos.y);
-      const r2 = Math.max(startR, mousePos.y);
-      const c1 = Math.min(startC, mousePos.x);
-      const c2 = Math.max(startC, mousePos.x);
-      // Top & bottom edges
-      for (let c = c1; c <= c2; c++) {
-        renderDpWithMode(draftScreen, r1, c, getDraftBaseLayer(), {
-          draftErasure: true,
-        });
-        renderDpWithMode(draftScreen, r2, c, getDraftBaseLayer(), {
-          draftErasure: true,
-        });
-      }
-      // Left & right edges
-      for (let r = r1; r <= r2; r++) {
-        renderDpWithMode(draftScreen, r, c1, getDraftBaseLayer(), {
-          draftErasure: true,
-        });
-        renderDpWithMode(draftScreen, r, c2, getDraftBaseLayer(), {
-          draftErasure: true,
-        });
-      }
-    },
-    onPointerUp() {
-      if (!this.data!.drawing) return;
-      this.data!.drawing = false;
-      this.submit!();
-    },
-    submit() {
-      const { startR, startC } = this.data!;
-      if (startR === -1 || startC === -1) return;
-      const r1 = Math.min(startR, mousePos.y);
-      const r2 = Math.max(startR, mousePos.y);
-      const c1 = Math.min(startC, mousePos.x);
-      const c2 = Math.max(startC, mousePos.x);
-
-      const phoxelsPositions: Array<PhoxelPosition> = [];
-
-      // Top & bottom edges
-      for (let c = c1; c <= c2; c++) {
-        phoxelsPositions.push([r1, c]);
-        phoxelsPositions.push([r2, c]);
-      }
-      // Left & right edges
-      for (let r = r1; r <= r2; r++) {
-        phoxelsPositions.push([r, c1]);
-        phoxelsPositions.push([r, c2]);
-      }
-
-      commitPhoxels(phoxelsPositions);
-      this.resetTool!();
-    },
-    resetTool() {
-      draftScreen.reset(true);
-      this.data!.startR = -1;
-      this.data!.startC = -1;
-      this.data!.drawing = false;
-    },
-    abort() {
-      this.resetTool!();
-    },
-  };
-
-  // ─── Filled Rectangle Tool ───────────────────────────────────────────────────
-  const filledRectTool: Tool = {
-    name: 'filledRect',
-    data: { startR: -1, startC: -1, drawing: false },
-    onPointerDown(_e: PointerEvent) {
-      this.data!.startR = mousePos.y;
-      this.data!.startC = mousePos.x;
-      this.data!.drawing = true;
-    },
-    onPointerMove(_e: PointerEvent) {
-      if (!this.data!.drawing) return;
-      draftScreen.reset(true);
-      const { startR, startC } = this.data!;
-      const r1 = Math.min(startR, mousePos.y);
-      const r2 = Math.max(startR, mousePos.y);
-      const c1 = Math.min(startC, mousePos.x);
-      const c2 = Math.max(startC, mousePos.x);
-      for (let r = r1; r <= r2; r++) {
-        for (let c = c1; c <= c2; c++) {
-          renderDpWithMode(draftScreen, r, c, getDraftBaseLayer(), {
-            draftErasure: true,
-          });
-        }
-      }
-    },
-    onPointerUp() {
-      if (!this.data!.drawing) return;
-      this.data!.drawing = false;
-      this.submit!();
-    },
-    submit() {
-      const { startR, startC } = this.data!;
-      if (startR === -1 || startC === -1) return;
-      const r1 = Math.min(startR, mousePos.y);
-      const r2 = Math.max(startR, mousePos.y);
-      const c1 = Math.min(startC, mousePos.x);
-      const c2 = Math.max(startC, mousePos.x);
-
-      const phoxelsPositions: Array<PhoxelPosition> = [];
-      for (let r = r1; r <= r2; r++) {
-        for (let c = c1; c <= c2; c++) {
-          phoxelsPositions.push([r, c]);
-        }
-      }
-      commitPhoxels(phoxelsPositions);
-      this.resetTool!();
-    },
-    resetTool() {
-      draftScreen.reset(true);
-      this.data!.startR = -1;
-      this.data!.startC = -1;
-      this.data!.drawing = false;
-    },
-    abort() {
-      this.resetTool!();
-    },
-  };
-
-  // ─── Line Tool (Bresenham's algorithm) ──────────────────────────────────────
-  function bresenhamCells(
-    r0: number,
-    c0: number,
-    r1: number,
-    c1: number,
-  ): { r: number; c: number }[] {
-    const cells: { r: number; c: number }[] = [];
-    let dr = Math.abs(r1 - r0);
-    let dc = Math.abs(c1 - c0);
-    const sr = r0 < r1 ? 1 : -1;
-    const sc = c0 < c1 ? 1 : -1;
-    let err = dr - dc;
-    let r = r0;
-    let c = c0;
-    while (true) {
-      cells.push({ r, c });
-      if (r === r1 && c === c1) break;
-      const e2 = 2 * err;
-      if (e2 > -dc) {
-        err -= dc;
-        r += sr;
-      }
-      if (e2 < dr) {
-        err += dr;
-        c += sc;
-      }
-    }
-    return cells;
-  }
-
-  const lineTool: Tool = {
-    name: 'line',
-    data: { startR: -1, startC: -1, drawing: false },
-    onPointerDown(_e: PointerEvent) {
-      this.data!.startR = mousePos.y;
-      this.data!.startC = mousePos.x;
-      this.data!.drawing = true;
-    },
-    onPointerMove(_e: PointerEvent) {
-      if (!this.data!.drawing) return;
-      draftScreen.reset(true);
-      const { startR, startC } = this.data!;
-      const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
-      for (const { r, c } of cells) {
-        renderDpWithMode(draftScreen, r, c, getDraftBaseLayer(), {
-          draftErasure: true,
-        });
-      }
-    },
-    onPointerUp() {
-      if (!this.data!.drawing) return;
-      this.data!.drawing = false;
-      this.submit!();
-    },
-    submit() {
-      const { startR, startC } = this.data!;
-      if (startR === -1 || startC === -1) return;
-      const cells = bresenhamCells(startR, startC, mousePos.y, mousePos.x);
-      const phoxelsPositions: Array<PhoxelPosition> = [];
-      for (const { r, c } of cells) {
-        phoxelsPositions.push([r, c]);
-      }
-      commitPhoxels(phoxelsPositions);
-      this.resetTool!();
-    },
-    resetTool() {
-      draftScreen.reset(true);
-      this.data!.startR = -1;
-      this.data!.startC = -1;
-      this.data!.drawing = false;
-    },
-    abort() {
-      this.resetTool!();
-    },
-  };
-
-  // ─── Ellipse Tool (outline) ──────────────────────────────────────────────────
-  // Uses the midpoint ellipse algorithm, with rx/ry derived from start→current position
-  const ellipseTool: Tool = {
-    name: 'ellipse',
-    data: { startR: -1, startC: -1, drawing: false },
-    onPointerDown(_e: PointerEvent) {
-      this.data!.startR = mousePos.y;
-      this.data!.startC = mousePos.x;
-      this.data!.drawing = true;
-    },
-    onPointerMove(_e: PointerEvent) {
-      if (!this.data!.drawing) return;
-      draftScreen.reset(true);
-      const { startR, startC } = this.data!;
-      const rx = Math.abs(mousePos.x - startC);
-      const ry = Math.abs(mousePos.y - startR);
-      drawEllipseOutline(
-        (r, c) =>
-          renderDpWithMode(draftScreen, r, c, getDraftBaseLayer(), {
-            draftErasure: true,
-          }),
-        startR,
-        startC,
-        rx,
-        ry,
-      );
-    },
-    onPointerUp() {
-      if (!this.data!.drawing) return;
-      this.data!.drawing = false;
-      this.submit!();
-    },
-    submit() {
-      const { startR, startC } = this.data!;
-      if (startR === -1 || startC === -1) return;
-      const rx = Math.abs(mousePos.x - startC);
-      const ry = Math.abs(mousePos.y - startR);
-      const phoxelsPositions: Array<PhoxelPosition> = [];
-      drawEllipseOutline((r, c) => phoxelsPositions.push([r, c]), startR, startC, rx, ry);
-      commitPhoxels(phoxelsPositions);
-      this.resetTool!();
-    },
-    resetTool() {
-      draftScreen.reset(true);
-      this.data!.startR = -1;
-      this.data!.startC = -1;
-      this.data!.drawing = false;
-    },
-    abort() {
-      this.resetTool!();
-    },
-  };
-
-  // ─── Filled Ellipse Tool ─────────────────────────────────────────────────────
-  const filledEllipseTool: Tool = {
-    name: 'filledEllipse',
-    data: { startR: -1, startC: -1, drawing: false },
-    onPointerDown(_e: PointerEvent) {
-      this.data!.startR = mousePos.y;
-      this.data!.startC = mousePos.x;
-      this.data!.drawing = true;
-    },
-    onPointerMove(_e: PointerEvent) {
-      if (!this.data!.drawing) return;
-      draftScreen.reset(true);
-      const { startR, startC } = this.data!;
-      const rx = Math.abs(mousePos.x - startC);
-      const ry = Math.abs(mousePos.y - startR);
-      drawEllipseFill(
-        (r, c) =>
-          renderDpWithMode(draftScreen, r, c, getDraftBaseLayer(), {
-            draftErasure: true,
-          }),
-        startR,
-        startC,
-        rx,
-        ry,
-      );
-    },
-    onPointerUp() {
-      if (!this.data!.drawing) return;
-      this.data!.drawing = false;
-      this.submit!();
-    },
-    submit() {
-      const { startR, startC } = this.data!;
-      if (startR === -1 || startC === -1) return;
-      const rx = Math.abs(mousePos.x - startC);
-      const ry = Math.abs(mousePos.y - startR);
-      const phoxelsPositions: Array<PhoxelPosition> = [];
-      drawEllipseFill((r, c) => phoxelsPositions.push([r, c]), startR, startC, rx, ry);
-      commitPhoxels(phoxelsPositions);
-      this.resetTool!();
-    },
-    resetTool() {
-      draftScreen.reset(true);
-      this.data!.startR = -1;
-      this.data!.startC = -1;
-    },
-    abort() {
-      this.resetTool!();
-    },
-  };
-
-  const tools = {
-    [panzoomTool.name]: panzoomTool,
-    [drawTool.name]: drawTool,
-    [lineTool.name]: lineTool,
-    [rectTool.name]: rectTool,
-    [filledRectTool.name]: filledRectTool,
-    [ellipseTool.name]: ellipseTool,
-    [filledEllipseTool.name]: filledEllipseTool,
-  };
-
-  // ─── Ellipse helper functions ────────────────────────────────────────────────
-
-  /** Draw ellipse outline using midpoint ellipse algorithm */
-  function drawEllipseOutline(
-    renderFn: (r: number, c: number) => void,
-    centerR: number,
-    centerC: number,
-    rx: number,
-    ry: number,
-  ) {
-    if (rx === 0 && ry === 0) return;
-    const rx2 = rx * rx;
-    const ry2 = ry * ry;
-    let x = 0;
-    let y = ry;
-    let d1 = ry2 - rx2 * ry + 0.25 * rx2;
-    let dx = 2 * ry2 * x;
-    let dy = 2 * rx2 * y;
-
-    const plot4 = (cr: number, cc: number, dx: number, dy: number) => {
-      renderFn(cr + dy, cc + dx);
-      renderFn(cr - dy, cc + dx);
-      renderFn(cr + dy, cc - dx);
-      renderFn(cr - dy, cc - dx);
-    };
-
-    // Region 1: slope > -1
-    while (dx < dy) {
-      plot4(centerR, centerC, x, y);
-      if (d1 < 0) {
-        x++;
-        dx += 2 * ry2;
-        d1 += dx + ry2;
-      } else {
-        x++;
-        y--;
-        dx += 2 * ry2;
-        dy -= 2 * rx2;
-        d1 += dx - dy + ry2;
-      }
-    }
-
-    // Region 2: slope <= -1
-    let d2 = ry2 * (x + 0.5) ** 2 + rx2 * (y - 1) ** 2 - rx2 * ry2;
-    while (y >= 0) {
-      plot4(centerR, centerC, x, y);
-      if (d2 > 0) {
-        y--;
-        dy -= 2 * rx2;
-        d2 += rx2 - dy;
-      } else {
-        y--;
-        x++;
-        dx += 2 * ry2;
-        dy -= 2 * rx2;
-        d2 += dx - dy + rx2;
-      }
-    }
-  }
-
-  /** Fill ellipse using scanline approach with midpoint ellipse algorithm */
-  function drawEllipseFill(
-    renderFn: (r: number, c: number) => void,
-    centerR: number,
-    centerC: number,
-    rx: number,
-    ry: number,
-  ) {
-    if (rx === 0 && ry === 0) return;
-
-    // For each row, find the leftmost and rightmost column that falls inside the ellipse
-    const halfRx = rx + 0.5;
-    const halfRy = ry + 0.5;
-    const rMin = centerR - halfRy;
-    const rMax = centerR + halfRy;
-
-    for (
-      let r = Math.max(0, Math.floor(rMin));
-      r <= Math.min(size.rows - 1, Math.ceil(rMax));
-      r++
-    ) {
-      const dy = r - centerR;
-      // ellipse equation: (x-cx)^2/rx^2 + (y-cy)^2/ry^2 <= 1
-      // => |x-cx| <= rx * sqrt(1 - (y-cy)^2/ry^2)
-      const ratio = (dy * dy) / (halfRy * halfRy);
-      if (ratio > 1) continue;
-      const dx = Math.sqrt(Math.max(0, 1 - ratio)) * halfRx;
-      const left = Math.max(0, Math.ceil(centerC - dx));
-      const right = Math.min(size.cols - 1, Math.floor(centerC + dx));
-      for (let c = left; c <= right; c++) {
-        renderFn(r, c);
-      }
-    }
-  }
-
-  let currTool: {
-    tool: Tool;
-    handlers: {
-      onPointerDown: (e: PointerEvent) => void;
-      onPointerUp: (e: PointerEvent) => void;
-      onPointerMove: (e: PointerEvent) => void;
-      onPinchStart: (e: HammerInput) => void;
-      onPinchMove: (e: HammerInput) => void;
-      onPinchEnd: (e: HammerInput) => void;
-    };
-  } | null = null;
-
-  let previousTool: Tool | null = null;
-  function setTool(name: string) {
-    const tool = tools[name];
-
-    if (!tool) {
-      console.error(`setTool error: Tool ${name} doesn't exist.`);
-      return;
+    if (typeof tool === 'string') {
+      // TODO redo this
+      tool = this.tools[tool as keyof ReturnType<typeof createTools>];
+      if (!tool) throw new Error(`No tool by name ${tool}`);
     }
 
     if (currTool) {
@@ -1347,10 +567,10 @@ export async function Workspace(config: WorkspaceInputConfig) {
       hammer.off('pinchstart', currTool.handlers.onPinchStart);
       hammer.off('pinchmove', currTool.handlers.onPinchMove);
       hammer.off('pinchend', currTool.handlers.onPinchEnd);
-      previousTool = currTool.tool;
+      this.previousTool = currTool.tool;
     }
 
-    currTool = {
+    this.currTool = {
       tool,
       handlers: {
         onPointerDown: (e) => {
@@ -1371,134 +591,16 @@ export async function Workspace(config: WorkspaceInputConfig) {
         onPinchEnd: (e) => tool.onPinchEnd!(e),
       },
     };
-    drawboard.addEventListener('pointerdown', currTool.handlers.onPointerDown);
-    drawboard.addEventListener('pointermove', currTool.handlers.onPointerMove);
-    drawboard.addEventListener('pointerup', currTool.handlers.onPointerUp);
-    hammer.on('pinchstart', currTool.handlers.onPinchStart);
-    hammer.on('pinchmove', currTool.handlers.onPinchMove);
-    hammer.on('pinchend', currTool.handlers.onPinchEnd);
+
+    // TODO fix currTOol type?
+    drawboard.addEventListener('pointerdown', this.currTool!.handlers.onPointerDown);
+    drawboard.addEventListener('pointermove', this.currTool!.handlers.onPointerMove);
+    drawboard.addEventListener('pointerup', this.currTool!.handlers.onPointerUp);
+    hammer.on('pinchstart', this.currTool!.handlers.onPinchStart);
+    hammer.on('pinchmove', this.currTool!.handlers.onPinchMove);
+    hammer.on('pinchend', this.currTool!.handlers.onPinchEnd);
   }
-  function setPreviousTool() {
-    if (previousTool) setTool(previousTool.name);
+  setPreviousTool() {
+    if (this.previousTool) this.setTool(this.previousTool);
   }
-
-  setTool(drawTool.name);
-
-  function drawCharShapeInAlphabet(
-    index: number,
-    charShape: CharShape,
-    fg: string,
-    bg: string,
-  ) {
-    const yOffset = Math.floor(index / alphabetCols) * font.height;
-    const xOffset = (index % alphabetCols) * font.width;
-    for (let y = 0; y < charShape.length; y++) {
-      for (let x = 0; x < charShape[0].length; x++) {
-        const pixelVal = charShape[y][x];
-        alphabetCtx.fillStyle = pixelVal ? fg : bg;
-        alphabetCtx.fillRect(xOffset + x, yOffset + y, 1, 1);
-      }
-    }
-  }
-
-  font.charactersList.forEach((char, i) => {
-    drawCharShapeInAlphabet(i, char.shape, '#FFFFFF', '#000000');
-  });
-
-  // MARK: File management
-  function exportData(): WorkspaceExportConfig {
-    const phoxelisData = phoxelis.exportPhoxelis();
-
-    const documentData = {
-      size,
-      fontName,
-      data: {
-        phoxelis: phoxelisData,
-        layers: ds.layers,
-        refImage: {
-          src: refImage.src ?? '',
-          config: {
-            panX: refImagePanzoom?.getPan().x ?? 0,
-            panY: refImagePanzoom?.getPan().y ?? 0,
-            scale: refImagePanzoom?.getScale() ?? 1,
-          },
-        },
-      },
-    };
-
-    return documentData;
-  }
-
-  // // TODO start document?
-
-  function exportPhoxelis() {
-    return phoxelis.exportPhoxelis();
-  }
-
-  // MARK: Rendering
-  let continueRenderLoop = true;
-  let lastAnimationFrame: number = -1;
-  const renderLoop = () => {
-    phoxelis.renderFrame(
-      phoxelis.layers.map((l) => ({
-        additionalTarget: layersTargets[l.id],
-        opacity: ds.layers[l.id].visible ? ds.layers[l.id].opacity / 100 : 0,
-      })),
-    );
-    draftScreen.renderFrame();
-    if(continueRenderLoop) {
-      lastAnimationFrame = window.requestAnimationFrame(renderLoop);
-    };
-  };
-  lastAnimationFrame = window.requestAnimationFrame(renderLoop);
-  
-
-  function dispose() {
-    // TODO There is some memory leak when creating many new documents. what else can we dispose of? 
-    window.removeEventListener('keydown', handleHotkeyKeydown);
-    window.removeEventListener('keyup', handleHotkeyKeyup);
-    window.removeEventListener('mouseout', handleWindowMouseOut);
-
-    continueRenderLoop = false;
-    window.cancelAnimationFrame(lastAnimationFrame);
-
-    hammer.destroy();
-    panzoom?.destroy();
-    refImagePanzoom?.destroy();
-    colorPicker.off('color:change', handleColorPickeChange);
-    colorPickerEl.remove();
-  }
-
-  return {
-    size,
-    fontName,
-    phoxelis,
-    ds,
-    session,
-    drawboard,
-    paletteSelector,
-    currTool,
-    layersTargets,
-    colorPicker: colorPickerEl,
-    alphabet: alphabetContainer,
-    hotkeys,
-    createLayer,
-    removeLayer,
-    moveLayer,
-    selectLayer,
-    getDraftBaseLayer,
-    renderDpWithMode,
-    undoLastChange,
-    redoLastChange,
-    commitPhoxels,
-    setReferenceImage,
-    setTool,
-    selectColorType,
-    startPanzoom,
-    getSortedLayers,
-    exportPhoxelis,
-    getReferenceImageConfig,
-    exportData,
-    dispose,
-  };
 }

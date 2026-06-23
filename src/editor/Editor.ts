@@ -6,14 +6,13 @@ import {
   Workspace,
   type WorkspaceExportConfig,
   type WorkspaceInputConfig,
-  type WorkspaceObj,
 } from '../workspace/Workspace';
 
 const ext = 'phx';
 
 export class Editor {
   protected editorSession: {
-    currentWorkspace: WorkspaceObj;
+    currentWorkspace: Workspace;
     documentName?: string;
   } | null = null;
 
@@ -34,7 +33,7 @@ export class Editor {
     return fileDataString;
   }
 
-  async saveDocument(name: string, workspace: WorkspaceObj) {
+  async saveDocument(name: string, workspace: Workspace) {
     try {
       const workspaceData = workspace.exportData();
       const dataString = JSON.stringify(workspaceData);
@@ -139,19 +138,19 @@ export class Editor {
       this.editorSession.currentWorkspace.dispose();
     }
 
-    const workspace = await Workspace(config);
+    const ws = await Workspace.create(config);
 
     this.editorSession = {
-      currentWorkspace: workspace,
+      currentWorkspace: ws,
       documentName: name,
     };
 
     this.mountLayout();
 
-    workspace.startPanzoom();
+    ws.startPanzoom();
 
     // Hotkeys
-    workspace.hotkeys.push({
+    ws.hotkeyManager.hotkeys.push({
       ctrl: true,
       key: 's',
       onHotkeyStart: (e) => {
@@ -161,7 +160,7 @@ export class Editor {
         this.saveDocumentCommand();
       },
     });
-    workspace.hotkeys.push({
+    ws.hotkeyManager.hotkeys.push({
       ctrl: true,
       key: 'o',
       onHotkeyStart: (e) => {
@@ -171,7 +170,7 @@ export class Editor {
         this.loadDocumentCommand();
       },
     });
-    workspace.hotkeys.push({
+    ws.hotkeyManager.hotkeys.push({
       ctrl: true,
       shift: true,
       key: 'o',

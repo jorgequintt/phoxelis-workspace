@@ -9,7 +9,7 @@ import {
   type DocumentLayer,
   type DrawModeDefinition,
   type ToolDefinition,
-} from '../workspace/Workspace';
+} from '../workspace/_Workspace';
 import { Editor } from './Editor';
 
 const appRoot = document.querySelector('#app')!;
@@ -288,12 +288,12 @@ export class HtmlEditor extends Editor {
 
     const undoButton = document.createElement('button');
     undoButton.innerHTML = 'Undo';
-    undoButton.onclick = () => w.undoLastChange();
+    undoButton.onclick = () => w.changesStack.undoLastChange();
     navBar.appendChild(undoButton);
 
     const redoButton = document.createElement('button');
     redoButton.innerHTML = 'Redo';
-    redoButton.onclick = () => w.redoLastChange();
+    redoButton.onclick = () => w.changesStack.redoLastChange();
     navBar.appendChild(redoButton);
 
     const layerPanel = document.createElement('div');
@@ -665,8 +665,8 @@ transition: opacity 0.1s;
 
     // layerList.replaceChildren();
     layerPanel.appendChild(layerList);
-    sidebar.appendChild(w.alphabet);
-    sidebar.appendChild(w.colorPicker);
+    sidebar.appendChild(w.alphabet.alphabet);
+    sidebar.appendChild(w.colorPicker.el);
     sidebar.appendChild(layerPanel);
 
     content.appendChild(secondLeftSidebar);
@@ -674,7 +674,7 @@ transition: opacity 0.1s;
     content.appendChild(w.drawboard);
     content.appendChild(sidebar);
 
-    footer.appendChild(w.paletteSelector);
+    footer.appendChild(w.palette);
 
     appContainer.appendChild(navBar);
     appContainer.appendChild(content);
