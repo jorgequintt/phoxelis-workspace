@@ -252,7 +252,7 @@ export class Workspace {
     return this.phoxelis.moveLayer(...args);
   }
 
-  private selectLayer(layerId: string) {
+  public selectLayer(layerId: string) {
     this.state.activeLayer = layerId;
   }
 
@@ -268,7 +268,7 @@ export class Workspace {
     return target;
   }
 
-  dispose() {
+  public dispose() {
     this.continueRenderLoop = false;
     window.cancelAnimationFrame(this.lastAnimationFrame);
     this.hotkeyManager.dispose();

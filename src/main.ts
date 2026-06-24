@@ -1,13 +1,10 @@
 import './style.css';
-import { HtmlEditor } from './editor/HtmlEditor';
-import mountSvelteApp from './editor/svelte/mountSvelteApp';
+import { SvelteEditor } from './editor/svelte/SvelteEditor';
 
-mountSvelteApp();
-
-// const editor = new HtmlEditor();
-// const lastDocId = localStorage.getItem('last_doc');
-// if (lastDocId) {
-//   editor.loadDocument(lastDocId);
-// } else {
-//   editor.startSession();
-// }
+const editor = new SvelteEditor();
+const lastDocId = localStorage.getItem('last_doc');
+if (lastDocId) {
+  editor.loadDocument(lastDocId);
+} else {
+  editor.startSession();
+}
