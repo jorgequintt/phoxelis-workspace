@@ -73,9 +73,24 @@ export class Workspace {
   font: Font;
   phoxelis: PhoxelisObj;
   draftScreen: PhoxelisObj;
+  state: State = {
+    dp: { char: 'D', fg: '#00FF00', bg: '#FF00FF' },
+    drawMode: 'draw',
+    activeLayer: '',
+    paletteData: {
+      selectedPhox: -1,
+      modifyingPhox: false,
+    },
+    alphabetData: {
+      selectedChar: 0,
+    },
+    selectedColorType: 'fg',
+    movingRefImage: false,
+  };
+  data: DocumentState = {
+    layers: {},
+  };
   layersTargets: Record<string, HTMLCanvasElement> = {};
-  data: DocumentState;
-  state: State;
   drawboard: Drawboard;
   colorPicker: ReturnType<typeof createColorPicker>;
   alphabet: ReturnType<typeof createAlphabetSelector>;
@@ -102,26 +117,7 @@ export class Workspace {
       createBaseLayer: false,
     });
     this.draftScreen = Phoxelis(size.rows, size.cols, font);
-
-    this.data = {
-      layers: {},
-    };
-
-    const baseLayer = this.createLayer();
-    this.state = {
-      dp: { char: 'D', fg: '#00FF00', bg: '#FF00FF' },
-      drawMode: 'draw',
-      activeLayer: baseLayer,
-      paletteData: {
-        selectedPhox: -1,
-        modifyingPhox: false,
-      },
-      alphabetData: {
-        selectedChar: 0
-      },
-      selectedColorType: 'fg',
-      movingRefImage: false,
-    };
+    this.createLayer(); // create base layer manually
 
     // MARK: Modules
     this.drawboard = new Drawboard(this);
@@ -164,7 +160,9 @@ export class Workspace {
       this.phoxelis.renderFrame(
         this.phoxelis.layers.map((l) => ({
           additionalTarget: this.layersTargets[l.id],
-          opacity: this.data.layers[l.id].visible ? this.data.layers[l.id].opacity / 100 : 0,
+          opacity: this.data.layers[l.id].visible
+            ? this.data.layers[l.id].opacity / 100
+            : 0,
         })),
       );
       this.draftScreen.renderFrame();
