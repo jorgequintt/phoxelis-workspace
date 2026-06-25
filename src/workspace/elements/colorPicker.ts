@@ -16,24 +16,23 @@ export function createColorPicker(ws: Workspace) {
     ],
   });
 
-  const handleColorPickeChange = (color: any) => {
-    ws.state.dp[ws.state.selectedColorType] = color.hexString;
+  const handleColorPickeChange = (color: { hexString: string }) => {
+    const dp = ws.state$.dp.get();
+    const selectedColorType = ws.state$.selectedColorType.get();
+    ws.state$.dp[selectedColorType].set(color.hexString);
 
-    if (ws.state.paletteData.modifyingPhox && ws.state.paletteData.selectedPhox > 0) {
+    if (
+      ws.state$.paletteData.modifyingPhox.get() &&
+      ws.state$.paletteData.selectedPhox.get() > 0
+    ) {
       const selectedPalettePhox = ws.phoxelis.getPhoxFromPaletteIndex(
-        ws.state.paletteData.selectedPhox,
+        ws.state$.paletteData.selectedPhox.get(),
       );
       if (selectedPalettePhox) {
-        ws.phoxelis.storePhoxInPalette(ws.state.paletteData.selectedPhox, {
+        ws.phoxelis.storePhoxInPalette(ws.state$.paletteData.selectedPhox.get(), {
           char: selectedPalettePhox.char,
-          fg:
-            ws.state.selectedColorType === 'fg'
-              ? ws.state.dp[ws.state.selectedColorType]
-              : selectedPalettePhox.fg,
-          bg:
-            ws.state.selectedColorType === 'bg'
-              ? ws.state.dp[ws.state.selectedColorType]
-              : selectedPalettePhox.bg,
+          fg: selectedColorType === 'fg' ? dp[selectedColorType] : selectedPalettePhox.fg,
+          bg: selectedColorType === 'bg' ? dp[selectedColorType] : selectedPalettePhox.bg,
         });
       }
     }
@@ -41,9 +40,9 @@ export function createColorPicker(ws: Workspace) {
   colorPicker.on('color:change', handleColorPickeChange);
 
   const selectColorType = (type: 'fg' | 'bg') => {
-    ws.state.selectedColorType = type;
-    colorPicker.color.hexString = ws.state.dp[type];
-  }
+    ws.state$.selectedColorType.set(type);
+    colorPicker.color.hexString = ws.state$.dp[type].get();
+  };
 
   const fgColorButton = document.createElement('button');
   fgColorButton.innerHTML = 'Foreground';

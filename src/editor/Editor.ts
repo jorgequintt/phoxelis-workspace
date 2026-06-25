@@ -127,22 +127,26 @@ export class Editor {
     );
   }
 
+  public async createWorkspace(config: WorkspaceInputConfig) {
+    return await Workspace.create(config);
+  }
+
   public async startSession(
     config: WorkspaceInputConfig = {
       size: { rows: 37, cols: 152 },
       fontName: '1_Trithemius8x16',
     },
-    name?: string,
+    documentName?: string,
   ) {
     if (this.editorSession) {
       this.editorSession.currentWorkspace.dispose();
     }
 
-    const ws = await Workspace.create(config);
+    const ws = await this.createWorkspace(config);
 
     this.editorSession = {
       currentWorkspace: ws,
-      documentName: name,
+      documentName
     };
 
     this.mountLayout();

@@ -10,6 +10,7 @@ export function createPaletteSelector(ws: Workspace) {
   const paletteScaledHeight = ws.font.height * paletteScale;
   ws.phoxelis.palette.style = `height: ${paletteScaledHeight}px; image-rendering: pixelated; border: 1px solid black;`;
   paletteOverlay.style = `height: ${paletteScaledHeight}px; border: 1px solid black; position: absolute; top: 0; left: 0; image-rendering: pixelated;`;
+
   const onPaletteOverlayClick = (e: MouseEvent) => {
     if (!paletteOverlay) {
       console.error(
@@ -27,20 +28,25 @@ export function createPaletteSelector(ws: Workspace) {
       console.warn('Null Phox selected. Omitting selection');
       return;
     }
-    ws.state.dp = phox;
-    ws.state.paletteData.selectedPhox = pos;
-    ws.colorPicker.picker.color.hexString = ws.state.dp[ws.state.selectedColorType];
+
+    const dp = ws.state$.dp.get();
+    const selectedColorType = ws.state$.selectedColorType.get();
+    ws.state$.dp.set(phox);
+    ws.state$.paletteData.selectedPhox.set(pos);
+    ws.colorPicker.picker.color.hexString = dp[selectedColorType];
     ws.alphabet.selectCharInAlphabet(
       ws.font.charactersList.findIndex(
-        (c) => c.codepoint === ws.state.dp.char.codePointAt(0),
+        (c) => c.codepoint === dp.char.codePointAt(0),
       ),
     );
+
     const ctx = paletteOverlay.getContext('2d');
     ctx!.reset();
     ctx!.strokeStyle = 'green';
     ctx!.lineWidth = 2;
     ctx!.strokeRect(pos * ws.font.width, 0, ws.font.width, ws.font.height);
   };
+
   paletteOverlay.addEventListener('click', onPaletteOverlayClick);
   paletteSelector.append(ws.phoxelis.palette);
   paletteSelector.append(paletteOverlay);

@@ -30,55 +30,59 @@ export class DrawManager {
     layerId: string,
     options: { draftErasure: boolean } = { draftErasure: false },
   ) {
-    const { state, phoxelis } = this.ws;
-    if (state.drawMode === 'draw') {
-      target.renderPhoxel(state.dp.char, state.dp.fg, state.dp.bg, r, c, layerId);
+    const { state$, phoxelis } = this.ws;
+    const dp = state$.dp.get();
+    const drawMode = state$.drawMode.get();
+    const activeLayer = state$.activeLayer.get();
+    
+    if (drawMode === 'draw') {
+      target.renderPhoxel(dp.char, dp.fg, dp.bg, r, c, layerId);
       return;
-    } else if (state.drawMode === 'char') {
-      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, state.activeLayer);
+    } else if (drawMode === 'char') {
+      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, activeLayer);
       if (!underlyingPhoxel) return;
       target.renderPhoxel(
-        state.dp.char,
+        dp.char,
         underlyingPhoxel.fg,
         underlyingPhoxel.bg,
         r,
         c,
         layerId,
       );
-    } else if (state.drawMode === 'color') {
-      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, state.activeLayer);
+    } else if (drawMode === 'color') {
+      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, activeLayer);
       if (!underlyingPhoxel) return;
       target.renderPhoxel(
         underlyingPhoxel.char,
-        state.dp.fg,
-        state.dp.bg,
+        dp.fg,
+        dp.bg,
         r,
         c,
         layerId,
       );
-    } else if (state.drawMode === 'fg') {
-      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, state.activeLayer);
+    } else if (drawMode === 'fg') {
+      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, activeLayer);
       if (!underlyingPhoxel) return;
       target.renderPhoxel(
         underlyingPhoxel.char,
-        state.dp.fg,
+        dp.fg,
         underlyingPhoxel.bg,
         r,
         c,
         layerId,
       );
-    } else if (state.drawMode === 'bg') {
-      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, state.activeLayer);
+    } else if (drawMode === 'bg') {
+      const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, activeLayer);
       if (!underlyingPhoxel) return;
       target.renderPhoxel(
         underlyingPhoxel.char,
         underlyingPhoxel.fg,
-        state.dp.bg,
+        dp.bg,
         r,
         c,
         layerId,
       );
-    } else if (state.drawMode === 'erase') {
+    } else if (drawMode === 'erase') {
       if (options.draftErasure) {
         target.renderPhoxel('D', '#FF0000', '#FF000055', r, c, layerId);
       } else {

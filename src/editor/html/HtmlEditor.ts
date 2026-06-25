@@ -2,13 +2,13 @@ import _ from 'lodash';
 import {
   fileToBase64,
   toggleFullScreen,
-} from '../utils';
+} from '../../utils';
 import {
-  type DocumentLayer,
-} from '../workspace/Workspace';
-import { Editor } from './Editor';
-import { toolDefs, type ToolDefinition } from '../workspace/Toolbox';
-import { drawModeDefs, type DrawModeDefinition } from '../workspace/DrawManager';
+  type WorkspaceLayer,
+} from '../../workspace/Workspace';
+import { Editor } from '../Editor';
+import { toolDefs, type ToolDefinition } from '../../workspace/Toolbox';
+import { drawModeDefs, type DrawModeDefinition } from '../../workspace/DrawManager';
 
 const appRoot = document.querySelector('#app')!;
 
@@ -92,7 +92,7 @@ export class HtmlEditor extends Editor {
         .forEach((lid) => {
           let layerEl = layerList.querySelector(`#layer-${lid}`);
           if (!layerEl) {
-            layerEl = createLayerElement(lid, w.data.layers[lid]);
+            layerEl = createLayerElement(lid, w.data$.layers.get()[lid]);
           }
           layerList.appendChild(layerEl);
         });
@@ -106,14 +106,14 @@ export class HtmlEditor extends Editor {
         return;
       }
 
-      w.state.activeLayer = layerId;
+      w.state$.activeLayer.set(layerId);
 
       layerList
         .querySelectorAll('.layer-row')
         .forEach((el) => ((el as HTMLDivElement).style.background = '#2a2a2a'));
       (layerRow as HTMLDivElement).style.background = '#7a7a7a';
     }
-    selectLayer(w.state.activeLayer);
+    selectLayer(w.state$.activeLayer.get());
 
     const drawModeButtons: HTMLButtonElement[] = [];
 
@@ -139,7 +139,7 @@ export class HtmlEditor extends Editor {
         btn.style.background = '#555';
       });
       btn.addEventListener('mouseleave', () => {
-        btn.style.background = w.state.drawMode === def.name ? '#666' : '#444';
+        btn.style.background = w.state$.drawMode.get() === def.name ? '#666' : '#444';
       });
       btn.addEventListener('click', () => {
         drawModeButtons.forEach((b) => {
@@ -148,7 +148,7 @@ export class HtmlEditor extends Editor {
         });
         btn.style.background = '#666';
         btn.style.borderColor = '#888';
-        w.state.drawMode = def.name;
+        w.state$.drawMode.set(def.name);
       });
       return btn;
     }
@@ -267,18 +267,18 @@ export class HtmlEditor extends Editor {
     moveRefImageToggle.type = 'checkbox';
     moveRefImageToggle.addEventListener('change', (e) => {
       const checked = (e.target as HTMLInputElement).checked;
-      w.state.movingRefImage = checked;
+      w.state$.movingRefImage.set(checked);
     });
     navBar.appendChild(moveRefImageToggle);
 
     const modifyPalettePhoxButton = document.createElement('button');
     modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
     modifyPalettePhoxButton.onclick = () => {
-      if (!w.state.paletteData.modifyingPhox) {
-        w.state.paletteData.modifyingPhox = true;
+      if (!w.state$.paletteData.modifyingPhox.get()) {
+        w.state$.paletteData.modifyingPhox.set(true);
         modifyPalettePhoxButton.innerHTML = 'UPDATING PALETTE PHOX';
       } else {
-        w.state.paletteData.modifyingPhox = false;
+        w.state$.paletteData.modifyingPhox.set(false);
         modifyPalettePhoxButton.innerHTML = 'Modify Palette Phox';
       }
     };
@@ -334,7 +334,7 @@ cursor: pointer;
 `;
     addLayerBtn.addEventListener('click', () => {
       const layerId = w.createLayer();
-      createLayerElement(layerId, w.data.layers[layerId]);
+      createLayerElement(layerId, w.data$.layers.get()[layerId]);
       selectLayer(layerId);
       renderLayerList();
     });
@@ -353,8 +353,8 @@ font-size: 11px;
 cursor: pointer;
 `;
     removeLayerBtn.addEventListener('click', () => {
-      const layerId = w.state.activeLayer;
-      w.removeLayer(w.state.activeLayer);
+      const layerId = w.state$.activeLayer.get();
+      w.removeLayer(w.state$.activeLayer.get());
       layerList.removeChild(layerList.querySelector(`#layer-${layerId}`)!);
       renderLayerList();
     });
@@ -362,7 +362,7 @@ cursor: pointer;
 
     layerPanel.appendChild(layerActions);
 
-    function createLayerElement(layerId: string, layer: DocumentLayer) {
+    function createLayerElement(layerId: string, layer: WorkspaceLayer) {
       const layerRow = document.createElement('div');
       layerRow.id = `layer-${layerId}`;
       layerRow.classList.add('layer-row');

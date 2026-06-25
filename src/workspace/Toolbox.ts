@@ -186,7 +186,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     onPointerMove(e) {
       if (!this.data.panzooming) return;
-      const targetZoom = ws.state.movingRefImage ? dbd.refImagePanzoom : dbd.panzoom;
+      const targetZoom = ws.state$.movingRefImage.get() ? dbd.refImagePanzoom : dbd.panzoom;
 
       if (!targetZoom) {
         console.error(
@@ -212,7 +212,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     onPinchStart() {
       this.data.panzooming = true;
-      const targetZoom = ws.state.movingRefImage ? dbd.refImagePanzoom : dbd.panzoom;
+      const targetZoom = ws.state$.movingRefImage.get() ? dbd.refImagePanzoom : dbd.panzoom;
 
       if (!targetZoom) {
         console.error(
@@ -221,7 +221,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
         return;
       }
 
-      if (ws.state.movingRefImage) {
+      if (ws.state$.movingRefImage.get()) {
         ws.drawboard.refImageScale = targetZoom.getScale();
       } else {
         ws.drawboard.scale = targetZoom.getScale();
@@ -229,7 +229,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     onPinchMove(e) {
       if (this.data.panzooming) {
-        const targetZoom = ws.state.movingRefImage ? dbd.refImagePanzoom : dbd.panzoom;
+        const targetZoom = ws.state$.movingRefImage.get() ? dbd.refImagePanzoom : dbd.panzoom;
 
         if (!targetZoom) {
           console.error(
@@ -238,7 +238,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
           return;
         }
 
-        const s = ws.state.movingRefImage
+        const s = ws.state$.movingRefImage.get()
           ? ws.drawboard.refImageScale
           : ws.drawboard.scale;
         const newZoomVal = s * e.scale;
@@ -288,11 +288,11 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     onPointerDown() {
       this.data.drawing = true;
-      this.addPhoxelToDraft({ phox: ws.state.dp, r: dbd.mousePos.y, c: dbd.mousePos.x });
+      this.addPhoxelToDraft({ phox: ws.state$.dp.get(), r: dbd.mousePos.y, c: dbd.mousePos.x });
     },
     onPointerMove() {
       if (this.data.drawing) {
-        this.addPhoxelToDraft({ phox: ws.state.dp, r: dbd.mousePos.y, c: dbd.mousePos.x });
+        this.addPhoxelToDraft({ phox: ws.state$.dp.get(), r: dbd.mousePos.y, c: dbd.mousePos.x });
       }
     },
     onPointerUp() {

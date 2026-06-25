@@ -11,10 +11,10 @@ export function createChangesStack(ws: Workspace) {
   const commitPhoxels = (phoxelPositions: Array<PhoxelPosition>) => {
     const undoChanges: ChangesStack = [];
     const changes: ChangesStack = [];
-    const currentLayerId = ws.state.activeLayer; // Captured for undo/redo funcs
+    const currentLayerId = ws.state$.activeLayer.get(); // Captured for undo/redo funcs
 
     phoxelPositions.forEach(([r, c]) => {
-      const origPhox = phoxelis.getPhoxFromPosition(r, c, ws.state.activeLayer);
+      const origPhox = phoxelis.getPhoxFromPosition(r, c, ws.state$.activeLayer.get());
       if (!origPhox) {
         // Note: Pass currentLayerId, not ws.state.activeLayer to funcs
         undoChanges.push(() => phoxelis.removePhoxel(r, c, currentLayerId));
@@ -31,9 +31,9 @@ export function createChangesStack(ws: Workspace) {
         );
       }
 
-      ws.drawManager.draw(phoxelis, r, c, ws.state.activeLayer);
+      ws.drawManager.draw(phoxelis, r, c, ws.state$.activeLayer.get());
 
-      const newPhox = phoxelis.getPhoxFromPosition(r, c, ws.state.activeLayer);
+      const newPhox = phoxelis.getPhoxFromPosition(r, c, ws.state$.activeLayer.get());
       if (!newPhox) {
         changes.push(() => phoxelis.removePhoxel(r, c, currentLayerId));
       } else {

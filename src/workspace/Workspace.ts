@@ -9,6 +9,7 @@ import { createChangesStack } from './ChangesStack';
 import { createHotkeyManager } from './HotkeyManager';
 import { Toolbox } from './Toolbox';
 import { DrawManager } from './DrawManager';
+import { observable, type Observable } from '@legendapp/state';
 
 export type Phoxel = {
   phox: Phox;
@@ -17,14 +18,14 @@ export type Phoxel = {
 };
 export type PhoxelPosition = [r: number, c: number];
 
-export type DocumentLayer = {
+export type WorkspaceLayer = {
   name: string;
   opacity: number;
   visible: boolean;
 };
 
-interface DocumentState {
-  layers: Record<string, DocumentLayer>;
+interface DocumentData {
+  layers: Record<string, WorkspaceLayer>;
 }
 
 interface State {
@@ -44,7 +45,7 @@ interface State {
 
 export interface WorkspaceData {
   phoxelis: ReturnType<PhoxelisObj['exportPhoxelis']>;
-  layers: DocumentState['layers'];
+  layers: DocumentData['layers'];
   refImage: {
     src: string;
     config: {
@@ -73,7 +74,11 @@ export class Workspace {
   font: Font;
   phoxelis: PhoxelisObj;
   draftScreen: PhoxelisObj;
-  state: State = {
+  layersTargets: Record<string, HTMLCanvasElement> = {};
+  data$: Observable<DocumentData> = observable({
+    layers: {},
+  } as DocumentData); // TODO fix?
+  state$: Observable<State> = observable({
     dp: { char: 'D', fg: '#00FF00', bg: '#FF00FF' },
     drawMode: 'draw',
     activeLayer: '',
@@ -86,11 +91,7 @@ export class Workspace {
     },
     selectedColorType: 'fg',
     movingRefImage: false,
-  };
-  data: DocumentState = {
-    layers: {},
-  };
-  layersTargets: Record<string, HTMLCanvasElement> = {};
+  });
   drawboard: Drawboard;
   colorPicker: ReturnType<typeof createColorPicker>;
   alphabet: ReturnType<typeof createAlphabetSelector>;
@@ -107,7 +108,7 @@ export class Workspace {
     return new Workspace(config, font);
   }
 
-  private constructor(config: WorkspaceInputConfig, font: Font) {
+  protected constructor(config: WorkspaceInputConfig, font: Font) {
     this.config = config;
     const { size } = this.config;
 
@@ -117,7 +118,7 @@ export class Workspace {
       createBaseLayer: false,
     });
     this.draftScreen = Phoxelis(size.rows, size.cols, font);
-    this.createLayer(); // create base layer manually
+    this.createLayer();
 
     // MARK: Modules
     this.drawboard = new Drawboard(this);
@@ -141,7 +142,7 @@ export class Workspace {
       const { data } = this.config;
       this.phoxelis.importPhoxelis(data.phoxelis);
 
-      this.data.layers = _.mapValues(data.layers, (l, k) => {
+      const newLayers = _.mapValues(data.layers, (l, k) => {
         const target = this.createLayerTarget();
         this.layersTargets[k] = target;
 
@@ -149,6 +150,7 @@ export class Workspace {
           ...l,
         };
       });
+      this.data$.layers.set(newLayers);
       this.selectLayer(this.phoxelis.layers[0].id);
       this.drawboard.setReferenceImage(data.refImage.src);
     }
@@ -160,8 +162,8 @@ export class Workspace {
       this.phoxelis.renderFrame(
         this.phoxelis.layers.map((l) => ({
           additionalTarget: this.layersTargets[l.id],
-          opacity: this.data.layers[l.id].visible
-            ? this.data.layers[l.id].opacity / 100
+          opacity: this.data$.layers.get()[l.id].visible
+            ? this.data$.layers.get()[l.id].opacity / 100
             : 0,
         })),
       );
@@ -180,7 +182,7 @@ export class Workspace {
   exportData(): WorkspaceExportConfig {
     const {
       phoxelis,
-      data,
+      data$,
       drawboard,
       config: { size, fontName },
     } = this;
@@ -192,7 +194,7 @@ export class Workspace {
       size,
       fontName,
       data: {
-        layers: data.layers,
+        layers: data$.layers.get(),
         phoxelis: phoxelisData,
         refImage: {
           src: refImage.img.src ?? '',
@@ -217,11 +219,11 @@ export class Workspace {
 
     const lid = layerId ?? this.phoxelis.addLayer();
 
-    this.data.layers[lid] = {
+    this.data$.layers[lid].set({
       name: `Layer #${this.phoxelis.layers.length}`,
       opacity: 100,
       visible: true,
-    };
+    });
 
     this.layersTargets[lid] = target;
 
@@ -236,7 +238,7 @@ export class Workspace {
 
     const layerPosition = this.phoxelis.layerPositions[layerId];
     this.phoxelis.removeLayer(layerId);
-    delete this.data.layers[layerId];
+    this.data$.layers[layerId].delete();
 
     const newSelectPos = Math.max(
       0,
@@ -251,7 +253,7 @@ export class Workspace {
   }
 
   public selectLayer(layerId: string) {
-    this.state.activeLayer = layerId;
+    this.state$.activeLayer.set(layerId);
   }
 
   public getSortedLayers() {
