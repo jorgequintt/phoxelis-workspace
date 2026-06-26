@@ -1,8 +1,10 @@
 import type { PhoxelisObj } from 'phoxelis';
 import type { Workspace } from './Workspace';
 
+export type DrawModeName = 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase';
+
 export type DrawModeDefinition = {
-  name: 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase';
+  name: DrawModeName;
   icon: string;
   tooltip: string;
 };

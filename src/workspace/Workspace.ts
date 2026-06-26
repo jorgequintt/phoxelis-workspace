@@ -7,8 +7,8 @@ import { createColorPicker } from './elements/colorPicker';
 import { createPaletteSelector } from './elements/palette';
 import { createChangesStack } from './ChangesStack';
 import { createHotkeyManager } from './HotkeyManager';
-import { Toolbox } from './Toolbox';
-import { DrawManager } from './DrawManager';
+import { Toolbox, type ToolName } from './Toolbox';
+import { DrawManager, type DrawModeName } from './DrawManager';
 import { observable, type Observable } from '@legendapp/state';
 
 export type Phoxel = {
@@ -30,7 +30,8 @@ interface DocumentData {
 
 interface State {
   dp: Phox;
-  drawMode: 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase';
+  drawMode: DrawModeName;
+  tool: ToolName;
   activeLayer: string;
   paletteData: {
     selectedPhox: number;
@@ -81,6 +82,7 @@ export class Workspace {
   state$: Observable<State> = observable({
     dp: { char: 'D', fg: '#00FF00', bg: '#FF00FF' },
     drawMode: 'draw',
+    tool: 'draw',
     activeLayer: '',
     paletteData: {
       selectedPhox: -1,

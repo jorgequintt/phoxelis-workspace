@@ -16,5 +16,5 @@ export function DOMWrapper(props: { el: HTMLElement }) {
     };
   }, []);
 
-  return <div ref={containerRef}></div>;
+  return <div style={{display: 'contents'}} ref={containerRef}></div>;
 }

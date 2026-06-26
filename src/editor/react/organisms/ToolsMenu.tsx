@@ -10,6 +10,7 @@ export function ToolsMenu() {
     <Container>
       {toolDefs.map((t) => (
         <SideButton
+          key={t.name}
           title={t.tooltip}
           onClick={() => {
             ws.toolbox.setTool(t.name);

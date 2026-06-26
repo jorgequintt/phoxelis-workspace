@@ -1,15 +1,10 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 import type { Workspace } from '../../workspace/Workspace';
 import type { Editor } from '../Editor';
-import LayersPanel from './organisms/LayersPanel';
 import styled from 'styled-components';
 import { NavBar } from './NavBar';
-import { Content } from './workspace-containers/Content';
-import { Footer } from './workspace-containers/Footer';
-import { Sidebar } from './workspace-containers/Sidebar';
-import { DOMWrapper } from './atoms/DOMWrapper';
-import { DrawModeMenu } from './organisms/DrawModeMenu';
-import { ToolsMenu } from './organisms/ToolsMenu';
+import { Content } from './layout/Content';
+import { Footer } from './layout/Footer';
 
 interface AppContextValue {
   ws: Workspace;
@@ -30,20 +25,15 @@ interface Props {
 }
 
 export default function App({ ws, ed }: Props) {
+  useEffect(() => {
+    ws.drawboard.startPanzoom();
+  });
+
   return (
     <AppContext.Provider value={{ ws, ed }}>
       <Container>
         <NavBar />
-        <Content>
-          <DrawModeMenu />
-          <ToolsMenu />
-          <DOMWrapper el={ws.drawboard.element} />
-          <Sidebar>
-            <DOMWrapper el={ws.alphabet.element} />
-            <DOMWrapper el={ws.colorPicker.element}/>
-            <LayersPanel />
-          </Sidebar>
-        </Content>
+        <Content />
         <Footer />
       </Container>
     </AppContext.Provider>
@@ -51,5 +41,8 @@ export default function App({ ws, ed }: Props) {
 }
 
 const Container = styled.div`
-width: 100%; height: 100%; display: flex; flex-direction: column;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 `;

@@ -1,7 +1,7 @@
 import { Workspace, type Phoxel, type PhoxelPosition } from './Workspace';
 
 export interface Tool {
-  name: string;
+  name: ToolName;
   onPointerDown?: (e: PointerEvent) => void;
   onPointerMove?: (e: PointerEvent) => void;
   onPointerUp?: (e: PointerEvent) => void;
@@ -27,7 +27,7 @@ export type CurrentTool = {
 };
 
 export type ToolDefinition = {
-  name: string;
+  name: ToolName;
   icon: string;
   tooltip: string;
 };
@@ -128,6 +128,8 @@ export class Toolbox {
         onPinchEnd: (e) => tool.onPinchEnd?.(e),
       },
     };
+
+    this.ws.state$.tool.set(tool.name);
 
     drawboard.element.addEventListener(
       'pointerdown',
@@ -739,3 +741,5 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     filledEllipse: filledEllipseTool,
   };
 }
+
+export type ToolName = keyof ReturnType<typeof createTools>;
