@@ -1,10 +1,11 @@
 import _ from 'lodash';
-import {
-  type WorkspaceLayer,
-} from '../../workspace/Workspace';
+import { type WorkspaceLayer } from '../../workspace/Workspace';
 import { Editor } from '../Editor';
-import { toolDefs, type ToolDefinition } from '../../workspace/Toolbox';
-import { drawModeDefs, type DrawModeDefinition } from '../../workspace/DrawManager';
+import { toolDefs, type ToolDefinition } from '../../workspace/modules/Toolbox';
+import {
+  drawModeDefs,
+  type DrawModeDefinition,
+} from '../../workspace/modules/DrawManager';
 
 const appRoot = document.querySelector('#app')!;
 

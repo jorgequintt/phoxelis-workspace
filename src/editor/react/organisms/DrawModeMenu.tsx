@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { drawModeDefs } from '../../../workspace/DrawManager';
+import { drawModeDefs } from '../../../workspace/modules/DrawManager';
 import { SideButton } from '../atoms/SideButton';
 import { useAppContext } from '../App';
 import { useValue } from '@legendapp/state/react';

@@ -1,7 +1,7 @@
 import styled from 'styled-components';
 import { SideButton } from '../atoms/SideButton';
 import { useAppContext } from '../App';
-import { toolDefs } from '../../../workspace/Toolbox';
+import { toolDefs } from '../../../workspace/modules/Toolbox';
 import { useValue } from '@legendapp/state/react';
 
 export function ToolsMenu() {
@@ -12,7 +12,7 @@ export function ToolsMenu() {
     <Container>
       {toolDefs.map((t) => (
         <SideButton
-        active={currentTool === t.name}
+          active={currentTool === t.name}
           key={t.name}
           title={t.tooltip}
           onClick={() => {

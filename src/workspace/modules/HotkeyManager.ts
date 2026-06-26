@@ -1,4 +1,4 @@
-import type { Workspace } from './Workspace';
+import type { Workspace } from '../Workspace';
 
 export function createHotkeyManager(ws: Workspace) {
   // MARK: Hotkeys

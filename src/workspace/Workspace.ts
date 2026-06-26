@@ -5,10 +5,10 @@ import { Drawboard } from './elements/Drawboard';
 import { createAlphabetSelector } from './elements/alphabet';
 import { createColorPicker } from './elements/colorPicker';
 import { createPaletteSelector } from './elements/palette';
-import { createChangesStack } from './ChangesStack';
-import { createHotkeyManager } from './HotkeyManager';
-import { Toolbox, type ToolName } from './Toolbox';
-import { DrawManager, type DrawModeName } from './DrawManager';
+import { createChangesStack } from './modules/ChangesStack';
+import { createHotkeyManager } from './modules/HotkeyManager';
+import { Toolbox, type ToolName } from './modules/Toolbox';
+import { DrawManager, type DrawModeName } from './modules/DrawManager';
 import { observable, type Observable } from '@legendapp/state';
 
 export type Phoxel = {
