@@ -132,6 +132,27 @@ export class Workspace {
     this.toolbox = new Toolbox(this);
     this.hotkeyManager = createHotkeyManager(this);
 
+    this.hotkeyManager.hotkeys.push(
+      { ctrl: true, key: 'z', onHotkeyEnd: () => this.changesStack.undoLastChange() },
+      { ctrl: true, key: 'y', onHotkeyEnd: () => this.changesStack.redoLastChange() },
+      {
+        ctrl: true,
+        mouse: 0,
+        onHotkeyStart: (e) => {
+          this.toolbox.setTool(this.toolbox.tools.panzoom);
+          this.toolbox.currentTool?.handlers.onPointerDown(e as PointerEvent);
+        },
+      },
+      {
+        shift: true,
+        mouse: 0,
+        onHotkeyStart: (e) => {
+          this.toolbox.setTool(this.toolbox.tools.panzoom);
+          this.toolbox.currentTool?.handlers.onPointerDown(e as PointerEvent);
+        },
+      },
+    );
+
     this.loadData();
 
     this.startRenderLoop();

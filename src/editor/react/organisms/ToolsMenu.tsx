@@ -2,14 +2,17 @@ import styled from 'styled-components';
 import { SideButton } from '../atoms/SideButton';
 import { useAppContext } from '../App';
 import { toolDefs } from '../../../workspace/Toolbox';
+import { useValue } from '@legendapp/state/react';
 
 export function ToolsMenu() {
   const { ws } = useAppContext();
+  const currentTool = useValue(ws.state$.tool);
 
   return (
     <Container>
       {toolDefs.map((t) => (
         <SideButton
+        active={currentTool === t.name}
           key={t.name}
           title={t.tooltip}
           onClick={() => {

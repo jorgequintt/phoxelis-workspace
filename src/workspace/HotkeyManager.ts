@@ -12,26 +12,7 @@ export function createHotkeyManager(ws: Workspace) {
     onHotkeyEnd?: (e: KeyboardEvent | PointerEvent) => void;
   }
 
-  const hotkeys: Hotkey[] = [
-    { ctrl: true, key: 'z', onHotkeyEnd: () => ws.changesStack.undoLastChange() },
-    { ctrl: true, key: 'y', onHotkeyEnd: () => ws.changesStack.redoLastChange() },
-    {
-      ctrl: true,
-      mouse: 1,
-      onHotkeyStart: (e) => {
-        ws.toolbox.setTool(ws.toolbox.tools.panzoom);
-        ws.toolbox.currentTool?.handlers.onPointerDown(e as PointerEvent);
-      },
-    },
-    {
-      shift: true,
-      mouse: 1,
-      onHotkeyStart: (e) => {
-        ws.toolbox.setTool(ws.toolbox.tools.panzoom);
-        ws.toolbox.currentTool?.handlers.onPointerDown(e as PointerEvent);
-      },
-    },
-  ];
+  const hotkeys: Hotkey[] = [];
   const downHotkeys: Hotkey[] = [];
 
   const handleHotkeyKeydown = (e: KeyboardEvent) => {
