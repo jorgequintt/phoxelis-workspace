@@ -6,6 +6,7 @@ import styled from 'styled-components';
 export default function LayersPanel() {
   const { ws } = useAppContext();
   const layers = useValue(ws.data$.layers);
+  const activeLayer = useValue(ws.state$.activeLayer);
 
   const handleAddLayer = () => {
     const layerId = ws.createLayer();
@@ -24,8 +25,13 @@ export default function LayersPanel() {
         <ActionButton onClick={handleRemoveLayer}>− Remove</ActionButton>
       </LayerActions>
       <LayersList>
-        {ws.getSortedLayers().map(layerId => (
-          <LayerListItem key={layerId} layerId={layerId} layer={layers[layerId]} />
+        {ws.getSortedLayers().map((layerId) => (
+          <LayerListItem
+            key={layerId}
+            layerId={layerId}
+            layer={layers[layerId]}
+            active={layerId === activeLayer}
+          />
         ))}
       </LayersList>
     </Container>

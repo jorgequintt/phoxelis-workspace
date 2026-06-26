@@ -6,9 +6,10 @@ import styled from 'styled-components';
 interface Props {
   layerId: string;
   layer: WorkspaceLayer;
+  active: boolean;
 }
 
-export default function LayerListItem({ layerId, layer }: Props) {
+export default function LayerListItem({ layerId, layer, active }: Props) {
   const { ws } = useAppContext();
   const previewContainerRef = useRef<HTMLDivElement>(null);
 
@@ -31,34 +32,31 @@ export default function LayerListItem({ layerId, layer }: Props) {
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    layer.name = e.target.value;
+    ws.data$.layers[layerId].name.set(e.target.value);
   };
 
   const handleOpacityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    layer.opacity = parseInt(e.target.value);
+    ws.data$.layers[layerId].opacity.set(parseInt(e.target.value));
   };
 
   const handleVisibilityChange = (e: React.MouseEvent) => {
-    layer.visible = !layer.visible;
+    ws.data$.layers[layerId].visible.set(!layer.visible);
     e.stopPropagation();
   };
 
   return (
-    <LayerRow id={`layer-${layerId}`} onClick={handleLayerClick}>
+    <LayerRow id={`layer-${layerId}`} onClick={handleLayerClick} $active={active}>
       <DragHandle>⠿</DragHandle>
-
       <PreviewContainer ref={previewContainerRef} />
-
       <NameInput type="text" value={layer.name} onChange={handleNameChange} />
-
       <OpacitySlider
         type="range"
         min="0"
         max="100"
         value={layer.opacity}
         onChange={handleOpacityChange}
+        onClick={(e) => e.stopPropagation()}
       />
-
       <EyeBtn onClick={handleVisibilityChange} opacity={layer.visible ? 1 : 0.4}>
         {layer.visible ? '👁‍🗨' : '👁'}
       </EyeBtn>
@@ -66,12 +64,12 @@ export default function LayerListItem({ layerId, layer }: Props) {
   );
 }
 
-const LayerRow = styled.div`
+const LayerRow = styled.div<{ $active: boolean }>`
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 4px;
-  background: #2a2a2a;
+  background: ${(p) => (p.$active ? '#7a7a7a' : '#2a2a2a')};
   border: 1px solid #3a3a3a;
   border-radius: 3px;
   cursor: grab;
