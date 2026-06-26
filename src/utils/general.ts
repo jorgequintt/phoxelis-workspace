@@ -22,9 +22,7 @@ export function downloadArrayBuffer(
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url); // Free up memory
 }
-/**
- * Convert a file to a base64 data URL.
- */
+
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

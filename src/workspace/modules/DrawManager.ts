@@ -1,5 +1,5 @@
 import type { PhoxelisObj } from 'phoxelis';
-import type { Workspace } from './Workspace';
+import type { Workspace } from '../Workspace';
 
 export type DrawModeName = 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase';
 

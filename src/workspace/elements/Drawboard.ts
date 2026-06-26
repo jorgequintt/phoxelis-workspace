@@ -4,6 +4,19 @@ import { createRefImage } from './refImage';
 import type { PanzoomObject } from '@panzoom/panzoom';
 import Panzoom from '@panzoom/panzoom';
 
+export type CellChangeDetail = {
+  x: number;
+  y: number;
+};
+
+declare global {
+  interface HTMLElementEventMap {
+    'cellChange': CustomEvent<CellChangeDetail>;
+  }
+  interface DocumentEventMap {
+    'cellChange': CustomEvent<CellChangeDetail>;
+  }
+}
 
 export const panzoomConfiguration = {
   minScale: 0.15,
@@ -30,7 +43,7 @@ export class Drawboard {
   constructor(ws: Workspace) {
     this.ws = ws;
     this.refImage = createRefImage();
-    
+
     const drawboard = document.createElement('div');
     this.element = drawboard;
     drawboard.style =
@@ -62,21 +75,41 @@ export class Drawboard {
       const scale = width / (size.cols * font.width);
       const mouseScreenPosX = event.clientX - left;
       const mouseScreenPosY = event.clientY - top;
-      this.mousePos.x = Math.min(
+
+      const newPosX = Math.min(
         size.cols - 1,
         Math.max(0, Math.floor(mouseScreenPosX / (font.width * scale))),
       );
-      this.mousePos.y = Math.min(
+
+      const newPosY = Math.min(
         size.rows - 1,
         Math.max(0, Math.floor(mouseScreenPosY / (font.height * scale))),
       );
+
+      if (this.mousePos.x !== newPosX || this.mousePos.y !== newPosY) {
+        this.mousePos.x = newPosX;
+        this.mousePos.y = newPosY;
+
+        const cellChangeEvent = new CustomEvent<CellChangeDetail>(
+          'cellChange',
+          {
+            bubbles: true,
+            cancelable: true,
+            detail: {
+              x: newPosX,
+              y: newPosY,
+            },
+          },
+        );
+
+        drawboard.dispatchEvent(cellChangeEvent);
+      }
     };
 
     drawboard.addEventListener('pointerdown', setMousePos);
     drawboard.addEventListener('pointermove', setMousePos);
     drawboard.addEventListener('pointerup', setMousePos);
     window.addEventListener('mouseout', this.handleWindowMouseOut);
-  
   }
 
   handleWindowMouseOut = (e: MouseEvent) => {
@@ -107,7 +140,7 @@ export class Drawboard {
     const {
       config: { data },
     } = this.ws;
-  
+
     this.panzoom = Panzoom(
       this.element.firstElementChild as HTMLElement,
       panzoomConfiguration,

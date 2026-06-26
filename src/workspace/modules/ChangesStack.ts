@@ -1,4 +1,4 @@
-import type { PhoxelPosition, Workspace } from './Workspace';
+import type { PhoxelPosition, Workspace } from '../Workspace';
 
 export function createChangesStack(ws: Workspace) {
   const { phoxelis } = ws;

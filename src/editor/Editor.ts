@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { downloadArrayBuffer as downloadAsFile, fileToBase64 } from '../utils';
+import { downloadArrayBuffer as downloadAsFile, fileToBase64 } from '../utils/general';
 import {
   Workspace,
   type WorkspaceExportConfig,

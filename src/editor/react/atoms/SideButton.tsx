@@ -19,7 +19,7 @@ export function SideButton(props: Props) {
   return (
     <Button
       $hovered={isHovered}
-      active={active}
+      $active={active}
       onMouseEnter={handleHover}
       onMouseLeave={handleHoverOut}
       {...buttonProps}
@@ -29,8 +29,8 @@ export function SideButton(props: Props) {
   );
 }
 
-const Button = styled.button<{ active?: boolean; $hovered?: boolean }>`
-  background: ${(p) => (p.active ? '#888' : p.$hovered ? '#666' : '#444')};
+const Button = styled.button<{ $active?: boolean; $hovered?: boolean }>`
+  background: ${(p) => (p.$active ? '#888' : p.$hovered ? '#666' : '#444')};
   color: #ccc;
   border: 1px solid #555;
   border-radius: 3px;
