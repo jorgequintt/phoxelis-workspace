@@ -60,5 +60,5 @@ export function createColorPicker(ws: Workspace) {
     colorPickerEl.remove();
   };
 
-  return { picker: colorPicker, el: colorPickerEl, dispose };
+  return { picker: colorPicker, element: colorPickerEl, dispose };
 }

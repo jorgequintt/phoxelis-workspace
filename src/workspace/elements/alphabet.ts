@@ -84,5 +84,5 @@ export function createAlphabetSelector(ws: Workspace) {
 
   selectCharInAlphabet(1);
 
-  return { alphabet: alphabetContainer, selectCharInAlphabet };
+  return { element: alphabetContainer, selectCharInAlphabet };
 }

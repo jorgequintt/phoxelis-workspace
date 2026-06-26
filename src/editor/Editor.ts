@@ -1,7 +1,5 @@
 import _ from 'lodash';
-import {
-  downloadArrayBuffer as downloadAsFile,
-} from '../utils';
+import { downloadArrayBuffer as downloadAsFile, fileToBase64 } from '../utils';
 import {
   Workspace,
   type WorkspaceExportConfig,
@@ -69,12 +67,12 @@ export class Editor {
 
   /* To be implemented by users extending the Editor class */
   protected mountLayout() {
-    if(this.editorSession) {   
-      document.body.appendChild(this.editorSession.currentWorkspace.drawboard.element)
+    if (this.editorSession) {
+      document.body.appendChild(this.editorSession.currentWorkspace.drawboard.element);
     }
   }
 
-  protected async saveDocumentCommand() {
+  public async saveDocumentCommand() {
     if (!this.editorSession) {
       console.error('exportPhoxelisCommand: No active editor session.');
       return;
@@ -111,11 +109,11 @@ export class Editor {
     }
   }
 
-  protected async newDocumentCommand() {
+  public async newDocumentCommand() {
     await this.startSession();
   }
 
-  protected exportPhoxelisCommand() {
+  public exportPhoxelisCommand() {
     if (!this.editorSession) {
       console.error('exportPhoxelisCommand: No active editor session.');
       return;
@@ -126,6 +124,30 @@ export class Editor {
       `${this.editorSession.documentName ?? 'untitled'}.phoxelis`,
     );
   }
+
+  public async addReferenceImageCommand(file: File) {
+    const base64 = await fileToBase64(file);
+
+    if (!base64) {
+      console.error('addReferenceImage error: Failed converting image to base64');
+      return;
+    }
+
+    if (!this.editorSession?.currentWorkspace) {
+      console.error('addReferenceImage error: No current workspace to add reference image');
+      return;
+    }
+
+    this.editorSession?.currentWorkspace.drawboard.setReferenceImage(base64);
+  }
+
+  public async toggleFullScreenCommand() {
+  if (!document.fullscreenElement) {
+    document.body.requestFullscreen();
+  } else {
+    document.exitFullscreen?.();
+  }
+}
 
   public async createWorkspace(config: WorkspaceInputConfig) {
     return await Workspace.create(config);
@@ -146,7 +168,7 @@ export class Editor {
 
     this.editorSession = {
       currentWorkspace: ws,
-      documentName
+      documentName,
     };
 
     this.mountLayout();

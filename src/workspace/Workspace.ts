@@ -257,7 +257,7 @@ export class Workspace {
   }
 
   public getSortedLayers() {
-    return this.phoxelis.layers.map((l) => l.id);
+    return this.phoxelis.layers.map((l) => l.id).toReversed();
   }
 
   private createLayerTarget() {

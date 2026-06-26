@@ -1,9 +1,5 @@
 import _ from 'lodash';
 import {
-  fileToBase64,
-  toggleFullScreen,
-} from '../../utils';
-import {
   type WorkspaceLayer,
 } from '../../workspace/Workspace';
 import { Editor } from '../Editor';
@@ -227,7 +223,7 @@ export class HtmlEditor extends Editor {
 
     const fullscreenButton = document.createElement('button');
     fullscreenButton.innerHTML = 'Fullscreen';
-    fullscreenButton.onclick = () => toggleFullScreen(document.body);
+    fullscreenButton.onclick = () => this.toggleFullScreenCommand();
     navBar.appendChild(fullscreenButton);
 
     const exportButton = document.createElement('button');
@@ -247,18 +243,7 @@ export class HtmlEditor extends Editor {
         const file = e.target.files?.[0]; // Get the selected file
 
         if (file) {
-          // Convert to base64 for storage
-          try {
-            const base64 = await fileToBase64(file);
-
-            if (!base64) {
-              throw new Error('Failed converting image to base64');
-            }
-
-            w.drawboard.setReferenceImage(base64);
-          } catch (err) {
-            console.error('Failed to load reference image:', err);
-          }
+          this.addReferenceImageCommand(file);
         }
       }
     });
@@ -663,8 +648,8 @@ transition: opacity 0.1s;
 
     // layerList.replaceChildren();
     layerPanel.appendChild(layerList);
-    sidebar.appendChild(w.alphabet.alphabet);
-    sidebar.appendChild(w.colorPicker.el);
+    sidebar.appendChild(w.alphabet.element);
+    sidebar.appendChild(w.colorPicker.element);
     sidebar.appendChild(layerPanel);
 
     content.appendChild(secondLeftSidebar);
