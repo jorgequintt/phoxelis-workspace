@@ -1,18 +1,23 @@
 import type { CharShape } from 'phoxelis';
 import type { Workspace } from '../Workspace';
 
+const alphabetWidth = 150;
+const containerHeight = 200;
+const margin = 1;
+
 export function createAlphabetSelector(ws: Workspace) {
   const alphabetCanvas = document.createElement('canvas');
-  const alphabetWidth = 100;
-  const alphabetCols = Math.ceil(alphabetWidth / ws.font.width);
+  const cellWidth = ws.font.width + margin;
+  const cellHeight = ws.font.height + margin;
+  const alphabetCols = Math.ceil(alphabetWidth / cellWidth);
   const alphabetRows = Math.ceil(ws.font.length / alphabetCols);
-  alphabetCanvas.width = alphabetCols * ws.font.width;
-  alphabetCanvas.height = alphabetRows * ws.font.height;
+  alphabetCanvas.width = alphabetCols * cellWidth;
+  alphabetCanvas.height = alphabetRows * cellHeight;
   const alphabetViewScale = 2;
   alphabetCanvas.style = `width: ${alphabetCanvas.width * alphabetViewScale}px; image-rendering: pixelated;`;
   const alphabetCtx = alphabetCanvas.getContext('2d')!;
   const alphabetContainer = document.createElement('div');
-  alphabetContainer.style = 'height: 250px; overflow-y: scroll;';
+  alphabetContainer.style = `height: ${containerHeight}px; overflow-y: scroll;`;
   alphabetContainer.append(alphabetCanvas);
 
   const drawCharShapeInAlphabet = (
@@ -21,8 +26,8 @@ export function createAlphabetSelector(ws: Workspace) {
     fg: string,
     bg: string,
   ) => {
-    const yOffset = Math.floor(index / alphabetCols) * ws.font.height;
-    const xOffset = (index % alphabetCols) * ws.font.width;
+    const yOffset = Math.floor(index / alphabetCols) * cellHeight;
+    const xOffset = (index % alphabetCols) * cellWidth;
     for (let y = 0; y < charShape.length; y++) {
       for (let x = 0; x < charShape[0].length; x++) {
         const pixelVal = charShape[y][x];
@@ -37,8 +42,8 @@ export function createAlphabetSelector(ws: Workspace) {
   });
 
   alphabetCanvas.addEventListener('click', (e) => {
-    const r = Math.floor(e.offsetY / alphabetViewScale / ws.font.height);
-    const c = Math.floor(e.offsetX / alphabetViewScale / ws.font.width);
+    const r = Math.floor(e.offsetY / alphabetViewScale / cellHeight);
+    const c = Math.floor(e.offsetX / alphabetViewScale / cellWidth);
     const index = r * alphabetCols + c;
     const char = ws.font.charactersList[index];
     if (!char) throw new Error(`No char found for position y${r},x${c}`);

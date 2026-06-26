@@ -14,6 +14,7 @@ export function createColorPicker(ws: Workspace) {
         component: iro.ui.Slider,
       },
     ],
+    layoutDirection: 'horizontal'
   });
 
   const handleColorPickeChange = (color: { hexString: string }) => {
