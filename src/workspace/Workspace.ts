@@ -122,11 +122,15 @@ export class Workspace {
     this.draftScreen = Phoxelis(size.rows, size.cols, font);
     this.createLayer();
 
-    // MARK: Modules
+    // Elements
     this.drawboard = new Drawboard(this);
+    this.loadData();
+    
     this.colorPicker = createColorPicker(this);
     this.alphabet = createAlphabetSelector(this);
     this.palette = createPaletteSelector(this);
+    
+    // Modules
     this.drawManager = new DrawManager(this);
     this.changesStack = createChangesStack(this);
     this.toolbox = new Toolbox(this);
@@ -152,8 +156,6 @@ export class Workspace {
         },
       },
     );
-
-    this.loadData();
 
     this.startRenderLoop();
 
