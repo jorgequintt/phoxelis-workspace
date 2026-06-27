@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect } from 'react';
+import '@mantine/core/styles.css';
+import { MantineProvider } from '@mantine/core';
 import type { Workspace } from '../../workspace/Workspace';
 import type { Editor } from '../Editor';
 import styled from 'styled-components';
@@ -31,11 +33,13 @@ export default function App({ ws, ed }: Props) {
 
   return (
     <AppContext.Provider value={{ ws, ed }}>
-      <Container>
-        <NavBar />
-        <Content />
-        <Footer />
-      </Container>
+      <MantineProvider>
+        <Container>
+          <NavBar />
+          <Content />
+          <Footer />
+        </Container>
+      </MantineProvider>
     </AppContext.Provider>
   );
 }
