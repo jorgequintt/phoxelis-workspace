@@ -13,5 +13,4 @@ export function Footer() {
 }
 
 const Container = styled.div`
-  overflow-x: scroll;
 `;

@@ -1,16 +1,23 @@
-import { observe } from '@legendapp/state';
 import type { Workspace } from '../Workspace';
+
+const indicatorHeight = 10;
 
 export function createPaletteSelector(ws: Workspace) {
   const paletteScale = 2;
-  const paletteSelector = document.createElement('div');
-  paletteSelector.style = 'position: relative;';
   const paletteOverlay = document.createElement('canvas');
   paletteOverlay.width = ws.phoxelis.palette.width;
   paletteOverlay.height = ws.phoxelis.palette.height;
   const paletteScaledHeight = ws.font.height * paletteScale;
-  ws.phoxelis.palette.style = `height: ${paletteScaledHeight}px; image-rendering: pixelated; border: 1px solid black;`;
-  paletteOverlay.style = `height: ${paletteScaledHeight}px; border: 1px solid black; position: absolute; top: 0; left: 0; image-rendering: pixelated;`;
+
+  ws.phoxelis.palette.style = `position: absolute; top: ${indicatorHeight / 3}px; left: 0; height: ${paletteScaledHeight}px; image-rendering: pixelated; display: block;`;
+  
+  paletteOverlay.style = `height: ${paletteScaledHeight + indicatorHeight}px; width: ${ws.phoxelis.palette.width * paletteScale}px; border-top: 1px solid black; image-rendering: pixelated; display: block;`;
+
+  const paletteSelector = document.createElement('div');
+  paletteSelector.style = `position: relative; overflow: overlay; scrollbar-width: none;`;
+
+  paletteSelector.append(paletteOverlay);
+  paletteSelector.append(ws.phoxelis.palette);
 
   const onPaletteOverlayClick = (e: MouseEvent) => {
     if (!paletteOverlay) {
@@ -42,9 +49,8 @@ export function createPaletteSelector(ws: Workspace) {
   function renderIndicator(index: number, color = 'green') {
     const ctx = paletteOverlay.getContext('2d');
     ctx!.reset();
-    ctx!.strokeStyle = color;
-    ctx!.lineWidth = 2;
-    ctx!.strokeRect(index * ws.font.width, 0, ws.font.width, ws.font.height);
+    ctx!.fillStyle = color;
+    ctx!.fillRect(index * ws.font.width, 0, ws.font.width, ws.font.height);
   }
 
   ws.state$.paletteData.selectedPhox.onChange(({ value: selectedPhox }) => {
@@ -79,8 +85,7 @@ export function createPaletteSelector(ws: Workspace) {
   });
 
   paletteOverlay.addEventListener('click', onPaletteOverlayClick);
-  paletteSelector.append(ws.phoxelis.palette);
-  paletteSelector.append(paletteOverlay);
+  ws.phoxelis.palette.addEventListener('click', onPaletteOverlayClick);
 
   return paletteSelector;
 }

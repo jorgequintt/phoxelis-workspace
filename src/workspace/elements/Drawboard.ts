@@ -48,8 +48,8 @@ export class Drawboard {
     this.element = drawboard;
     drawboard.style =
       'width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;';
-    ws.phoxelis.canvas.style = `position: relative; border: 1px solid black; image-rendering: pixelated;`;
-    ws.draftScreen.canvas.style = `position: absolute; top: 0px; right: 0px; border: 1px solid black; image-rendering: pixelated;`;
+    ws.phoxelis.canvas.style = `display: block; position: relative; border: 1px solid black; image-rendering: pixelated;`;
+    ws.draftScreen.canvas.style = `display: block; position: absolute; top: 0px; right: 0px; border: 1px solid black; image-rendering: pixelated;`;
 
     const layersWrapper = document.createElement('div');
     layersWrapper.style = 'position: relative';
