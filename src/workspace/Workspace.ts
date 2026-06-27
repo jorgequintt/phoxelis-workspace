@@ -112,6 +112,7 @@ export class Workspace {
     this.phoxelis = Phoxelis(size.rows, size.cols, font, {
       renderPalette: true,
       createBaseLayer: false,
+      paletteDirection: 'left'
     });
     this.draftScreen = Phoxelis(size.rows, size.cols, font);
     this.createLayer();
@@ -285,6 +286,10 @@ export class Workspace {
     target.height = this.font.height * this.config.size.rows;
     target.style = `height: 100%; width: 100%; object-fit: contain;`;
     return target;
+  }
+
+  public onMounted() {
+    this.drawboard.startPanzoom();
   }
 
   public dispose() {

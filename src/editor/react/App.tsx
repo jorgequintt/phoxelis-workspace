@@ -26,7 +26,7 @@ interface Props {
 
 export default function App({ ws, ed }: Props) {
   useEffect(() => {
-    ws.drawboard.startPanzoom();
+    ws.onMounted();
   });
 
   return (
