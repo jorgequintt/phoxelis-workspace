@@ -48,46 +48,30 @@ export function createAlphabetSelector(ws: Workspace) {
     const char = ws.font.charactersList[index];
     if (!char) throw new Error(`No char found for position y${r},x${c}`);
 
-    selectCharInAlphabet(index);
-
-    if (
-      ws.state$.paletteData.modifyingPhox.get() &&
-      ws.state$.paletteData.selectedPhox.get() > 0
-    ) {
-      const selectedPalettePhox = ws.phoxelis.getPhoxFromPaletteIndex(
-        ws.state$.paletteData.selectedPhox.get(),
-      );
-      if (selectedPalettePhox) {
-        ws.phoxelis.storePhoxInPalette(ws.state$.paletteData.selectedPhox.get(), {
-          char: ws.state$.dp.char.get(),
-          fg: selectedPalettePhox.fg,
-          bg: selectedPalettePhox.bg,
-        });
-      }
-    }
+    ws.state$.dp.char.set(String.fromCodePoint(char.codepoint));
   });
 
-  const selectCharInAlphabet = (index: number) => {
-    const char = ws.font.charactersList[index];
+  ws.state$.dp.char.onChange(({ value, getPrevious }) => {
+    const charIndex = ws.font.charactersList.findIndex(
+      (c) => c.codepoint === value.codePointAt(0),
+    );
+    const prevCharIndex = ws.font.charactersList.findIndex(
+      (c) => c.codepoint === getPrevious().codePointAt(0),
+    );
 
     drawCharShapeInAlphabet(
-      ws.state$.alphabetData.selectedChar.get(),
-      ws.font.charactersList[ws.state$.alphabetData.selectedChar.get()].shape,
+      prevCharIndex,
+      ws.font.charactersList[prevCharIndex].shape,
       '#FFFFFF',
       '#000000',
     );
-    ws.state$.dp.char.set(String.fromCodePoint(char.codepoint));
     drawCharShapeInAlphabet(
-      index,
-      ws.font.charactersList[index].shape,
+      charIndex,
+      ws.font.charactersList[charIndex].shape,
       '#000000',
       '#00FFFF',
     );
+  });
 
-    ws.state$.alphabetData.selectedChar.set(index);
-  };
-
-  selectCharInAlphabet(1);
-
-  return { element: alphabetContainer, selectCharInAlphabet };
+  return { element: alphabetContainer };
 }

@@ -1,3 +1,4 @@
+import { observe } from '@legendapp/state';
 import type { Workspace } from '../Workspace';
 
 export function createPaletteSelector(ws: Workspace) {
@@ -23,29 +24,59 @@ export function createPaletteSelector(ws: Workspace) {
     const pos = Math.floor(
       (x / (paletteScale * ws.phoxelis.palette.width)) * paletteMaxCells,
     );
+
+    if (pos <= 0) {
+      console.warn('Null Phox selected. Omitting selection');
+      return;
+    }
+
     const phox = ws.phoxelis.getPhoxFromPaletteIndex(pos);
     if (!phox) {
       console.warn('Null Phox selected. Omitting selection');
       return;
     }
 
-    const dp = ws.state$.dp.get();
-    const selectedColorType = ws.state$.selectedColorType.get();
-    ws.state$.dp.set(phox);
     ws.state$.paletteData.selectedPhox.set(pos);
-    ws.colorPicker.picker.color.hexString = dp[selectedColorType];
-    ws.alphabet.selectCharInAlphabet(
-      ws.font.charactersList.findIndex(
-        (c) => c.codepoint === dp.char.codePointAt(0),
-      ),
-    );
+  };
 
+  function renderIndicator(index: number, color = 'green') {
     const ctx = paletteOverlay.getContext('2d');
     ctx!.reset();
-    ctx!.strokeStyle = 'green';
+    ctx!.strokeStyle = color;
     ctx!.lineWidth = 2;
-    ctx!.strokeRect(pos * ws.font.width, 0, ws.font.width, ws.font.height);
-  };
+    ctx!.strokeRect(index * ws.font.width, 0, ws.font.width, ws.font.height);
+  }
+
+  ws.state$.paletteData.selectedPhox.onChange(({ value: selectedPhox }) => {
+    if (selectedPhox > 0) {
+      const phox = ws.phoxelis.getPhoxFromPaletteIndex(selectedPhox);
+      if (!phox) return;
+      ws.state$.dp.set(phox);
+
+      const color = ws.state$.paletteData.modifyingPhox.get() ? 'red' : 'green';
+      renderIndicator(selectedPhox, color);
+    }
+  });
+
+  ws.state$.paletteData.modifyingPhox.onChange(({ value: modifyinPhox }) => {
+    renderIndicator(
+      ws.state$.paletteData.selectedPhox.get(),
+      modifyinPhox ? 'red' : 'green',
+    );
+  });
+
+  // TODO Maybe this should be somewhere else
+  ws.state$.dp.onChange(({ value: dp }) => {
+    const modifyingPhox = ws.state$.paletteData.modifyingPhox.get();
+    const selectedPhox = ws.state$.paletteData.selectedPhox.get();
+    if (modifyingPhox && selectedPhox > 0) {
+      const phox = ws.phoxelis.getPhoxFromPaletteIndex(selectedPhox);
+      if (!phox) return;
+      ws.phoxelis.storePhoxInPalette(selectedPhox, {
+        ...dp,
+      });
+    }
+  });
 
   paletteOverlay.addEventListener('click', onPaletteOverlayClick);
   paletteSelector.append(ws.phoxelis.palette);

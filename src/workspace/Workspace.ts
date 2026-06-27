@@ -37,9 +37,6 @@ interface State {
     selectedPhox: number;
     modifyingPhox: boolean;
   };
-  alphabetData: {
-    selectedChar: number;
-  };
   selectedColorType: 'fg' | 'bg';
   movingRefImage: boolean;
 }
@@ -88,9 +85,6 @@ export class Workspace {
       selectedPhox: -1,
       modifyingPhox: false,
     },
-    alphabetData: {
-      selectedChar: 0,
-    },
     selectedColorType: 'fg',
     movingRefImage: false,
   });
@@ -125,11 +119,11 @@ export class Workspace {
     // Elements
     this.drawboard = new Drawboard(this);
     this.loadData();
-    
+
     this.colorPicker = createColorPicker(this);
     this.alphabet = createAlphabetSelector(this);
     this.palette = createPaletteSelector(this);
-    
+
     // Modules
     this.drawManager = new DrawManager(this);
     this.changesStack = createChangesStack(this);
