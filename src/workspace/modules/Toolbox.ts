@@ -119,7 +119,7 @@ export class Toolbox {
       drawboard.hammer.off('pinchend', this.currentTool.handlers.onPinchEnd);
       this.previousTool = this.currentTool.tool;
     }
-
+    
     this.currentTool = {
       tool,
       handlers: {
@@ -168,7 +168,8 @@ export class Toolbox {
     drawboard.hammer.on('pinchend', this.currentTool.handlers.onPinchEnd);
   }
 
-  setPreviousTool() {
+  resumePreviousTool() {
+    console.log(this.previousTool?.name);
     if (this.previousTool) this.setTool(this.previousTool);
   }
 
@@ -230,9 +231,8 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     onPointerUp() {
       if (!this.data.panzooming) return;
-      this.reset!();
       this.submit!();
-      tb.setPreviousTool();
+      this.reset!();
     },
     onPinchStart() {
       this.data.panzooming = true;
@@ -279,11 +279,11 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     onPinchEnd() {
       if (!this.data!.panzooming) return;
-      this.reset!();
       this.submit!();
+      this.reset!();
     },
     submit() {
-      tb.setPreviousTool();
+      tb.resumePreviousTool();
     },
     reset() {
       this.data.panzooming = false;
