@@ -4190,19 +4190,17 @@ function le(e, t, n, r = {}) {
 	c.width = n.width * t, c.height = n.height * e;
 	let u = [], d = {};
 	function f(n = crypto.randomUUID()) {
-		if (u.find((e) => e.id === n)) return console.error(`addLayer error: Layer with ID ${n} already exists. Skipping creation.`), n;
-		let r = u.push({
+		return u.find((e) => e.id === n) ? (console.error(`addLayer error: Layer with ID ${n} already exists. Skipping creation.`), n) : (d[n] = u.push({
 			id: n,
 			buffer: new Uint8Array(e * t).fill(0)
-		}) - 1;
-		return d[n] = r, n;
+		}) - 1, n);
 	}
 	i && f();
 	function p(e) {
 		return u[d[e]];
 	}
 	function m() {
-		d = {}, u.forEach((e, t) => d[e.id] = t);
+		Object.keys(d).forEach((e) => delete d[e]), u.forEach((e, t) => d[e.id] = t);
 	}
 	function h(e, t) {
 		let n = d[e];

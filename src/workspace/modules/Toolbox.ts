@@ -186,6 +186,8 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     drawManager,
   } = ws;
 
+  const lm = ws.layerManager;
+
   const dbd = drawboard;
 
   interface PanzoomTool extends Tool {
@@ -310,7 +312,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     addPhoxelToDraft(p: Phoxel) {
       this.data!.draftPhoxels.set(`${p.r};${p.c}`, p);
-      drawManager.draw(draftScreen, p.r, p.c, ws.getDraftBaseLayer(), {
+      drawManager.draw(draftScreen, p.r, p.c, lm.getDraftBaseLayer(), {
         draftErasure: true,
       });
     },
@@ -383,19 +385,19 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const c2 = Math.max(startC, dbd.mousePos.x);
       // Top & bottom edges
       for (let c = c1; c <= c2; c++) {
-        drawManager.draw(draftScreen, r1, c, ws.getDraftBaseLayer(), {
+        drawManager.draw(draftScreen, r1, c, lm.getDraftBaseLayer(), {
           draftErasure: true,
         });
-        drawManager.draw(draftScreen, r2, c, ws.getDraftBaseLayer(), {
+        drawManager.draw(draftScreen, r2, c, lm.getDraftBaseLayer(), {
           draftErasure: true,
         });
       }
       // Left & right edges
       for (let r = r1; r <= r2; r++) {
-        drawManager.draw(draftScreen, r, c1, ws.getDraftBaseLayer(), {
+        drawManager.draw(draftScreen, r, c1, lm.getDraftBaseLayer(), {
           draftErasure: true,
         });
-        drawManager.draw(draftScreen, r, c2, ws.getDraftBaseLayer(), {
+        drawManager.draw(draftScreen, r, c2, lm.getDraftBaseLayer(), {
           draftErasure: true,
         });
       }
@@ -463,7 +465,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const c2 = Math.max(startC, dbd.mousePos.x);
       for (let r = r1; r <= r2; r++) {
         for (let c = c1; c <= c2; c++) {
-          drawManager.draw(draftScreen, r, c, ws.getDraftBaseLayer(), {
+          drawManager.draw(draftScreen, r, c, lm.getDraftBaseLayer(), {
             draftErasure: true,
           });
         }
@@ -521,7 +523,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const { startR, startC } = this.data!;
       const cells = bresenhamCells(startR, startC, dbd.mousePos.y, dbd.mousePos.x);
       for (const { r, c } of cells) {
-        drawManager.draw(draftScreen, r, c, ws.getDraftBaseLayer(), {
+        drawManager.draw(draftScreen, r, c, lm.getDraftBaseLayer(), {
           draftErasure: true,
         });
       }
@@ -575,7 +577,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const ry = Math.abs(dbd.mousePos.y - startR);
       drawEllipseOutline(
         (r, c) =>
-          drawManager.draw(draftScreen, r, c, ws.getDraftBaseLayer(), {
+          drawManager.draw(draftScreen, r, c, lm.getDraftBaseLayer(), {
             draftErasure: true,
           }),
         startR,
@@ -631,7 +633,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const ry = Math.abs(dbd.mousePos.y - startR);
       drawEllipseFill(
         (r, c) =>
-          drawManager.draw(draftScreen, r, c, ws.getDraftBaseLayer(), {
+          drawManager.draw(draftScreen, r, c, lm.getDraftBaseLayer(), {
             draftErasure: true,
           }),
         startR,

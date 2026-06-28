@@ -10,6 +10,7 @@ import { createHotkeyManager } from './modules/HotkeyManager';
 import { Toolbox, type ToolName } from './modules/Toolbox';
 import { DrawManager, type DrawModeName } from './modules/DrawManager';
 import { observable, type Observable } from '@legendapp/state';
+import { LayerManager } from './modules/LayerManager';
 
 export type Phoxel = {
   phox: Phox;
@@ -22,6 +23,7 @@ export type WorkspaceLayer = {
   name: string;
   opacity: number;
   visible: boolean;
+  position: number;
 };
 
 interface DocumentData {
@@ -92,6 +94,7 @@ export class Workspace {
   colorPicker: ReturnType<typeof createColorPicker>;
   alphabet: ReturnType<typeof createAlphabetSelector>;
   palette: ReturnType<typeof createPaletteSelector>;
+  layerManager: LayerManager;
   changesStack: ReturnType<typeof createChangesStack>;
   toolbox: Toolbox;
   drawManager: DrawManager;
@@ -112,10 +115,11 @@ export class Workspace {
     this.phoxelis = Phoxelis(size.rows, size.cols, font, {
       renderPalette: true,
       createBaseLayer: false,
-      paletteDirection: 'left'
+      paletteDirection: 'left',
     });
     this.draftScreen = Phoxelis(size.rows, size.cols, font);
-    this.createLayer();
+    this.layerManager = new LayerManager(this);
+    this.layerManager.createLayer();
 
     // Elements
     this.drawboard = new Drawboard(this);
@@ -163,7 +167,7 @@ export class Workspace {
       this.phoxelis.importPhoxelis(data.phoxelis);
 
       const newLayers = _.mapValues(data.layers, (l, k) => {
-        const target = this.createLayerTarget();
+        const target = this.layerManager.createLayerTarget();
         this.layersTargets[k] = target;
 
         return {
@@ -171,7 +175,7 @@ export class Workspace {
         };
       });
       this.data$.layers.set(newLayers);
-      this.selectLayer(this.phoxelis.layers[0].id);
+      this.layerManager.selectLayer(this.phoxelis.layers[0].id);
       this.drawboard.setReferenceImage(data.refImage.src);
     }
   }
@@ -230,63 +234,6 @@ export class Workspace {
     return documentData;
   }
 
-  public getDraftBaseLayer() {
-    return this.draftScreen.layers[0].id;
-  }
-
-  public createLayer(layerId?: string) {
-    const target = this.createLayerTarget();
-
-    const lid = layerId ?? this.phoxelis.addLayer();
-
-    this.data$.layers[lid].set({
-      name: `Layer #${this.phoxelis.layers.length}`,
-      opacity: 100,
-      visible: true,
-    });
-
-    this.layersTargets[lid] = target;
-
-    return lid;
-  }
-
-  public removeLayer(layerId: string) {
-    if (this.phoxelis.layers.length === 1) {
-      console.warn("removeDocumentLayer error: You can't remove the base layer.");
-      return;
-    }
-
-    const layerPosition = this.phoxelis.layerPositions[layerId];
-    this.phoxelis.removeLayer(layerId);
-    this.data$.layers[layerId].delete();
-
-    const newSelectPos = Math.max(
-      0,
-      Math.min(this.phoxelis.layers.length - 1, layerPosition),
-    );
-    const layerBeforeId = this.phoxelis.layers[newSelectPos].id;
-    this.selectLayer(layerBeforeId);
-  }
-
-  public moveLayer(...args: Parameters<typeof this.phoxelis.moveLayer>) {
-    return this.phoxelis.moveLayer(...args);
-  }
-
-  public selectLayer(layerId: string) {
-    this.state$.activeLayer.set(layerId);
-  }
-
-  public getSortedLayers() {
-    return this.phoxelis.layers.map((l) => l.id).toReversed();
-  }
-
-  private createLayerTarget() {
-    const target = document.createElement('canvas');
-    target.width = this.font.width * this.config.size.cols;
-    target.height = this.font.height * this.config.size.rows;
-    target.style = `height: 100%; width: 100%; object-fit: contain;`;
-    return target;
-  }
 
   public onMounted() {
     this.drawboard.startPanzoom();

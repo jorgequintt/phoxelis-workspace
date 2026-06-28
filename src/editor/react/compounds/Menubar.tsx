@@ -84,16 +84,14 @@ function renderMenuItems(menuEntries: MenuEntry[]) {
 
 export function Menubar(props: { items: MenubarItem[] }) {
   return (
-    <MMenubar>
+    <MMenubar key="menubar">
       {props.items.map((m) => (
-        <>
-          <MMenubar.Menu key={`menu-${m.name}`} width={m.width}>
-            <MMenubar.Target key={`target-${m.name}`}>{m.name}</MMenubar.Target>
-            <MMenubar.Dropdown key={`dropdown-${m.name}`}>
-              {renderMenuItems(m.menu)}
-            </MMenubar.Dropdown>
-          </MMenubar.Menu>
-        </>
+        <MMenubar.Menu key={`menu-${m.name}`} width={m.width}>
+          <MMenubar.Target key={`target-${m.name}`}>{m.name}</MMenubar.Target>
+          <MMenubar.Dropdown key={`dropdown-${m.name}`}>
+            {renderMenuItems(m.menu)}
+          </MMenubar.Dropdown>
+        </MMenubar.Menu>
       ))}
     </MMenubar>
   );

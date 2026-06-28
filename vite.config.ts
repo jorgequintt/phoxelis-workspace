@@ -5,4 +5,7 @@ export default defineConfig({
   plugins: [
     reactPlugin()
   ],
+  optimizeDeps: {
+    include: ['@phosphor-icons/react'],
+  },
 });
