@@ -1,21 +1,15 @@
 import { useValue } from '@legendapp/state/react';
 import { useAppContext } from '../App';
 import LayerListItem from './LayerListItem';
-import styled from 'styled-components';
+import { ActionIcon, Group, Paper, ScrollArea, Space, Stack } from '@mantine/core';
 import {
-  ActionIcon,
-  Button,
-  Card,
-  Group,
-  Paper,
-  ScrollArea,
-  Space,
-  Stack,
-  Text,
-  Title,
-} from '@mantine/core';
-import { useFloatingWindow } from '@mantine/hooks';
-import { PlusCircleIcon, TrashIcon } from '@phosphor-icons/react';
+  CaretDoubleDownIcon,
+  CaretDoubleUpIcon,
+  CaretDownIcon,
+  CaretUpIcon,
+  PlusIcon,
+  TrashIcon,
+} from '@phosphor-icons/react';
 
 export default function LayersPanel() {
   const { ws } = useAppContext();
@@ -34,13 +28,29 @@ export default function LayersPanel() {
   return (
     <Paper p="md" withBorder>
       <div className="content">
-        <Group justify="end">
-          <ActionIcon variant="default" size="xs" onClick={handleAddLayer}>
-            <PlusCircleIcon />
-          </ActionIcon>
-          <ActionIcon variant="default" size="xs" onClick={handleRemoveLayer}>
-            <TrashIcon />
-          </ActionIcon>
+        <Group justify="space-between">
+          <Group>
+            <ActionIcon size="xs" onClick={handleAddLayer}>
+              <PlusIcon />
+            </ActionIcon>
+            <ActionIcon variant="default" size="xs" onClick={handleAddLayer}>
+              <CaretDownIcon />
+            </ActionIcon>
+            <ActionIcon variant="default" size="xs" onClick={handleAddLayer}>
+              <CaretDoubleDownIcon />
+            </ActionIcon>
+            <ActionIcon variant="default" size="xs" onClick={handleAddLayer}>
+              <CaretDoubleUpIcon />
+            </ActionIcon>
+            <ActionIcon variant="default" size="xs" onClick={handleAddLayer}>
+              <CaretUpIcon />
+            </ActionIcon>
+          </Group>
+          <Group>
+            <ActionIcon color="red" size="xs" onClick={handleRemoveLayer}>
+              <TrashIcon />
+            </ActionIcon>
+          </Group>
         </Group>
         <Space h="md" />
         <ScrollArea h={150}>

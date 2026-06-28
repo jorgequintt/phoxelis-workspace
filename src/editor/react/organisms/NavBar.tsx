@@ -1,8 +1,7 @@
 import { useValue } from '@legendapp/state/react';
 import { useAppContext } from '../App';
-import styled from 'styled-components';
 import { Menubar, type MenubarItem, type MenuEntry } from '../compounds/Menubar';
-import { Card, Paper } from '@mantine/core';
+import { Paper } from '@mantine/core';
 
 export function NavBar() {
   const { ws, ed } = useAppContext();
