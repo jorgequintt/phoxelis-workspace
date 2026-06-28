@@ -10,7 +10,12 @@ export function NavBar() {
   const movingRefImage = useValue(ws.state$.movingRefImage);
 
   const fileMenuOptions: MenuEntry[] = [
-    { type: 'option', name: 'New', command: () => ed.newDocumentCommand(), hotkey: '^⇧O' },
+    {
+      type: 'option',
+      name: 'New',
+      command: () => ed.newDocumentCommand(),
+      hotkey: '^⇧O',
+    },
     {
       type: 'option',
       name: 'Save',
@@ -59,7 +64,7 @@ export function NavBar() {
     {
       type: 'option',
       checked: movingRefImage,
-      name: 'Pan/Zoom Reference Image',
+      name: 'Pan/Zoom ref. Image',
       command: () => ed.toggleMovingRefImage(),
     },
   ];
@@ -70,13 +75,8 @@ export function NavBar() {
   ];
 
   return (
-      <Card shadow="md" padding="xs" radius="xs" withBorder>
+    <Card shadow="md" padding="xs" radius="xs" withBorder>
       <Menubar items={menubar} />
-      </Card>
+    </Card>
   );
 }
-
-const Container = styled.div`
-  width: 100%;
-  background: #888888;
-`;

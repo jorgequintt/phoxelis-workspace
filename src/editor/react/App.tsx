@@ -29,10 +29,10 @@ interface Props {
 const theme = createTheme({
   scale: 0.95,
   spacing: {
-    xs: '0.5rem',
-    sm: '0.6rem',
-    md: '0.7rem',
-    lg: '1rem',
+    xs: '0.3rem',
+    sm: '0.45rem',
+    md: '0.55rem',
+    lg: '0.9rem',
     xl: '1.5rem',
   },
   radius: {
