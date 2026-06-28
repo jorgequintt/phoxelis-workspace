@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { WorkspaceLayer } from '../../../workspace/Workspace';
 import { useAppContext } from '../App';
 import styled from 'styled-components';
+import { ActionIcon, Card, Group, Slider, TextInput } from '@mantine/core';
 
 interface Props {
   layerId: string;
@@ -35,8 +36,8 @@ export default function LayerListItem({ layerId, layer, active }: Props) {
     ws.data$.layers[layerId].name.set(e.target.value);
   };
 
-  const handleOpacityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    ws.data$.layers[layerId].opacity.set(parseInt(e.target.value));
+  const handleOpacityChange = (opacity: number) => {
+    ws.data$.layers[layerId].opacity.set(opacity);
   };
 
   const handleVisibilityChange = (e: React.MouseEvent) => {
@@ -45,54 +46,36 @@ export default function LayerListItem({ layerId, layer, active }: Props) {
   };
 
   return (
-    <LayerRow id={`layer-${layerId}`} onClick={handleLayerClick} $active={active}>
-      <DragHandle>⠿</DragHandle>
-      <PreviewContainer ref={previewContainerRef} />
-      <NameInput type="text" value={layer.name} onChange={handleNameChange} />
-      <OpacitySlider
-        type="range"
-        min="0"
-        max="100"
-        value={layer.opacity}
-        onChange={handleOpacityChange}
-        onClick={(e) => e.stopPropagation()}
-      />
-      <EyeBtn onClick={handleVisibilityChange} opacity={layer.visible ? 1 : 0.4}>
-        {layer.visible ? '👁‍🗨' : '👁'}
-      </EyeBtn>
-    </LayerRow>
+    <Card
+      id={`layer-${layerId}`}
+      onClick={handleLayerClick}
+      withBorder
+      p="xs"
+      bg={active ? 'gray.7' : undefined}
+    >
+      <Group>
+        <PreviewContainer ref={previewContainerRef} />
+        <TextInput size="xs" flex={1} value={layer.name} onChange={handleNameChange} />
+        <Slider
+          label={null}
+          color="gray.5"
+          w={50}
+          min={0}
+          max={100}
+          value={layer.opacity}
+          onChange={handleOpacityChange}
+        />
+        <ActionIcon
+          variant="default"
+          onClick={handleVisibilityChange}
+          opacity={layer.visible ? 1 : 0.4}
+        >
+          {layer.visible ? '👁‍🗨' : '👁'}
+        </ActionIcon>
+      </Group>
+    </Card>
   );
 }
-
-const LayerRow = styled.div<{ $active: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px;
-  background: ${(p) => (p.$active ? '#7a7a7a' : '#2a2a2a')};
-  border: 1px solid #3a3a3a;
-  border-radius: 3px;
-  cursor: grab;
-  user-select: none;
-  transition: background 0.1s;
-`;
-
-const DragHandle = styled.div`
-  width: 16px;
-  height: 28px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  flex-shrink: 0;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-  font-size: 18px;
-  line-height: 1;
-  color: #666;
-`;
 
 const PreviewContainer = styled.div`
   width: 28px;
@@ -104,38 +87,4 @@ const PreviewContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-`;
-
-const NameInput = styled.input`
-  flex: 1;
-  min-width: 0;
-  padding: 2px 4px;
-  background: #1a1a1a;
-  border: 1px solid #444;
-  border-radius: 2px;
-  color: #ccc;
-  font-size: 11px;
-  outline: none;
-`;
-
-const OpacitySlider = styled.input`
-  width: 50px;
-  height: 4px;
-  accent-color: #666;
-  flex-shrink: 0;
-`;
-
-const EyeBtn = styled.button<{ opacity?: number }>`
-  width: 24px;
-  height: 24px;
-  background: transparent;
-  border: 1px solid #444;
-  border-radius: 2px;
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  opacity: ${(props) => props.opacity ?? 1};
 `;

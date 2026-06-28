@@ -2,7 +2,7 @@ import { useValue } from '@legendapp/state/react';
 import { useAppContext } from '../App';
 import styled from 'styled-components';
 import { Menubar, type MenubarItem, type MenuEntry } from '../compounds/Menubar';
-import { Card } from '@mantine/core';
+import { Card, Paper } from '@mantine/core';
 
 export function NavBar() {
   const { ws, ed } = useAppContext();
@@ -75,8 +75,8 @@ export function NavBar() {
   ];
 
   return (
-    <Card shadow="md" padding="xs" radius="xs" withBorder>
+    <Paper shadow="md" p="xs" radius="xs" withBorder>
       <Menubar items={menubar} />
-    </Card>
+    </Paper>
   );
 }
