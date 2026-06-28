@@ -1,5 +1,9 @@
 import _ from 'lodash';
-import { downloadArrayBuffer as downloadAsFile, fileToBase64 } from '../utils/general';
+import {
+  downloadArrayBuffer as downloadAsFile,
+  fileToBase64,
+  promptForFile,
+} from '../utils/general';
 import {
   Workspace,
   type WorkspaceExportConfig,
@@ -125,7 +129,21 @@ export class Editor {
     );
   }
 
-  public async addReferenceImageCommand(file: File) {
+  public async addReferenceImageCommand() {
+    if (!this.editorSession?.currentWorkspace) {
+      console.error(
+        'addReferenceImage error: No current workspace to add reference image',
+      );
+      return;
+    }
+
+    const file = await promptForFile();
+
+    if (!file) {
+      console.error('addReferenceImage: No file selected');
+      return;
+    }
+
     const base64 = await fileToBase64(file);
 
     if (!base64) {
@@ -133,21 +151,35 @@ export class Editor {
       return;
     }
 
-    if (!this.editorSession?.currentWorkspace) {
-      console.error('addReferenceImage error: No current workspace to add reference image');
-      return;
-    }
-
     this.editorSession?.currentWorkspace.drawboard.setReferenceImage(base64);
   }
 
-  public async toggleFullScreenCommand() {
-  if (!document.fullscreenElement) {
-    document.body.requestFullscreen();
-  } else {
-    document.exitFullscreen?.();
+  public async toggleModifyPalettePhoxCommand() {
+    if (!this.editorSession?.currentWorkspace) {
+      console.error('toggleModifyPalettePhox error: No current workspace');
+      return;
+    }
+    const modifyingPhox =
+      this.editorSession.currentWorkspace.state$.paletteData.modifyingPhox;
+    modifyingPhox.set(!modifyingPhox.get());
   }
-}
+
+  public async toggleMovingRefImage() {
+    if (!this.editorSession?.currentWorkspace) {
+      console.error('toggleMovingRefImage error: No current workspace');
+      return;
+    }
+    const movingRefImage = this.editorSession.currentWorkspace.state$.movingRefImage;
+    movingRefImage.set(!movingRefImage.get());
+  }
+
+  public async toggleFullScreenCommand() {
+    if (!document.fullscreenElement) {
+      document.body.requestFullscreen();
+    } else {
+      document.exitFullscreen?.();
+    }
+  }
 
   public async createWorkspace(config: WorkspaceInputConfig) {
     return await Workspace.create(config);

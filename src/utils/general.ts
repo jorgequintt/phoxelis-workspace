@@ -31,3 +31,24 @@ export function fileToBase64(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
+
+export function promptForFile(accept = 'image/*'): Promise<File | null> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+
+    input.onchange = (event: Event) => {
+      const t = event?.target as HTMLInputElement;
+      const file = t?.files?.[0];
+      if (file) {
+        resolve(file);
+      } else {
+        console.error('promptForFile: No file selected');
+        reject(null);
+      }
+    };
+
+    input.click();
+  });
+}

@@ -1,61 +1,76 @@
 import { useValue } from '@legendapp/state/react';
 import { useAppContext } from './App';
 import styled from 'styled-components';
+import { Menubar, type MenubarItem, type MenuEntry } from './compounds/Menubar';
 
 export function NavBar() {
   const { ws, ed } = useAppContext();
   const modifyingPhox = useValue(ws.state$.paletteData.modifyingPhox);
+  const movingRefImage = useValue(ws.state$.movingRefImage);
 
-  const handleNew = async () => {
-    await ed.newDocumentCommand();
-  };
-  const handleSave = () => ed.saveDocumentCommand();
-  const handleLoad = () => ed.loadDocumentCommand();
-  const handleFullscreen = () => ed.toggleFullScreenCommand();
-  const handleExport = () => ed.exportPhoxelisCommand();
+  const fileMenuOptions: MenuEntry[] = [
+    { type: 'option', name: 'New', command: () => ed.newDocumentCommand(), hotkey: '^N' },
+    {
+      type: 'option',
+      name: 'Save',
+      command: () => ed.saveDocumentCommand(),
+      hotkey: '^S',
+    },
+    {
+      type: 'option',
+      name: 'Load',
+      command: () => ed.loadDocumentCommand(),
+      hotkey: '^⇧O',
+    },
+    {
+      type: 'option',
+      name: 'Export',
+      command: () => ed.exportPhoxelisCommand(),
+    },
+  ];
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e?.target || !(e.target instanceof HTMLInputElement)) {
-      return;
-    }
-    if (e.target.files?.[0]) {
-      ed.addReferenceImageCommand(e.target.files?.[0]);
-    }
-  };
+  const editMenuOptions: MenuEntry[] = [
+    {
+      type: 'option',
+      name: 'Undo',
+      command: () => ws.changesStack.undoLastChange(),
+      hotkey: '^Z',
+    },
+    {
+      type: 'option',
+      name: 'Redo',
+      command: () => ws.changesStack.redoLastChange(),
+      hotkey: '^Y',
+    },
+    { type: 'divider' },
+    {
+      type: 'option',
+      checked: modifyingPhox,
+      name: 'Modify Palette Phox',
+      command: () => ed.toggleModifyPalettePhoxCommand(),
+    },
+    { type: 'divider' },
+    {
+      type: 'option',
+      name: 'Add reference image',
+      command: () => ed.addReferenceImageCommand(),
+    },
+    {
+      type: 'option',
+      checked: movingRefImage,
+      name: 'Pan/Zoom Reference Image',
+      command: () => ed.toggleMovingRefImage(),
+    },
+  ];
 
-  const handleMoveImgCheckChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const checked = (e.target as HTMLInputElement).checked;
-    ws.state$.movingRefImage.set(checked);
-  };
-
-  const handleModifyPalettePhox = () => {
-    ws.state$.paletteData.modifyingPhox.set(!modifyingPhox);
-  };
-
-  const undoButton = document.createElement('button');
-  undoButton.innerHTML = 'Undo';
-  const handleUndo = () => ws.changesStack.undoLastChange();
-
-  const redoButton = document.createElement('button');
-  redoButton.innerHTML = 'Redo';
-  const handleRedo = () => ws.changesStack.redoLastChange();
+  const menubar: MenubarItem[] = [
+    { name: 'File', menu: fileMenuOptions, width: 220 },
+    { name: 'Edit', menu: editMenuOptions, width: 220 },
+  ];
 
   return (
     <Container>
-      <button onClick={handleNew}>New</button>
-      <button onClick={handleSave}>Save</button>
-      <button onClick={handleLoad}>Load</button>
-      <button onClick={handleFullscreen}>Fullscreen</button>
-      <button onClick={handleExport}>Export</button>
-      <span>
-        <input type="file" accept="image/*" onChange={handleImageUpload} />
-        <input type="checkbox" onChange={handleMoveImgCheckChange} />
-      </span>
-      <button onClick={handleModifyPalettePhox}>
-        {modifyingPhox ? 'UPDATING PALETTE PHOX' : 'Modify Palette Phox'}
-      </button>
-      <button onClick={handleUndo}>Undo</button>
-      <button onClick={handleRedo}>Redo</button>
+      <Menubar items={menubar} />
     </Container>
   );
 }
