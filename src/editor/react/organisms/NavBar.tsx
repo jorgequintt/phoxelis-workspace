@@ -1,7 +1,8 @@
 import { useValue } from '@legendapp/state/react';
-import { useAppContext } from './App';
+import { useAppContext } from '../App';
 import styled from 'styled-components';
-import { Menubar, type MenubarItem, type MenuEntry } from './compounds/Menubar';
+import { Menubar, type MenubarItem, type MenuEntry } from '../compounds/Menubar';
+import { Card } from '@mantine/core';
 
 export function NavBar() {
   const { ws, ed } = useAppContext();
@@ -9,7 +10,7 @@ export function NavBar() {
   const movingRefImage = useValue(ws.state$.movingRefImage);
 
   const fileMenuOptions: MenuEntry[] = [
-    { type: 'option', name: 'New', command: () => ed.newDocumentCommand(), hotkey: '^N' },
+    { type: 'option', name: 'New', command: () => ed.newDocumentCommand(), hotkey: '^⇧O' },
     {
       type: 'option',
       name: 'Save',
@@ -20,7 +21,7 @@ export function NavBar() {
       type: 'option',
       name: 'Load',
       command: () => ed.loadDocumentCommand(),
-      hotkey: '^⇧O',
+      hotkey: '^O',
     },
     {
       type: 'option',
@@ -69,9 +70,9 @@ export function NavBar() {
   ];
 
   return (
-    <Container>
+      <Card shadow="md" padding="xs" radius="xs" withBorder>
       <Menubar items={menubar} />
-    </Container>
+      </Card>
   );
 }
 

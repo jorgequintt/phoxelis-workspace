@@ -232,22 +232,12 @@ export class HtmlEditor extends Editor {
     exportButton.onclick = () => this.exportPhoxelisCommand();
     navBar.appendChild(exportButton);
 
-    const referenceImageButton = document.createElement('input');
-    referenceImageButton.type = 'file';
-    referenceImageButton.accept = 'image/*';
-    referenceImageButton.addEventListener('change', async (e) => {
-      if (!e?.target) {
-        return;
-      }
-
-      if (e.target instanceof HTMLInputElement) {
-        const file = e.target.files?.[0]; // Get the selected file
-
-        if (file) {
-          this.addReferenceImageCommand(file);
-        }
-      }
+    const referenceImageButton = document.createElement('button');
+    referenceImageButton.innerHTML = "Add Ref Image";
+    referenceImageButton.addEventListener('click', () => {
+      this.addReferenceImageCommand();
     });
+    
     navBar.appendChild(referenceImageButton);
     const moveRefImageToggle = document.createElement('input');
     moveRefImageToggle.type = 'checkbox';
