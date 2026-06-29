@@ -347,7 +347,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       this.data.draftPhoxels.forEach((p) => {
         phoxelsPositions.push([p.r, p.c]);
       });
-      ws.changesStack.commitPhoxels(phoxelsPositions);
+      ws.changesManager.commitPhoxels(phoxelsPositions);
       this.reset!();
     },
     reset() {
@@ -428,7 +428,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
         phoxelsPositions.push([r, c2]);
       }
 
-      ws.changesStack.commitPhoxels(phoxelsPositions);
+      ws.changesManager.commitPhoxels(phoxelsPositions);
       this.reset!();
     },
     reset() {
@@ -490,7 +490,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
           phoxelsPositions.push([r, c]);
         }
       }
-      ws.changesStack.commitPhoxels(phoxelsPositions);
+      ws.changesManager.commitPhoxels(phoxelsPositions);
       this.reset!();
     },
     reset() {
@@ -541,7 +541,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       for (const { r, c } of cells) {
         phoxelsPositions.push([r, c]);
       }
-      ws.changesStack.commitPhoxels(phoxelsPositions);
+      ws.changesManager.commitPhoxels(phoxelsPositions);
       this.reset!();
     },
     reset() {
@@ -598,7 +598,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const ry = Math.abs(dbd.mousePos.y - startR);
       const phoxelsPositions: Array<PhoxelPosition> = [];
       drawEllipseOutline((r, c) => phoxelsPositions.push([r, c]), startR, startC, rx, ry);
-      ws.changesStack.commitPhoxels(phoxelsPositions);
+      ws.changesManager.commitPhoxels(phoxelsPositions);
       this.reset!();
     },
     reset() {
@@ -662,7 +662,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
         ry,
         size,
       );
-      ws.changesStack.commitPhoxels(phoxelsPositions);
+      ws.changesManager.commitPhoxels(phoxelsPositions);
       this.reset!();
     },
     reset() {

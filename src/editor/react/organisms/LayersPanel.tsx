@@ -1,14 +1,14 @@
 import { useValue } from '@legendapp/state/react';
 import { useAppContext } from '../App';
 import LayerListItem from './LayerListItem';
-import { ActionIcon, Group, Paper, ScrollArea, Space, Stack } from '@mantine/core';
+import { ActionIcon, Group, Paper, ScrollArea, Space, Stack, Text } from '@mantine/core';
 import { CaretDoubleDownIcon } from '@phosphor-icons/react/dist/csr/CaretDoubleDown';
 import { CaretDoubleUpIcon } from '@phosphor-icons/react/dist/csr/CaretDoubleUp';
 import { CaretDownIcon } from '@phosphor-icons/react/dist/csr/CaretDown';
 import { CaretUpIcon } from '@phosphor-icons/react/dist/csr/CaretUp';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
-
+import { modals } from '@mantine/modals';
 
 export default function LayersPanel() {
   const { ws } = useAppContext();
@@ -19,19 +19,19 @@ export default function LayersPanel() {
 
   const handleMoveLayerBottom = () => {
     lm.moveLayerBottom(activeLayer);
-  }
+  };
 
   const handleMoveLayerTop = () => {
     lm.moveLayerTop(activeLayer);
-  }
+  };
 
   const handleMoveLayerUp = () => {
     lm.moveLayerUp(activeLayer);
-  }
+  };
 
   const handleMoveLayerDown = () => {
     lm.moveLayerDown(activeLayer);
-  }
+  };
 
   const handleAddLayer = () => {
     const layerId = lm.createLayer();
@@ -39,7 +39,13 @@ export default function LayersPanel() {
   };
 
   const handleRemoveLayer = () => {
-    lm.removeLayer(ws.state$.activeLayer.get());
+    modals.openConfirmModal({
+      title: 'Delete layer',
+      children: <Text size="sm">Are you sure you want to delete this layer?</Text>,
+      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      onConfirm: () => lm.removeLayer(ws.state$.activeLayer.get()),
+      confirmProps: { color: 'red' },
+    });
   };
 
   return (

@@ -13,13 +13,14 @@ export type Layer = {
     buffer: Uint8Array<ArrayBuffer>;
 };
 export type PhoxelisObj = ReturnType<typeof Phoxelis>;
+export type LayerData = ReturnType<PhoxelisObj['removeLayer']>;
 export declare function Phoxelis(rows: number, cols: number, font: Font, options?: {
     createBaseLayer?: boolean;
     renderPalette?: boolean;
     paletteDirection?: 'right' | 'left';
 }): {
     renderFrame: (layerOptions?: Array<LayerOptions | null>) => void;
-    renderPhoxel: (char: string, fg: string, bg: string, r: number, c: number, layerId: string) => void;
+    renderPhoxel: (char: string, fg: string, bg: string, r: number, c: number, layerId?: string) => void;
     removePhoxel: (r: number, c: number, layerId?: string) => void;
     canvas: HTMLCanvasElement;
     reset: (keepBaseLayer?: boolean) => void;
@@ -55,6 +56,10 @@ export declare function Phoxelis(rows: number, cols: number, font: Font, options
     addLayer: (layerId?: string) => string;
     getLayer: (layerId: string) => Layer;
     moveLayer: (layerId: string, newIndex: number) => void;
-    removeLayer: (layerId: string) => void;
+    removeLayer: (layerId: string) => {
+        layer: Layer;
+        phoxes: Record<string, string>;
+    } | undefined;
+    loadLayer: (layerData: LayerData) => void;
     layerPositions: Record<string, number>;
 };

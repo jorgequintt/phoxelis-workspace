@@ -38,13 +38,13 @@ export function NavBar() {
     {
       type: 'option',
       name: 'Undo',
-      command: () => ws.changesStack.undoLastChange(),
+      command: () => ws.changesManager.undoLastChange(),
       hotkey: '^Z',
     },
     {
       type: 'option',
       name: 'Redo',
-      command: () => ws.changesStack.redoLastChange(),
+      command: () => ws.changesManager.redoLastChange(),
       hotkey: '^Y',
     },
     { type: 'divider' },

@@ -5,7 +5,7 @@ import { Drawboard } from './elements/Drawboard';
 import { createAlphabetSelector } from './elements/alphabet';
 import { createColorPicker } from './elements/colorPicker';
 import { createPaletteSelector } from './elements/palette';
-import { createChangesStack } from './modules/ChangesStack';
+import { createChangesManager } from './modules/ChangesManager';
 import { createHotkeyManager } from './modules/HotkeyManager';
 import { Toolbox, type ToolName } from './modules/Toolbox';
 import { DrawManager, type DrawModeName } from './modules/DrawManager';
@@ -95,7 +95,7 @@ export class Workspace {
   alphabet: ReturnType<typeof createAlphabetSelector>;
   palette: ReturnType<typeof createPaletteSelector>;
   layerManager: LayerManager;
-  changesStack: ReturnType<typeof createChangesStack>;
+  changesManager: ReturnType<typeof createChangesManager>;
   toolbox: Toolbox;
   drawManager: DrawManager;
   hotkeyManager: ReturnType<typeof createHotkeyManager>;
@@ -118,6 +118,7 @@ export class Workspace {
       paletteDirection: 'left',
     });
     this.draftScreen = Phoxelis(size.rows, size.cols, font);
+    this.changesManager = createChangesManager(this);
     this.layerManager = new LayerManager(this);
     this.layerManager.createLayer();
 
@@ -131,13 +132,12 @@ export class Workspace {
 
     // Modules
     this.drawManager = new DrawManager(this);
-    this.changesStack = createChangesStack(this);
     this.toolbox = new Toolbox(this);
     this.hotkeyManager = createHotkeyManager(this);
 
     this.hotkeyManager.hotkeys.push(
-      { ctrl: true, key: 'z', onHotkeyEnd: () => this.changesStack.undoLastChange() },
-      { ctrl: true, key: 'y', onHotkeyEnd: () => this.changesStack.redoLastChange() },
+      { ctrl: true, key: 'z', onHotkeyEnd: () => this.changesManager.undoLastChange() },
+      { ctrl: true, key: 'y', onHotkeyEnd: () => this.changesManager.redoLastChange() },
       {
         ctrl: true,
         mouse: 0,

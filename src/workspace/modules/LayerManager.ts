@@ -1,4 +1,5 @@
-import type { Workspace } from '../Workspace';
+import type { LayerData } from 'phoxelis';
+import type { Workspace, WorkspaceLayer } from '../Workspace';
 
 export class LayerManager {
   ws: Workspace;
@@ -20,10 +21,12 @@ export class LayerManager {
       name: `Layer #${this.ws.phoxelis.layers.length}`,
       opacity: 100,
       visible: true,
-      position: this.ws.phoxelis.layers.length - 1
+      position: this.ws.phoxelis.layers.length - 1,
     });
 
     this.ws.layersTargets[lid] = target;
+
+    this.ws.changesManager.commitAddLayer(lid);
 
     return lid;
   }
@@ -35,31 +38,52 @@ export class LayerManager {
     }
 
     const layerPosition = this.ws.phoxelis.layerPositions[layerId];
-    this.ws.phoxelis.removeLayer(layerId);
-    this.ws.data$.layers[layerId].delete();
+    const {layerData, layer} = this.deleteLayer(layerId);
 
     const newSelectPos = Math.max(
       0,
-      Math.min(this.ws.phoxelis.layers.length - 1, layerPosition),
+      Math.min(this.ws.phoxelis.layers.length - 1, layerPosition - 1),
     );
     const layerBeforeId = this.ws.phoxelis.layers[newSelectPos].id;
     this.selectLayer(layerBeforeId);
+
+    this.ws.changesManager.commitRemoveLayer(layerData, layer);
+  }
+  
+  public deleteLayer(layerId: string) {
+    const layer = this.ws.data$.layers[layerId].get();
+    const removedLayerData = this.ws.phoxelis.removeLayer(layerId);
+    this.ws.data$.layers[layerId].delete();
+    this.recalcPositions();
+    return { layer, layerData: removedLayerData };
   }
 
-  private moveLayer(...args: Parameters<typeof this.ws.phoxelis.moveLayer>) {
-    this.ws.phoxelis.moveLayer(...args);
+  public loadLayer(layerData: LayerData, layer: WorkspaceLayer) {
+    const layerId = layerData!.layer.id;
+    this.ws.phoxelis.loadLayer(layerData);
+    this.ws.data$.layers[layerId].set(layer);
+    this.setLayerPosition(layerId, layer.position);
+  }
+
+  private recalcPositions() {
     this.ws.phoxelis.layers.forEach((l, i) => {
       this.ws.data$.layers[l.id].position.set(i);
     });
   }
 
+  public setLayerPosition(...args: Parameters<typeof this.ws.phoxelis.moveLayer>) {
+    this.ws.phoxelis.moveLayer(...args);
+    this.recalcPositions();
+  }
+  
   public moveLayerUp(layerId: string) {
     const layerIndex = this.ws.phoxelis.layerPositions[layerId];
     const newPosition = Math.min(
       Math.max(0, layerIndex + 1),
       this.ws.phoxelis.layers.length - 1,
     );
-    this.moveLayer(layerId, newPosition);
+    this.setLayerPosition(layerId, newPosition);
+    this.ws.changesManager.commitMoveLayer(layerId, layerIndex, newPosition);
   }
   public moveLayerDown(layerId: string) {
     const layerIndex = this.ws.phoxelis.layerPositions[layerId];
@@ -67,13 +91,19 @@ export class LayerManager {
       Math.max(0, layerIndex - 1),
       this.ws.phoxelis.layers.length - 1,
     );
-    this.moveLayer(layerId, newPosition);
+    this.setLayerPosition(layerId, newPosition);
+    this.ws.changesManager.commitMoveLayer(layerId, layerIndex, newPosition);
   }
   public moveLayerTop(layerId: string) {
-    this.moveLayer(layerId, this.ws.phoxelis.layers.length - 1);
+    const prevPos = this.ws.phoxelis.layerPositions[layerId];
+    const newPos = this.ws.phoxelis.layers.length - 1;
+    this.setLayerPosition(layerId, newPos);
+    this.ws.changesManager.commitMoveLayer(layerId, prevPos, newPos);
   }
   public moveLayerBottom(layerId: string) {
-    this.moveLayer(layerId, 0);
+    const prevPos = this.ws.phoxelis.layerPositions[layerId];
+    this.setLayerPosition(layerId, 0);
+    this.ws.changesManager.commitMoveLayer(layerId, prevPos, 0);
   }
 
   public selectLayer(layerId: string) {

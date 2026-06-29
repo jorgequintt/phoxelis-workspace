@@ -262,12 +262,12 @@ export class HtmlEditor extends Editor {
 
     const undoButton = document.createElement('button');
     undoButton.innerHTML = 'Undo';
-    undoButton.onclick = () => w.changesStack.undoLastChange();
+    undoButton.onclick = () => w.changesManager.undoLastChange();
     navBar.appendChild(undoButton);
 
     const redoButton = document.createElement('button');
     redoButton.innerHTML = 'Redo';
-    redoButton.onclick = () => w.changesStack.redoLastChange();
+    redoButton.onclick = () => w.changesManager.redoLastChange();
     navBar.appendChild(redoButton);
 
     const layerPanel = document.createElement('div');
