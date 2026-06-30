@@ -1,6 +1,6 @@
 import type { Change } from './Actions';
 
-const maxChangesHistory = 50;
+const maxChangesHistory = 100;
 
 export class ChangesManager {
   changesHistory: Array<Change> = [];
