@@ -5,6 +5,7 @@ import {
 } from '../../utils/rendering';
 import type { CellChangeDetail } from '../elements/Drawboard';
 import { Workspace, type Phoxel, type PhoxelPosition } from '../Workspace';
+import { draw } from './Actions';
 
 export interface Tool {
   name: ToolName;
@@ -15,7 +16,7 @@ export interface Tool {
   onPinchStart?: (e: HammerInput) => void;
   onPinchMove?: (e: HammerInput) => void;
   onPinchEnd?: (e: HammerInput) => void;
-  draw?: () => void;
+  draft?: () => void;
   submit?: () => void;
   abort?: () => void;
   reset?: () => void;
@@ -184,12 +185,12 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     config: { size },
     draftScreen,
     drawManager,
+    state$
   } = ws;
-
-  const lm = ws.layerManager;
 
   const dbd = drawboard;
 
+  // MARK: Panzoom
   interface PanzoomTool extends Tool {
     data: {
       panzooming: boolean;
@@ -297,6 +298,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
   };
 
+  // MARK: Draw
   interface DrawTool extends Tool {
     data: {
       draftPhoxels: Map<string, Phoxel>;
@@ -312,9 +314,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
     addPhoxelToDraft(p: Phoxel) {
       this.data!.draftPhoxels.set(`${p.r};${p.c}`, p);
-      drawManager.draw(draftScreen, p.r, p.c, lm.getDraftBaseLayer(), {
-        draftErasure: true,
-      });
+      drawManager.draft(p.r, p.c);
     },
     onPointerDown() {
       this.data.drawing = true;
@@ -323,12 +323,12 @@ export function createTools(ws: Workspace, tb: Toolbox) {
         r: dbd.mousePos.y,
         c: dbd.mousePos.x,
       });
-      this.draw?.();
+      this.draft?.();
     },
     onCellChange() {
-      this.draw?.();
+      this.draft?.();
     },
-    draw() {
+    draft() {
       if (this.data.drawing) {
         this.addPhoxelToDraft({
           phox: ws.state$.dp.get(),
@@ -343,11 +343,11 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       this.submit!();
     },
     submit() {
-      const phoxelsPositions: Array<PhoxelPosition> = [];
+      const phoxPositions: Array<PhoxelPosition> = [];
       this.data.draftPhoxels.forEach((p) => {
-        phoxelsPositions.push([p.r, p.c]);
+        phoxPositions.push([p.r, p.c]);
       });
-      ws.changesManager.commitPhoxels(phoxelsPositions);
+      ws.dispatchAction(draw, phoxPositions, state$.activeLayer.get()); 
       this.reset!();
     },
     reset() {
@@ -360,7 +360,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
   };
 
-  // ─── Rectangle (outline) Tool ────────────────────────────────────────────────
+  // MARK: Rectangle outline
   const rectTool: Tool = {
     name: 'rect',
     data: { startR: -1, startC: -1, drawing: false },
@@ -368,12 +368,12 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       this.data!.startR = dbd.mousePos.y;
       this.data!.startC = dbd.mousePos.x;
       this.data!.drawing = true;
-      this.draw?.();
+      this.draft?.();
     },
     onCellChange() {
-      this.draw?.();
+      this.draft?.();
     },
-    draw() {
+    draft() {
       if (!this.data!.drawing) return;
 
       // Clear draft and redraw preview rectangle
@@ -385,21 +385,13 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const c2 = Math.max(startC, dbd.mousePos.x);
       // Top & bottom edges
       for (let c = c1; c <= c2; c++) {
-        drawManager.draw(draftScreen, r1, c, lm.getDraftBaseLayer(), {
-          draftErasure: true,
-        });
-        drawManager.draw(draftScreen, r2, c, lm.getDraftBaseLayer(), {
-          draftErasure: true,
-        });
+        drawManager.draft(r1, c);
+        drawManager.draft(r2, c);
       }
       // Left & right edges
       for (let r = r1; r <= r2; r++) {
-        drawManager.draw(draftScreen, r, c1, lm.getDraftBaseLayer(), {
-          draftErasure: true,
-        });
-        drawManager.draw(draftScreen, r, c2, lm.getDraftBaseLayer(), {
-          draftErasure: true,
-        });
+        drawManager.draft(r, c1);
+        drawManager.draft(r, c2);
       }
     },
     onPointerUp() {
@@ -415,20 +407,20 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const c1 = Math.min(startC, dbd.mousePos.x);
       const c2 = Math.max(startC, dbd.mousePos.x);
 
-      const phoxelsPositions: Array<PhoxelPosition> = [];
+      const phoxPositions: Array<PhoxelPosition> = [];
 
       // Top & bottom edges
       for (let c = c1; c <= c2; c++) {
-        phoxelsPositions.push([r1, c]);
-        phoxelsPositions.push([r2, c]);
+        phoxPositions.push([r1, c]);
+        phoxPositions.push([r2, c]);
       }
       // Left & right edges
       for (let r = r1; r <= r2; r++) {
-        phoxelsPositions.push([r, c1]);
-        phoxelsPositions.push([r, c2]);
+        phoxPositions.push([r, c1]);
+        phoxPositions.push([r, c2]);
       }
 
-      ws.changesManager.commitPhoxels(phoxelsPositions);
+      ws.dispatchAction(draw, phoxPositions, state$.activeLayer.get()); 
       this.reset!();
     },
     reset() {
@@ -442,7 +434,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
   };
 
-  // ─── Filled Rectangle Tool ───────────────────────────────────────────────────
+  // MARK: Rectangle
   const filledRectTool: Tool = {
     name: 'filledRect',
     data: { startR: -1, startC: -1, drawing: false },
@@ -450,12 +442,12 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       this.data!.startR = dbd.mousePos.y;
       this.data!.startC = dbd.mousePos.x;
       this.data!.drawing = true;
-      this.draw?.();
+      this.draft?.();
     },
     onCellChange() {
-      this.draw?.();
+      this.draft?.();
     },
-    draw() {
+    draft() {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
@@ -465,9 +457,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const c2 = Math.max(startC, dbd.mousePos.x);
       for (let r = r1; r <= r2; r++) {
         for (let c = c1; c <= c2; c++) {
-          drawManager.draw(draftScreen, r, c, lm.getDraftBaseLayer(), {
-            draftErasure: true,
-          });
+          drawManager.draft(r, c);
         }
       }
     },
@@ -484,13 +474,14 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const c1 = Math.min(startC, dbd.mousePos.x);
       const c2 = Math.max(startC, dbd.mousePos.x);
 
-      const phoxelsPositions: Array<PhoxelPosition> = [];
+      const phoxPositions: Array<PhoxelPosition> = [];
       for (let r = r1; r <= r2; r++) {
         for (let c = c1; c <= c2; c++) {
-          phoxelsPositions.push([r, c]);
+          phoxPositions.push([r, c]);
         }
       }
-      ws.changesManager.commitPhoxels(phoxelsPositions);
+      
+      ws.dispatchAction(draw, phoxPositions, state$.activeLayer.get()); 
       this.reset!();
     },
     reset() {
@@ -504,7 +495,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
   };
 
-  // ─── Line Tool (Bresenham's algorithm) ──────────────────────────────────────
+  // MARK: Line
   const lineTool: Tool = {
     name: 'line',
     data: { startR: -1, startC: -1, drawing: false },
@@ -512,20 +503,18 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       this.data!.startR = dbd.mousePos.y;
       this.data!.startC = dbd.mousePos.x;
       this.data!.drawing = true;
-      this.draw?.();
+      this.draft?.();
     },
     onCellChange() {
-      this.draw?.();
+      this.draft?.();
     },
-    draw() {
+    draft() {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
       const cells = bresenhamCells(startR, startC, dbd.mousePos.y, dbd.mousePos.x);
       for (const { r, c } of cells) {
-        drawManager.draw(draftScreen, r, c, lm.getDraftBaseLayer(), {
-          draftErasure: true,
-        });
+        drawManager.draft(r, c);
       }
     },
     onPointerUp() {
@@ -537,11 +526,12 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const { startR, startC } = this.data!;
       if (startR === -1 || startC === -1) return;
       const cells = bresenhamCells(startR, startC, dbd.mousePos.y, dbd.mousePos.x);
-      const phoxelsPositions: Array<PhoxelPosition> = [];
+      const phoxPositions: Array<PhoxelPosition> = [];
       for (const { r, c } of cells) {
-        phoxelsPositions.push([r, c]);
+        phoxPositions.push([r, c]);
       }
-      ws.changesManager.commitPhoxels(phoxelsPositions);
+
+      ws.dispatchAction(draw, phoxPositions, state$.activeLayer.get()); 
       this.reset!();
     },
     reset() {
@@ -555,8 +545,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
   };
 
-  // ─── Ellipse Tool (outline) ──────────────────────────────────────────────────
-  // Uses the midpoint ellipse algorithm, with rx/ry derived from start→current position
+  // MARK: Outline Ellipse
   const ellipseTool: Tool = {
     name: 'ellipse',
     data: { startR: -1, startC: -1, drawing: false },
@@ -564,12 +553,12 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       this.data!.startR = dbd.mousePos.y;
       this.data!.startC = dbd.mousePos.x;
       this.data!.drawing = true;
-      this.draw?.();
+      this.draft?.();
     },
     onCellChange() {
-      this.draw?.();
+      this.draft?.();
     },
-    draw() {
+    draft() {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
@@ -577,9 +566,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const ry = Math.abs(dbd.mousePos.y - startR);
       drawEllipseOutline(
         (r, c) =>
-          drawManager.draw(draftScreen, r, c, lm.getDraftBaseLayer(), {
-            draftErasure: true,
-          }),
+          drawManager.draft(r, c),
         startR,
         startC,
         rx,
@@ -596,9 +583,10 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       if (startR === -1 || startC === -1) return;
       const rx = Math.abs(dbd.mousePos.x - startC);
       const ry = Math.abs(dbd.mousePos.y - startR);
-      const phoxelsPositions: Array<PhoxelPosition> = [];
-      drawEllipseOutline((r, c) => phoxelsPositions.push([r, c]), startR, startC, rx, ry);
-      ws.changesManager.commitPhoxels(phoxelsPositions);
+      const phoxPositions: Array<PhoxelPosition> = [];
+      drawEllipseOutline((r, c) => phoxPositions.push([r, c]), startR, startC, rx, ry);
+
+      ws.dispatchAction(draw, phoxPositions, state$.activeLayer.get()); 
       this.reset!();
     },
     reset() {
@@ -612,7 +600,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
   };
 
-  // ─── Filled Ellipse Tool ─────────────────────────────────────────────────────
+  // MARK: Ellipse
   const filledEllipseTool: Tool = {
     name: 'filledEllipse',
     data: { startR: -1, startC: -1, drawing: false },
@@ -620,12 +608,12 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       this.data!.startR = dbd.mousePos.y;
       this.data!.startC = dbd.mousePos.x;
       this.data!.drawing = true;
-      this.draw?.();
+      this.draft?.();
     },
     onCellChange() {
-      this.draw?.();
+      this.draft?.();
     },
-    draw() {
+    draft() {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
       const { startR, startC } = this.data!;
@@ -633,9 +621,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const ry = Math.abs(dbd.mousePos.y - startR);
       drawEllipseFill(
         (r, c) =>
-          drawManager.draw(draftScreen, r, c, lm.getDraftBaseLayer(), {
-            draftErasure: true,
-          }),
+          drawManager.draft(r, c),
         startR,
         startC,
         rx,
@@ -653,16 +639,17 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       if (startR === -1 || startC === -1) return;
       const rx = Math.abs(dbd.mousePos.x - startC);
       const ry = Math.abs(dbd.mousePos.y - startR);
-      const phoxelsPositions: Array<PhoxelPosition> = [];
+      const phoxPositions: Array<PhoxelPosition> = [];
       drawEllipseFill(
-        (r, c) => phoxelsPositions.push([r, c]),
+        (r, c) => phoxPositions.push([r, c]),
         startR,
         startC,
         rx,
         ry,
         size,
       );
-      ws.changesManager.commitPhoxels(phoxelsPositions);
+
+      ws.dispatchAction(draw, phoxPositions, state$.activeLayer.get()); 
       this.reset!();
     },
     reset() {

@@ -4216,12 +4216,7 @@ function ue(e, t, n, r = {}) {
 		u.splice(n, 1), u.splice(t, 0, r), m();
 	}
 	function g(e) {
-		let t = p(e);
-		if (!t) {
-			console.error(`removeLayer error: Could not find layer by id ${e}`);
-			return;
-		}
-		let n = {};
+		let t = p(e), n = {};
 		t.buffer.forEach((e) => {
 			e > 0 && x[e] && (n[e] || (n[e] = x[e]), Fe(e));
 		});

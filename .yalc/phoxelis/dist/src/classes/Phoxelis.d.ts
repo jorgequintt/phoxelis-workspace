@@ -59,7 +59,7 @@ export declare function Phoxelis(rows: number, cols: number, font: Font, options
     removeLayer: (layerId: string) => {
         layer: Layer;
         phoxes: Record<string, string>;
-    } | undefined;
+    };
     loadLayer: (layerData: LayerData) => void;
     layerPositions: Record<string, number>;
 };

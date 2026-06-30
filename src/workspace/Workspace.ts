@@ -5,12 +5,13 @@ import { Drawboard } from './elements/Drawboard';
 import { createAlphabetSelector } from './elements/alphabet';
 import { createColorPicker } from './elements/colorPicker';
 import { createPaletteSelector } from './elements/palette';
-import { createChangesManager } from './modules/ChangesManager';
+import { ChangesManager } from './modules/ChangesManager';
 import { createHotkeyManager } from './modules/HotkeyManager';
 import { Toolbox, type ToolName } from './modules/Toolbox';
 import { DrawManager, type DrawModeName } from './modules/DrawManager';
 import { observable, type Observable } from '@legendapp/state';
 import { LayerManager } from './modules/LayerManager';
+import type { Change } from './modules/Actions';
 
 export type Phoxel = {
   phox: Phox;
@@ -95,7 +96,7 @@ export class Workspace {
   alphabet: ReturnType<typeof createAlphabetSelector>;
   palette: ReturnType<typeof createPaletteSelector>;
   layerManager: LayerManager;
-  changesManager: ReturnType<typeof createChangesManager>;
+  changesManager: ChangesManager;
   toolbox: Toolbox;
   drawManager: DrawManager;
   hotkeyManager: ReturnType<typeof createHotkeyManager>;
@@ -118,7 +119,7 @@ export class Workspace {
       paletteDirection: 'left',
     });
     this.draftScreen = Phoxelis(size.rows, size.cols, font);
-    this.changesManager = createChangesManager(this);
+    this.changesManager = new ChangesManager();
     this.layerManager = new LayerManager(this);
     this.layerManager.createLayer();
 
@@ -175,7 +176,7 @@ export class Workspace {
         };
       });
       this.data$.layers.set(newLayers);
-      this.layerManager.selectLayer(this.phoxelis.layers[0].id);
+      this.state$.activeLayer.set(this.phoxelis.layers[0].id);
       this.drawboard.setReferenceImage(data.refImage.src);
     }
   }
@@ -234,7 +235,6 @@ export class Workspace {
     return documentData;
   }
 
-
   public onMounted() {
     this.drawboard.startPanzoom();
   }
@@ -245,5 +245,14 @@ export class Workspace {
     this.hotkeyManager.dispose();
     this.colorPicker.dispose();
     this.drawboard.dispose();
+  }
+
+  public dispatchAction<T extends (...args: any[]) => Change>(
+    action: T,
+    ...params: Parameters<T>
+  ) {
+    const change = action.call(this, ...params);
+    change.execute();
+    this.changesManager.addChange(change);
   }
 }

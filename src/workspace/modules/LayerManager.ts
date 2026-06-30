@@ -15,7 +15,7 @@ export class LayerManager {
   public createLayer(layerId?: string) {
     const target = this.createLayerTarget();
 
-    const lid = layerId ?? this.ws.phoxelis.addLayer();
+    const lid = this.ws.phoxelis.addLayer(layerId);
 
     this.ws.data$.layers[lid].set({
       name: `Layer #${this.ws.phoxelis.layers.length}`,
@@ -26,43 +26,25 @@ export class LayerManager {
 
     this.ws.layersTargets[lid] = target;
 
-    this.ws.changesManager.commitAddLayer(lid);
-
     return lid;
   }
 
-  public removeLayer(layerId: string) {
-    if (this.ws.phoxelis.layers.length === 1) {
-      console.warn("removeDocumentLayer error: You can't remove the base layer.");
-      return;
-    }
-
-    const layerPosition = this.ws.phoxelis.layerPositions[layerId];
-    const {layerData, layer} = this.deleteLayer(layerId);
-
-    const newSelectPos = Math.max(
-      0,
-      Math.min(this.ws.phoxelis.layers.length - 1, layerPosition - 1),
-    );
-    const layerBeforeId = this.ws.phoxelis.layers[newSelectPos].id;
-    this.selectLayer(layerBeforeId);
-
-    this.ws.changesManager.commitRemoveLayer(layerData, layer);
+  public getLayerId(ind: number) {
+    return this.ws.phoxelis.layers[ind].id;
   }
-  
+
   public deleteLayer(layerId: string) {
-    const layer = this.ws.data$.layers[layerId].get();
+    const metadata = this.ws.data$.layers[layerId].get();
     const removedLayerData = this.ws.phoxelis.removeLayer(layerId);
     this.ws.data$.layers[layerId].delete();
     this.recalcPositions();
-    return { layer, layerData: removedLayerData };
+    return { metadata, layerData: removedLayerData };
   }
 
   public loadLayer(layerData: LayerData, layer: WorkspaceLayer) {
     const layerId = layerData!.layer.id;
     this.ws.phoxelis.loadLayer(layerData);
     this.ws.data$.layers[layerId].set(layer);
-    this.setLayerPosition(layerId, layer.position);
   }
 
   private recalcPositions() {
@@ -75,7 +57,7 @@ export class LayerManager {
     this.ws.phoxelis.moveLayer(...args);
     this.recalcPositions();
   }
-  
+
   public moveLayerUp(layerId: string) {
     const layerIndex = this.ws.phoxelis.layerPositions[layerId];
     const newPosition = Math.min(
@@ -83,7 +65,6 @@ export class LayerManager {
       this.ws.phoxelis.layers.length - 1,
     );
     this.setLayerPosition(layerId, newPosition);
-    this.ws.changesManager.commitMoveLayer(layerId, layerIndex, newPosition);
   }
   public moveLayerDown(layerId: string) {
     const layerIndex = this.ws.phoxelis.layerPositions[layerId];
@@ -92,26 +73,21 @@ export class LayerManager {
       this.ws.phoxelis.layers.length - 1,
     );
     this.setLayerPosition(layerId, newPosition);
-    this.ws.changesManager.commitMoveLayer(layerId, layerIndex, newPosition);
   }
   public moveLayerTop(layerId: string) {
-    const prevPos = this.ws.phoxelis.layerPositions[layerId];
     const newPos = this.ws.phoxelis.layers.length - 1;
     this.setLayerPosition(layerId, newPos);
-    this.ws.changesManager.commitMoveLayer(layerId, prevPos, newPos);
   }
   public moveLayerBottom(layerId: string) {
-    const prevPos = this.ws.phoxelis.layerPositions[layerId];
     this.setLayerPosition(layerId, 0);
-    this.ws.changesManager.commitMoveLayer(layerId, prevPos, 0);
-  }
-
-  public selectLayer(layerId: string) {
-    this.ws.state$.activeLayer.set(layerId);
   }
 
   public getSortedLayers() {
     return this.ws.phoxelis.layers.map((l) => l.id).toReversed();
+  }
+
+  public getLayerPosition(layerId: string){
+    return this.ws.phoxelis.layerPositions[layerId];
   }
 
   public createLayerTarget() {
@@ -120,5 +96,14 @@ export class LayerManager {
     target.height = this.ws.font.height * this.ws.config.size.rows;
     target.style = `height: 100%; width: 100%; object-fit: contain;`;
     return target;
+  }
+
+  public getNextLayer(layerId: string) {
+    const layerPosition = this.ws.data$.layers[layerId].position.get();
+    const newSelectPos = Math.max(
+      0,
+      Math.min(this.ws.phoxelis.layers.length - 1, layerPosition - 1),
+    );
+    return this.ws.layerManager.getLayerId(newSelectPos);
   }
 }
