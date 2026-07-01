@@ -1,7 +1,8 @@
 import type { CharShape } from 'phoxelis';
 import type { Workspace } from '../Workspace';
+import { sidebarWidth } from '../../editor/react/layout/Sidebar';
 
-const alphabetWidth = 150;
+const alphabetWidth = sidebarWidth;
 const containerHeight = 200;
 const margin = 1;
 

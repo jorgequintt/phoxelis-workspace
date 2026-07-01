@@ -3,6 +3,8 @@ import { DOMWrapper } from '../atoms/DOMWrapper';
 import { useAppContext } from '../App';
 import LayersPanel from '../organisms/LayersPanel';
 
+export const sidebarWidth = 120;
+
 export function Sidebar() {
   const { ws } = useAppContext();
 

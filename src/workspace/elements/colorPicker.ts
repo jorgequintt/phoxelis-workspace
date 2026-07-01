@@ -1,30 +1,29 @@
 import iro from '@jaames/iro';
 import type { Workspace } from '../Workspace';
+import { sidebarWidth } from '../../editor/react/layout/Sidebar';
 
 const baseButtonStyle = `
   display: flex;
   border-radius: 7px;
-  border-width: 1.5px;
+  font-size: 12px;
+  width: 50px;
+  cursor: pointer;
+  padding: 2px 5px;
   flex: 1;`
 const buttonStyle = `
   ${baseButtonStyle} 
   color: black;
-  text-shadow: 
-    -1px -1px 0 #FFF,  
-     1px -1px 0 #FFF,
-    -1px  1px 0 #FFF,
-     1px  1px 0 #FFF;
-  border-color: #FFF;
-`;
-const buttonActivStyle = `
+  border: 1px solid #000;
+  `;
+  const buttonActivStyle = `
   ${baseButtonStyle} 
   color: white;
   text-shadow: 
-    -1px -1px 0 #000,  
-     1px -1px 0 #000,
-    -1px  1px 0 #000,
-     1px  1px 0 #000;
-  border-color: #000;
+  -1px -1px 0 #000,  
+  1px -1px 0 #000,
+  -1px  1px 0 #000,
+  1px  1px 0 #000;
+  border: 2px solid white;
 `;
 
 export function createColorPicker(ws: Workspace) {
@@ -38,7 +37,7 @@ export function createColorPicker(ws: Workspace) {
   const colorPickerContainer = document.createElement('div');
   colorPickerContainer.id = '#colorpicker';
   const colorPicker = iro.ColorPicker(colorPickerContainer, {
-    width: 150,
+    width: sidebarWidth,
     layout: [
       {
         component: iro.ui.Wheel,
@@ -79,11 +78,11 @@ export function createColorPicker(ws: Workspace) {
     gap: 0.5em;
     padding: 0.6em 0px;
   `;
-  const fgColorButton = document.createElement('button');
-  fgColorButton.innerHTML = 'Foreground';
+  const fgColorButton = document.createElement('div');
+  fgColorButton.innerHTML = 'FG';
   fgColorButton.addEventListener('click', () => selectColorType('fg'));
-  const bgColorButton = document.createElement('button');
-  bgColorButton.innerHTML = 'Background';
+  const bgColorButton = document.createElement('div');
+  bgColorButton.innerHTML = 'BG';
   bgColorButton.addEventListener('click', () => selectColorType('bg'));
   renderButtons();
   
