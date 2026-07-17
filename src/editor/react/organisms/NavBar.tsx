@@ -1,7 +1,9 @@
 import { useValue } from '@legendapp/state/react';
 import { useAppContext } from '../App';
 import { Menubar, type MenubarItem, type MenuEntry } from '../compounds/Menubar';
+import { NewDocumentModal } from '../compounds/NewDocumentModal';
 import { Paper } from '@mantine/core';
+import { openModal } from '@mantine/modals';
 
 export function NavBar() {
   const { ws, ed } = useAppContext();
@@ -12,7 +14,11 @@ export function NavBar() {
     {
       type: 'option',
       name: 'New',
-      command: () => ed.newDocumentCommand(),
+      command: () =>
+        openModal({
+          title: 'New Document',
+          children: <NewDocumentModal />,
+        }),
       hotkey: '^⇧O',
     },
     {
