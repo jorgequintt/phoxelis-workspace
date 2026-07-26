@@ -3,6 +3,7 @@ import type { Workspace } from '../../workspace/Workspace';
 import type { Editor } from '../Editor';
 import styled from 'styled-components';
 import { NavBar } from './organisms/NavBar';
+import { Toolbar } from './organisms/Toolbar';
 import { Content } from './layout/Content';
 import { Footer } from './layout/Footer';
 import { Mantine } from './Mantine';
@@ -35,6 +36,7 @@ export default function App({ ws, ed }: Props) {
       <Mantine>
         <Container>
           <NavBar />
+          <Toolbar />
           <Content />
           <Footer />
         </Container>
