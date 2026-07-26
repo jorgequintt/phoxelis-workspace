@@ -74,9 +74,18 @@ export function NavBar() {
     },
   ];
 
+  const viewMenuOptions: MenuEntry[] = [
+    {
+      type: 'option',
+      name: 'Fullscreen',
+      command: () => ed.toggleFullScreenCommand(),
+    }
+  ];
+
   const menubar: MenubarItem[] = [
     { name: 'File', menu: fileMenuOptions, width: 220 },
     { name: 'Edit', menu: editMenuOptions, width: 220 },
+    { name: 'View', menu: viewMenuOptions, width: 220 },
   ];
 
   return (
