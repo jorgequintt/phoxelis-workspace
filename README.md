@@ -1,3 +1,5 @@
+Live Demo: https://phoebis.netlify.app/
+
 # Phoxelis Workspace
 
 A browser-based **phoxel art editor** — a hybrid of pixel art and classic ANSI/terminal art. Every cell on the canvas is a *phox*: a character glyph from a bitmap (BDF) font, rendered with a foreground and background color. The result is a font-aware canvas where each "pixel" is a small piece of typography.
