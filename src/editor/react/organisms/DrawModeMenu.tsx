@@ -1,6 +1,7 @@
 import styled from 'styled-components';
 import { drawModeDefs } from '../../../workspace/modules/DrawManager';
 import { SideButton } from '../atoms/SideButton';
+import { MenuIcon } from '../atoms/MenuIcon';
 import { useAppContext } from '../App';
 import { useValue } from '@legendapp/state/react';
 
@@ -19,7 +20,7 @@ export function DrawModeMenu() {
             ws.state$.drawMode.set(dm.name);
           }}
         >
-          {dm.icon}
+          <MenuIcon name={dm.icon} />
         </SideButton>
       ))}
     </Container>

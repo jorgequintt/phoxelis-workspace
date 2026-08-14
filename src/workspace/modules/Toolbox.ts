@@ -50,42 +50,42 @@ export type ToolDefinition = {
 export const toolDefs: ToolDefinition[] = [
   {
     name: 'select',
-    icon: '▣',
+    icon: 'selection',
     tooltip: 'Select',
   },
   {
     name: 'draw',
-    icon: '✏',
+    icon: 'pencil',
     tooltip: 'Draw (freehand)',
   },
   {
     name: 'rect',
-    icon: '□',
+    icon: 'square',
     tooltip: 'Rectangle (outline)',
   },
   {
     name: 'filledRect',
-    icon: '■',
+    icon: 'squareFill',
     tooltip: 'Filled Rectangle',
   },
   {
     name: 'line',
-    icon: '╱',
+    icon: 'lineSegment',
     tooltip: 'Line',
   },
   {
     name: 'ellipse',
-    icon: '⬭',
+    icon: 'circle',
     tooltip: 'Ellipse (outline)',
   },
   {
     name: 'filledEllipse',
-    icon: '●',
+    icon: 'circleFill',
     tooltip: 'Filled Ellipse',
   },
   {
     name: 'text',
-    icon: 'T',
+    icon: 'textT',
     tooltip: 'Text',
   },
 ];

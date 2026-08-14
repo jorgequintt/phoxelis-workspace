@@ -10,13 +10,13 @@ export type DrawModeDefinition = {
 };
 
 export const drawModeDefs: DrawModeDefinition[] = [
-  { name: 'draw', icon: '✏', tooltip: 'Draw (char + fg + bg)' },
-  { name: 'char', icon: 'A', tooltip: 'Char only' },
-  { name: 'fg', icon: 'F', tooltip: 'Foreground color only' },
-  { name: 'bg', icon: 'B', tooltip: 'Background color only' },
-  { name: 'color', icon: '◉', tooltip: 'Color (fg + bg) only' },
-  { name: 'erase', icon: '✕', tooltip: 'Erase' },
-  { name: 'motion', icon: '▶', tooltip: 'Motion' },
+  { name: 'draw', icon: 'pencil', tooltip: 'Draw (char + fg + bg)' },
+  { name: 'char', icon: 'textAa', tooltip: 'Char only' },
+  { name: 'fg', icon: 'circleFill', tooltip: 'Foreground color only' },
+  { name: 'bg', icon: 'circle', tooltip: 'Background color only' },
+  { name: 'color', icon: 'circleHalf', tooltip: 'Color (fg + bg) only' },
+  { name: 'erase', icon: 'eraser', tooltip: 'Erase' },
+  { name: 'motion', icon: 'play', tooltip: 'Motion' },
 ];
 
 export class DrawManager {

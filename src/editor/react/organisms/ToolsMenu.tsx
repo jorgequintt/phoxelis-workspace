@@ -1,5 +1,6 @@
 import styled from 'styled-components';
 import { SideButton } from '../atoms/SideButton';
+import { MenuIcon } from '../atoms/MenuIcon';
 import { useAppContext } from '../App';
 import { toolDefs } from '../../../workspace/modules/Toolbox';
 import { useValue } from '@legendapp/state/react';
@@ -20,7 +21,7 @@ export function ToolsMenu() {
             ws.toolbox.setTool(t.name);
           }}
         >
-          {t.icon}
+          <MenuIcon name={t.icon} />
         </SideButton>
       ))}
       <Divider />
@@ -31,7 +32,7 @@ export function ToolsMenu() {
           ws.state$.mirrorEnabled.set(!mirrorEnabled);
         }}
       >
-        ⧉
+        <MenuIcon name="columns" />
       </SideButton>
     </Container>
   );
