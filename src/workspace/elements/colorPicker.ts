@@ -71,6 +71,14 @@ export function createColorPicker(ws: Workspace) {
     renderButtons();
   };
 
+  const swapColors = () => {
+    const { dp } = ws.state$;
+    const fg = dp.fg.get();
+    dp.fg.set(dp.bg.get());
+    dp.bg.set(fg);
+    selectColorType(ws.state$.selectedColorType.get());
+  };
+
   const buttonsContainer = document.createElement('div');
   buttonsContainer.style.cssText = `
     display: flex;
@@ -84,9 +92,25 @@ export function createColorPicker(ws: Workspace) {
   const bgColorButton = document.createElement('div');
   bgColorButton.innerHTML = 'BG';
   bgColorButton.addEventListener('click', () => selectColorType('bg'));
+  const swapColorButton = document.createElement('div');
+  swapColorButton.innerHTML = '&#8646;';
+  swapColorButton.style.cssText = `
+    ${baseButtonStyle}
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 16px;
+    height: 5px;
+    flex: 0.2;
+  `;
+  swapColorButton.title = 'Swap colors';
+  swapColorButton.addEventListener('click', swapColors);
   renderButtons();
   
   buttonsContainer.append(fgColorButton);
+  buttonsContainer.append(swapColorButton);
   buttonsContainer.append(bgColorButton);
   colorPickerEl.appendChild(buttonsContainer);
   colorPickerEl.appendChild(colorPickerContainer);
