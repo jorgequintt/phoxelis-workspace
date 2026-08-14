@@ -6,6 +6,13 @@ import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowC
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
+import { ArrowUpIcon } from '@phosphor-icons/react/dist/csr/ArrowUp';
+import { ArrowDownIcon } from '@phosphor-icons/react/dist/csr/ArrowDown';
+import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft';
+import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
+import { CopyIcon } from '@phosphor-icons/react/dist/csr/Copy';
+import { ScissorsIcon } from '@phosphor-icons/react/dist/csr/Scissors';
+import { ClipboardTextIcon } from '@phosphor-icons/react/dist/csr/ClipboardText';
 import { useValue } from '@legendapp/state/react';
 import styled from 'styled-components';
 import { MotionModal } from '../compounds/MotionModal';
@@ -23,6 +30,8 @@ export function Toolbar() {
   const mirrorEnabled = useValue(ws.state$.mirrorEnabled);
   const mirrorSelectingPoint = useValue(ws.state$.mirrorSelectingPoint);
   const mirrorPoint = useValue(ws.state$.mirrorPoint);
+  const selection = useValue(ws.state$.selection);
+  const clipboard = useValue(ws.state$.clipboard);
 
   const motionOptions = Object.values(motions).map((m) => ({
     value: m.id,
@@ -93,6 +102,78 @@ export function Toolbar() {
             >
               Clear
             </Button>
+          </ToolbarSection>
+        )}
+        {currentTool === 'select' && (
+          <ToolbarSection>
+            <Tooltip label="Copy (Ctrl+C)" position="bottom">
+              <ToolbarButton
+                disabled={!selection}
+                onClick={() => ws.selectionManager.copy()}
+              >
+                <CopyIcon size={iconSize} />
+              </ToolbarButton>
+            </Tooltip>
+            <Tooltip label="Cut (Ctrl+X)" position="bottom">
+              <ToolbarButton
+                disabled={!selection}
+                onClick={() => ws.selectionManager.cut()}
+              >
+                <ScissorsIcon size={iconSize} />
+              </ToolbarButton>
+            </Tooltip>
+            <Tooltip label="Paste (Ctrl+V)" position="bottom">
+              <ToolbarButton
+                disabled={!clipboard}
+                onClick={() => ws.selectionManager.paste()}
+              >
+                <ClipboardTextIcon size={iconSize} />
+              </ToolbarButton>
+            </Tooltip>
+            <Tooltip label="Delete (Del)" position="bottom">
+              <ToolbarButton
+                disabled={!selection}
+                onClick={() => ws.selectionManager.remove()}
+              >
+                <TrashIcon size={iconSize} />
+              </ToolbarButton>
+            </Tooltip>
+          </ToolbarSection>
+        )}
+        {currentTool === 'select' && (
+          <ToolbarSection>
+            <Tooltip label="Move left" position="bottom">
+              <ToolbarButton
+                disabled={!selection}
+                onClick={() => ws.selectionManager.move(0, -1)}
+              >
+                <ArrowLeftIcon size={iconSize} />
+              </ToolbarButton>
+            </Tooltip>
+            <Tooltip label="Move up" position="bottom">
+              <ToolbarButton
+                disabled={!selection}
+                onClick={() => ws.selectionManager.move(-1, 0)}
+              >
+                <ArrowUpIcon size={iconSize} />
+              </ToolbarButton>
+            </Tooltip>
+            <Tooltip label="Move down" position="bottom">
+              <ToolbarButton
+                disabled={!selection}
+                onClick={() => ws.selectionManager.move(1, 0)}
+              >
+                <ArrowDownIcon size={iconSize} />
+              </ToolbarButton>
+            </Tooltip>
+            <Tooltip label="Move right" position="bottom">
+              <ToolbarButton
+                disabled={!selection}
+                onClick={() => ws.selectionManager.move(0, 1)}
+              >
+                <ArrowRightIcon size={iconSize} />
+              </ToolbarButton>
+            </Tooltip>
           </ToolbarSection>
         )}
         {drawMode === 'motion' && (
@@ -188,5 +269,11 @@ const ToolbarButton = styled.button`
 
   &:active {
     background: #888;
+  }
+
+  &:disabled {
+    background: #333;
+    color: #666;
+    cursor: not-allowed;
   }
 `;

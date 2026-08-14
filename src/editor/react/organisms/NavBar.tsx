@@ -56,6 +56,31 @@ export function NavBar() {
     { type: 'divider' },
     {
       type: 'option',
+      name: 'Copy',
+      command: () => ws.selectionManager.copy(),
+      hotkey: '^C',
+    },
+    {
+      type: 'option',
+      name: 'Cut',
+      command: () => ws.selectionManager.cut(),
+      hotkey: '^X',
+    },
+    {
+      type: 'option',
+      name: 'Paste',
+      command: () => ws.selectionManager.paste(),
+      hotkey: '^V',
+    },
+    {
+      type: 'option',
+      name: 'Delete Selection',
+      command: () => ws.selectionManager.remove(),
+      hotkey: 'Del',
+    },
+    { type: 'divider' },
+    {
+      type: 'option',
       checked: modifyingPhox,
       name: 'Modify Palette Phox',
       command: () => ed.toggleModifyPalettePhoxCommand(),

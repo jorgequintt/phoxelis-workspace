@@ -11,6 +11,7 @@ import { Toolbox, type ToolName } from './modules/Toolbox';
 import { DrawManager, type DrawModeName } from './modules/DrawManager';
 import { observable, type Observable } from '@legendapp/state';
 import { LayerManager } from './modules/LayerManager';
+import { SelectionManager, type SelectionData } from './modules/SelectionManager';
 import type { Change } from './modules/Actions';
 
 export type Phoxel = {
@@ -55,6 +56,15 @@ interface State {
   mirrorEnabled: boolean;
   mirrorPoint: { r: number; c: number } | null;
   mirrorSelectingPoint: boolean;
+  selection: { start: PhoxelPosition; end: PhoxelPosition } | null;
+  selectionMove: {
+    data: SelectionData;
+    offset: PhoxelPosition;
+    source: { start: PhoxelPosition; end: PhoxelPosition };
+    target: PhoxelPosition;
+    layerId: string;
+  } | null;
+  clipboard: SelectionData | null;
 }
 
 export interface WorkspaceData {
@@ -110,13 +120,17 @@ export class Workspace {
     pencilRadius: 0,
     mirrorEnabled: false,
     mirrorPoint: null,
-    mirrorSelectingPoint: false
+    mirrorSelectingPoint: false,
+    selection: null,
+    selectionMove: null,
+    clipboard: null,
   } as State);
   drawboard: Drawboard;
   colorPicker: ReturnType<typeof createColorPicker>;
   alphabet: ReturnType<typeof createAlphabetSelector>;
   palette: ReturnType<typeof createPaletteSelector>;
   layerManager: LayerManager;
+  selectionManager: SelectionManager;
   changesManager: ChangesManager;
   toolbox: Toolbox;
   drawManager: DrawManager;
@@ -142,6 +156,7 @@ export class Workspace {
     this.draftScreen = Phoxelis(size.rows, size.cols, font);
     this.changesManager = new ChangesManager();
     this.layerManager = new LayerManager(this);
+    this.selectionManager = new SelectionManager(this);
     const baseLayerId = this.layerManager.createLayer();
     this.state$.activeLayer.set(baseLayerId);
 
@@ -177,11 +192,88 @@ export class Workspace {
           this.toolbox.currentTool?.handlers.onPointerDown(e as PointerEvent);
         },
       },
+      {
+        ctrl: true,
+        key: 'c',
+        onHotkeyEnd: () => {
+          if (this.state$.tool.get() === 'select') this.selectionManager.copy();
+        },
+      },
+      {
+        ctrl: true,
+        key: 'x',
+        onHotkeyEnd: () => {
+          if (this.state$.tool.get() === 'select') this.selectionManager.cut();
+        },
+      },
+      {
+        ctrl: true,
+        key: 'v',
+        onHotkeyEnd: () => {
+          if (this.state$.tool.get() === 'select') this.selectionManager.paste();
+        },
+      },
+      {
+        key: 'delete',
+        onHotkeyStart: (e) => {
+          if (this.state$.tool.get() !== 'select') return;
+          e.preventDefault();
+          this.selectionManager.remove();
+        },
+      },
+      {
+        key: 'backspace',
+        onHotkeyStart: (e) => {
+          if (this.state$.tool.get() !== 'select') return;
+          e.preventDefault();
+          this.selectionManager.remove();
+        },
+      },
+      {
+        key: 'escape',
+        onHotkeyStart: () => {
+          if (this.state$.tool.get() === 'select') this.selectionManager.clearSelection();
+        },
+      },
+      {
+        key: 'arrowleft',
+        onHotkeyStart: (e) => {
+          if (this.state$.tool.get() !== 'select') return;
+          e.preventDefault();
+          this.selectionManager.move(0, -1);
+        },
+      },
+      {
+        key: 'arrowright',
+        onHotkeyStart: (e) => {
+          if (this.state$.tool.get() !== 'select') return;
+          e.preventDefault();
+          this.selectionManager.move(0, 1);
+        },
+      },
+      {
+        key: 'arrowup',
+        onHotkeyStart: (e) => {
+          if (this.state$.tool.get() !== 'select') return;
+          e.preventDefault();
+          this.selectionManager.move(-1, 0);
+        },
+      },
+      {
+        key: 'arrowdown',
+        onHotkeyStart: (e) => {
+          if (this.state$.tool.get() !== 'select') return;
+          e.preventDefault();
+          this.selectionManager.move(1, 0);
+        },
+      },
     );
 
     this.state$.mirrorEnabled.onChange(() => this.drawboard.renderMirrorOverlay());
     this.state$.mirrorPoint.onChange(() => this.drawboard.renderMirrorOverlay());
+    this.state$.selection.onChange(() => this.drawboard.renderSelectionOverlay());
     this.drawboard.renderMirrorOverlay();
+    this.drawboard.renderSelectionOverlay();
 
     this.startRenderLoop();
 

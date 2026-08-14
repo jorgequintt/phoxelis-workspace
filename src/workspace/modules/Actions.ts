@@ -40,6 +40,40 @@ export function draw(
   return { execute, undo };
 }
 
+export function drawPhoxes(
+  this: Workspace,
+  phoxels: Array<{ phox: Phox | null; r: number; c: number }>,
+  layerId: string,
+): Change {
+  const phoxelis = this.phoxelis;
+  const previous: Array<{ phox: Phox | null; r: number; c: number }> = [];
+
+  const execute = () => {
+    previous.length = 0;
+    phoxels.forEach(({ r, c }) => {
+      previous.push({ phox: phoxelis.getPhoxFromPosition(r, c, layerId), r, c });
+    });
+    phoxels.forEach(({ phox, r, c }) => {
+      if (phox) {
+        phoxelis.renderPhoxel(phox.char, phox.fg, phox.bg, r, c, layerId);
+      } else {
+        phoxelis.removePhoxel(r, c, layerId);
+      }
+    });
+  };
+  const undo = () => {
+    previous.forEach(({ phox, r, c }) => {
+      if (phox) {
+        phoxelis.renderPhoxel(phox.char, phox.fg, phox.bg, r, c, layerId);
+      } else {
+        phoxelis.removePhoxel(r, c, layerId);
+      }
+    });
+  };
+
+  return { execute, undo };
+}
+
 export function newLayer(this: Workspace): Change {
   let layerId: string;
   let prevActiveLayerId: string;

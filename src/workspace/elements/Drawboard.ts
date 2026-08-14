@@ -34,6 +34,7 @@ export class Drawboard {
   mousePos: { x: number; y: number } = { x: -1, y: -1 };
   refImage: { img: HTMLImageElement; wrapper: HTMLDivElement };
   mirrorOverlay: HTMLCanvasElement;
+  selectionOverlay: HTMLCanvasElement;
   hammer: HammerManager;
   scale = panzoomConfiguration.startScale;
   refImageScale = panzoomConfiguration.startScale;
@@ -64,6 +65,13 @@ export class Drawboard {
     this.mirrorOverlay.style =
       'position: absolute; top: 0; left: 0; pointer-events: none;';
     layersWrapper.appendChild(this.mirrorOverlay);
+
+    this.selectionOverlay = document.createElement('canvas');
+    this.selectionOverlay.width = ws.config.size.cols * ws.font.width;
+    this.selectionOverlay.height = ws.config.size.rows * ws.font.height;
+    this.selectionOverlay.style =
+      'position: absolute; top: 0; left: 0; pointer-events: none;';
+    layersWrapper.appendChild(this.selectionOverlay);
 
     drawboard.appendChild(layersWrapper);
 
@@ -158,6 +166,32 @@ export class Drawboard {
     ctx.stroke();
 
     ctx.fillRect(x - 2, y - 2, 5, 5);
+  }
+
+  renderSelectionOverlay() {
+    const ctx = this.selectionOverlay.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, this.selectionOverlay.width, this.selectionOverlay.height);
+
+    const selection = this.ws.state$.selection.get();
+    if (!selection) return;
+
+    const { width, height } = this.ws.font;
+    const r1 = Math.min(selection.start[0], selection.end[0]);
+    const r2 = Math.max(selection.start[0], selection.end[0]);
+    const c1 = Math.min(selection.start[1], selection.end[1]);
+    const c2 = Math.max(selection.start[1], selection.end[1]);
+
+    const x = c1 * width;
+    const y = r1 * height;
+    const w = (c2 - c1 + 1) * width;
+    const h = (r2 - r1 + 1) * height;
+
+    ctx.strokeStyle = '#00FFFF';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    ctx.setLineDash([]);
   }
 
   getReferenceImageConfig() {

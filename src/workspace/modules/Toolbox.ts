@@ -45,6 +45,11 @@ export type ToolDefinition = {
 
 export const toolDefs: ToolDefinition[] = [
   {
+    name: 'select',
+    icon: '▣',
+    tooltip: 'Select',
+  },
+  {
     name: 'draw',
     icon: '✏',
     tooltip: 'Draw (freehand)',
@@ -100,6 +105,9 @@ export class Toolbox {
 
     if (this.currentTool) {
       this.currentTool.tool.abort?.();
+      if (this.currentTool.tool.name === 'select' && tool.name !== 'select') {
+        this.ws.selectionManager.clearSelection();
+      }
       drawboard.element.removeEventListener(
         'pointerdown',
         this.currentTool.handlers.onPointerDown,
@@ -688,8 +696,60 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
   };
 
+  // MARK: Select
+  interface SelectTool extends Tool {
+    data: {
+      selecting: boolean;
+      moving: boolean;
+    };
+  }
+  const selectTool: SelectTool = {
+    name: 'select',
+    data: { selecting: false, moving: false },
+    onPointerDown(e: PointerEvent) {
+      if (e.button !== 0) return;
+      const r = dbd.mousePos.y;
+      const c = dbd.mousePos.x;
+      const selectionManager = ws.selectionManager;
+      if (state$.selection.get() && selectionManager.isInside(r, c)) {
+        selectionManager.startMove(r, c);
+        this.data.moving = true;
+      } else {
+        state$.selection.set({ start: [r, c], end: [r, c] });
+        this.data.selecting = true;
+      }
+    },
+    onCellChange() {
+      const r = dbd.mousePos.y;
+      const c = dbd.mousePos.x;
+      if (this.data.moving) {
+        ws.selectionManager.updateMove(r, c);
+      } else if (this.data.selecting) {
+        const selection = state$.selection.get();
+        if (selection) {
+          state$.selection.set({ start: selection.start, end: [r, c] });
+        }
+      }
+    },
+    onPointerUp() {
+      if (this.data.moving) ws.selectionManager.commitMove();
+      this.data.moving = false;
+      this.data.selecting = false;
+    },
+    reset() {
+      draftScreen.reset(true);
+    },
+    abort() {
+      ws.selectionManager.cancelMove();
+      this.data.moving = false;
+      this.data.selecting = false;
+      draftScreen.reset(true);
+    },
+  };
+
   return {
     panzoom: panzoomTool,
+    select: selectTool,
     draw: drawTool,
     line: lineTool,
     rect: rectTool,
