@@ -70,6 +70,7 @@ interface State {
   mirrorEnabled: boolean;
   mirrorPoint: { r: number; c: number } | null;
   mirrorSelectingPoint: boolean;
+  textCursor: { r: number; c: number; startC: number } | null;
   selection: { start: PhoxelPosition; end: PhoxelPosition } | null;
   selectionMove: {
     data: SelectionData;
@@ -117,9 +118,9 @@ export class Workspace {
   data$: Observable<DocumentData> = observable({
     layers: {},
     motions: {},
-  } as DocumentData); // TODO fix?
+  } as DocumentData);
   state$: Observable<State> = observable({
-    dp: { char: 'D', fg: '#00FF00', bg: '#FF00FF' },
+    dp: { char: '0', fg: '#FFFFFF', bg: '#000000' },
     drawMode: 'draw',
     tool: 'draw',
     activeLayer: '',
@@ -135,6 +136,7 @@ export class Workspace {
     mirrorEnabled: false,
     mirrorPoint: null,
     mirrorSelectingPoint: false,
+    textCursor: null,
     selection: null,
     selectionMove: null,
     clipboard: null,
@@ -288,8 +290,10 @@ export class Workspace {
     this.state$.mirrorEnabled.onChange(() => this.drawboard.renderMirrorOverlay());
     this.state$.mirrorPoint.onChange(() => this.drawboard.renderMirrorOverlay());
     this.state$.selection.onChange(() => this.drawboard.renderSelectionOverlay());
+    this.state$.textCursor.onChange(() => this.drawboard.renderTextOverlay());
     this.drawboard.renderMirrorOverlay();
     this.drawboard.renderSelectionOverlay();
+    this.drawboard.renderTextOverlay();
 
     this.startRenderLoop();
 

@@ -35,6 +35,7 @@ export class Drawboard {
   refImage: { img: HTMLImageElement; wrapper: HTMLDivElement };
   mirrorOverlay: HTMLCanvasElement;
   selectionOverlay: HTMLCanvasElement;
+  textOverlay: HTMLCanvasElement;
   hammer: HammerManager;
   scale = panzoomConfiguration.startScale;
   refImageScale = panzoomConfiguration.startScale;
@@ -72,6 +73,13 @@ export class Drawboard {
     this.selectionOverlay.style =
       'position: absolute; top: 0; left: 0; pointer-events: none;';
     layersWrapper.appendChild(this.selectionOverlay);
+
+    this.textOverlay = document.createElement('canvas');
+    this.textOverlay.width = ws.config.size.cols * ws.font.width;
+    this.textOverlay.height = ws.config.size.rows * ws.font.height;
+    this.textOverlay.style =
+      'position: absolute; top: 0; left: 0; pointer-events: none;';
+    layersWrapper.appendChild(this.textOverlay);
 
     drawboard.appendChild(layersWrapper);
 
@@ -192,6 +200,32 @@ export class Drawboard {
     ctx.setLineDash([4, 3]);
     ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
     ctx.setLineDash([]);
+  }
+
+  renderTextOverlay() {
+    const ctx = this.textOverlay.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, this.textOverlay.width, this.textOverlay.height);
+
+    const cursor = this.ws.state$.textCursor.get();
+    if (!cursor) return;
+
+    const { width, height } = this.ws.font;
+
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#00FF00';
+    ctx.beginPath();
+    ctx.moveTo(cursor.startC * width, 0);
+    ctx.lineTo(cursor.startC * width, this.textOverlay.height);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.strokeRect(
+      cursor.c * width + 1,
+      cursor.r * height + 1,
+      width - 2,
+      height - 2,
+    );
   }
 
   getReferenceImageConfig() {

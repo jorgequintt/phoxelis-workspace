@@ -6,7 +6,7 @@ import {
 } from '../../utils/rendering';
 import type { CellChangeDetail } from '../elements/Drawboard';
 import { Workspace, type Phoxel, type PhoxelPosition } from '../Workspace';
-import { draw } from './Actions';
+import { draw, drawPhoxes } from './Actions';
 
 export interface Tool {
   name: ToolName;
@@ -14,6 +14,8 @@ export interface Tool {
   onCellChange?: (e: CustomEvent<CellChangeDetail>) => void;
   onPointerMove?: (e: PointerEvent) => void;
   onPointerUp?: (e: PointerEvent) => void;
+  onKeyDown?: (e: KeyboardEvent) => void;
+  onKeyUp?: (e: KeyboardEvent) => void;
   onPinchStart?: (e: HammerInput) => void;
   onPinchMove?: (e: HammerInput) => void;
   onPinchEnd?: (e: HammerInput) => void;
@@ -31,6 +33,8 @@ export type CurrentTool = {
     onPointerUp: (e: PointerEvent) => void;
     onCellChange: (e: CustomEvent<CellChangeDetail>) => void;
     onPointerMove: (e: PointerEvent) => void;
+    onKeyDown: (e: KeyboardEvent) => void;
+    onKeyUp: (e: KeyboardEvent) => void;
     onPinchStart: (e: HammerInput) => void;
     onPinchMove: (e: HammerInput) => void;
     onPinchEnd: (e: HammerInput) => void;
@@ -79,6 +83,11 @@ export const toolDefs: ToolDefinition[] = [
     icon: '●',
     tooltip: 'Filled Ellipse',
   },
+  {
+    name: 'text',
+    icon: 'T',
+    tooltip: 'Text',
+  },
 ];
 
 export class Toolbox {
@@ -124,6 +133,8 @@ export class Toolbox {
         'pointerup',
         this.currentTool.handlers.onPointerUp,
       );
+      window.removeEventListener('keydown', this.currentTool.handlers.onKeyDown);
+      window.removeEventListener('keyup', this.currentTool.handlers.onKeyUp);
       drawboard.hammer.off('pinchstart', this.currentTool.handlers.onPinchStart);
       drawboard.hammer.off('pinchmove', this.currentTool.handlers.onPinchMove);
       drawboard.hammer.off('pinchend', this.currentTool.handlers.onPinchEnd);
@@ -162,6 +173,8 @@ export class Toolbox {
             tool.onPointerUp?.(e);
           } catch {}
         },
+        onKeyDown: (e) => tool.onKeyDown?.(e),
+        onKeyUp: (e) => tool.onKeyUp?.(e),
         onPinchStart: (e) => tool.onPinchStart?.(e),
         onPinchMove: (e) => tool.onPinchMove?.(e),
         onPinchEnd: (e) => tool.onPinchEnd?.(e),
@@ -186,6 +199,8 @@ export class Toolbox {
       'pointerup',
       this.currentTool.handlers.onPointerUp,
     );
+    window.addEventListener('keydown', this.currentTool.handlers.onKeyDown);
+    window.addEventListener('keyup', this.currentTool.handlers.onKeyUp);
     drawboard.hammer.on('pinchstart', this.currentTool.handlers.onPinchStart);
     drawboard.hammer.on('pinchmove', this.currentTool.handlers.onPinchMove);
     drawboard.hammer.on('pinchend', this.currentTool.handlers.onPinchEnd);
@@ -747,6 +762,146 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     },
   };
 
+  // MARK: Text
+  const textTool: Tool = {
+    name: 'text',
+    onPointerDown(e: PointerEvent) {
+      if (e.button !== 0) return;
+      const r = dbd.mousePos.y;
+      const c = dbd.mousePos.x;
+      state$.textCursor.set({ r, c, startC: c });
+    },
+    onKeyDown(e: KeyboardEvent) {
+      const cursor = state$.textCursor.get();
+      if (!cursor) return;
+
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      const { r, c, startC } = cursor;
+      const activeLayer = state$.activeLayer.get();
+      const dp = state$.dp.get();
+
+      const moveTo = (nr: number, nc: number) => {
+        const clampedR = Math.min(Math.max(0, nr), size.rows - 1);
+        const clampedC = Math.min(Math.max(0, nc), size.cols - 1);
+        state$.textCursor.set({ r: clampedR, c: clampedC, startC });
+      };
+
+      const eraseCell = (nr: number, nc: number) => {
+        ws.dispatchAction(drawPhoxes, [{ phox: null, r: nr, c: nc }], activeLayer);
+      };
+
+      const charToGlyph = (ch: string): string | null => {
+        const cp = ch.codePointAt(0);
+        if (cp === undefined) return null;
+        return ws.font.characters[cp] ? ch : null;
+      };
+
+      switch (e.key) {
+        case 'Escape':
+          e.preventDefault();
+          state$.textCursor.set(null);
+          return;
+        case 'Enter':
+          e.preventDefault();
+          moveTo(r + 1, startC);
+          return;
+        case 'ArrowLeft':
+          e.preventDefault();
+          moveTo(r, c - 1);
+          return;
+        case 'ArrowRight':
+          e.preventDefault();
+          moveTo(r, c + 1);
+          return;
+        case 'ArrowUp':
+          e.preventDefault();
+          moveTo(r - 1, c);
+          return;
+        case 'ArrowDown':
+          e.preventDefault();
+          moveTo(r + 1, c);
+          return;
+        case 'Backspace': {
+          e.preventDefault();
+          if (c - 1 < 0) return;
+          eraseCell(r, c - 1);
+          moveTo(r, c - 1);
+          return;
+        }
+        case 'Delete': {
+          e.preventDefault();
+          if (c + 1 >= size.cols) return;
+          eraseCell(r, c + 1);
+          moveTo(r, c + 1);
+          return;
+        }
+      }
+
+      if (e.ctrlKey && e.key.toLocaleLowerCase() === 'v') {
+        e.preventDefault();
+        navigator.clipboard
+          .readText()
+          .then((text) => {
+            if (!text) return;
+            const freeC = size.cols - c;
+            const freeR = size.rows - r;
+            const lines = text
+              .split('\n')
+              .map((line) => [...line].slice(0, freeC))
+              .slice(0, freeR);
+
+            const phoxels: Array<{
+              phox: { char: string; fg: string; bg: string };
+              r: number;
+              c: number;
+            }> = [];
+            lines.forEach((line, li) => {
+              line.forEach((ch, ci) => {
+                const glyph = charToGlyph(ch);
+                if (glyph === null) return;
+                phoxels.push({
+                  phox: { char: glyph, fg: dp.fg, bg: dp.bg },
+                  r: r + li,
+                  c: c + ci,
+                });
+              });
+            });
+
+            if (phoxels.length > 0) {
+              ws.dispatchAction(drawPhoxes, phoxels, activeLayer);
+            }
+          })
+          .catch(() => {});
+        return;
+      }
+
+      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        const glyph = charToGlyph(e.key);
+        if (glyph !== null) {
+          ws.dispatchAction(
+            drawPhoxes,
+            [{ phox: { char: glyph, fg: dp.fg, bg: dp.bg }, r, c }],
+            activeLayer,
+          );
+        }
+        moveTo(r, c + 1);
+      }
+    },
+    abort() {
+      state$.textCursor.set(null);
+    },
+  };
+
   return {
     panzoom: panzoomTool,
     select: selectTool,
@@ -756,6 +911,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     filledRect: filledRectTool,
     ellipse: ellipseTool,
     filledEllipse: filledEllipseTool,
+    text: textTool,
   };
 }
 
