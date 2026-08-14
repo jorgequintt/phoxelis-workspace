@@ -3,8 +3,10 @@ import { useAppContext } from '../App';
 import { Menubar, type MenubarItem, type MenuEntry } from '../compounds/Menubar';
 import { NewDocumentModal } from '../compounds/NewDocumentModal';
 import { ExportModal } from '../compounds/ExportModal';
-import { Paper } from '@mantine/core';
+import { Button, Paper, Tooltip } from '@mantine/core';
 import { openModal } from '@mantine/modals';
+import { FrameCornersIcon } from '@phosphor-icons/react/dist/csr/FrameCorners';
+import styled from 'styled-components';
 
 export function NavBar() {
   const { ws, ed } = useAppContext();
@@ -125,7 +127,20 @@ export function NavBar() {
 
   return (
     <Paper shadow="md" p="xs" radius="xs" withBorder>
-      <Menubar items={menubar} />
+      <NavBarInner>
+        <Menubar items={menubar} />
+        <Tooltip label="Fullscreen" position="bottom">
+          <Button variant='subtle' onClick={() => ed.toggleFullScreenCommand()} size='compact-xs'>
+            <FrameCornersIcon size={22} />
+          </Button>
+        </Tooltip>
+      </NavBarInner>
     </Paper>
   );
 }
+
+const NavBarInner = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
