@@ -12,6 +12,7 @@ import { DrawManager, type DrawModeName } from './modules/DrawManager';
 import { observable, type Observable } from '@legendapp/state';
 import { LayerManager } from './modules/LayerManager';
 import { SelectionManager, type SelectionData } from './modules/SelectionManager';
+import { VersioningManager } from './modules/VersioningManager';
 import type { Change } from './modules/Actions';
 
 export type Phoxel = {
@@ -21,11 +22,24 @@ export type Phoxel = {
 };
 export type PhoxelPosition = [r: number, c: number];
 
+export type BranchBase = {
+  branch: string;
+  step: number;
+};
+
+export type Branch = {
+  base: BranchBase | null;
+  history: Record<string, Phox | null>[];
+};
+
 export type WorkspaceLayer = {
   name: string;
   opacity: number;
   visible: boolean;
   position: number;
+  branches: Record<string, Branch>;
+  currentBranch: string;
+  branchStep: number;
 };
 
 export type Motion = {
@@ -131,6 +145,7 @@ export class Workspace {
   palette: ReturnType<typeof createPaletteSelector>;
   layerManager: LayerManager;
   selectionManager: SelectionManager;
+  versioningManager: VersioningManager;
   changesManager: ChangesManager;
   toolbox: Toolbox;
   drawManager: DrawManager;
@@ -157,6 +172,7 @@ export class Workspace {
     this.changesManager = new ChangesManager();
     this.layerManager = new LayerManager(this);
     this.selectionManager = new SelectionManager(this);
+    this.versioningManager = new VersioningManager(this);
     const baseLayerId = this.layerManager.createLayer();
     this.state$.activeLayer.set(baseLayerId);
 
@@ -288,6 +304,13 @@ export class Workspace {
       const newLayers = _.mapValues(data.layers, (l, k) => {
         const target = this.layerManager.createLayerTarget();
         this.layersTargets[k] = target;
+
+        if (!l.branches) {
+          return {
+            ...l,
+            ...this.versioningManager.seedBranchesFromLayer(k),
+          };
+        }
 
         return {
           ...l,

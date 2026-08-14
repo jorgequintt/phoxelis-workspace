@@ -22,6 +22,9 @@ export class LayerManager {
       opacity: 100,
       visible: true,
       position: this.ws.phoxelis.layers.length - 1,
+      branches: this.ws.versioningManager.createInitialBranches(),
+      currentBranch: 'master',
+      branchStep: 0,
     });
 
     this.ws.layersTargets[lid] = target;

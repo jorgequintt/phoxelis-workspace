@@ -1,9 +1,24 @@
 import type { LayerData, Phox } from 'phoxelis';
-import type { PhoxelPosition, Workspace, WorkspaceLayer } from '../Workspace';
+import _ from 'lodash';
+import type { Branch, PhoxelPosition, Workspace, WorkspaceLayer } from '../Workspace';
 
 export interface Change {
   execute: () => void;
   undo: () => void;
+}
+
+type VersioningSnapshot = {
+  branches: Record<string, Branch>;
+  currentBranch: string;
+  branchStep: number;
+};
+
+function snapshotVersioning(layer: WorkspaceLayer): VersioningSnapshot {
+  return {
+    branches: _.cloneDeep(layer.branches),
+    currentBranch: layer.currentBranch,
+    branchStep: layer.branchStep,
+  };
 }
 
 export function draw(
@@ -16,15 +31,21 @@ export function draw(
   const dp = {...this.state$.dp.get()};
   const drawMode = this.state$.drawMode.get();
   const positions = this.drawManager.expandPositions(phoxelPositions);
+  const versioningSnapshot = snapshotVersioning(this.data$.layers[layerId].get());
 
   const execute = () => {
     this.drawManager.startMotionStroke();
+    const changes: Record<string, Phox | null> = {};
     positions.forEach(([r, c]) => {
       const origPhox = phoxelis.getPhoxFromPosition(r, c, layerId);
       previousPhoxels.push(origPhox ? { phox: origPhox, r, c } : { phox: null, r, c });
 
       this.drawManager.draw(drawMode, dp, r, c, layerId);
+
+      const newPhox = phoxelis.getPhoxFromPosition(r, c, layerId);
+      changes[`${r},${c}`] = newPhox;
     });
+    this.versioningManager.recordChanges(layerId, changes);
   };
   const undo = () => {
     previousPhoxels.forEach((p) => {
@@ -35,6 +56,9 @@ export function draw(
         phoxelis.renderPhoxel(char, fg, bg, p.r, p.c, layerId);
       }
     });
+    this.data$.layers[layerId].branches.set(versioningSnapshot.branches);
+    this.data$.layers[layerId].currentBranch.set(versioningSnapshot.currentBranch);
+    this.data$.layers[layerId].branchStep.set(versioningSnapshot.branchStep);
   };
 
   return { execute, undo };
@@ -47,9 +71,11 @@ export function drawPhoxes(
 ): Change {
   const phoxelis = this.phoxelis;
   const previous: Array<{ phox: Phox | null; r: number; c: number }> = [];
+  const versioningSnapshot = snapshotVersioning(this.data$.layers[layerId].get());
 
   const execute = () => {
     previous.length = 0;
+    const changes: Record<string, Phox | null> = {};
     phoxels.forEach(({ r, c }) => {
       previous.push({ phox: phoxelis.getPhoxFromPosition(r, c, layerId), r, c });
     });
@@ -59,7 +85,9 @@ export function drawPhoxes(
       } else {
         phoxelis.removePhoxel(r, c, layerId);
       }
+      changes[`${r},${c}`] = phox;
     });
+    this.versioningManager.recordChanges(layerId, changes);
   };
   const undo = () => {
     previous.forEach(({ phox, r, c }) => {
@@ -69,6 +97,9 @@ export function drawPhoxes(
         phoxelis.removePhoxel(r, c, layerId);
       }
     });
+    this.data$.layers[layerId].branches.set(versioningSnapshot.branches);
+    this.data$.layers[layerId].currentBranch.set(versioningSnapshot.currentBranch);
+    this.data$.layers[layerId].branchStep.set(versioningSnapshot.branchStep);
   };
 
   return { execute, undo };
@@ -168,6 +199,79 @@ export function moveLayerBottom(this: Workspace, layerId: string): Change {
 
   const undo = () => {
     this.layerManager.setLayerPosition(layerId, originalPos);
+  };
+
+  return { execute, undo };
+}
+
+export function addVersion(this: Workspace, layerId: string): Change {
+  let snapshot: VersioningSnapshot;
+
+  const execute = () => {
+    const layer = this.data$.layers[layerId].get();
+    snapshot = snapshotVersioning(layer);
+    const branch = layer.branches[layer.currentBranch];
+    const newHistory = [...branch.history, {}];
+    const newBranches = {
+      ...layer.branches,
+      [layer.currentBranch]: { ...branch, history: newHistory },
+    };
+    this.data$.layers[layerId].branches.set(newBranches);
+    this.data$.layers[layerId].branchStep.set(newHistory.length - 1);
+  };
+  const undo = () => {
+    this.data$.layers[layerId].branches.set(snapshot.branches);
+    this.data$.layers[layerId].currentBranch.set(snapshot.currentBranch);
+    this.data$.layers[layerId].branchStep.set(snapshot.branchStep);
+  };
+
+  return { execute, undo };
+}
+
+export function createBranch(this: Workspace, layerId: string): Change {
+  let snapshot: VersioningSnapshot;
+
+  const execute = () => {
+    const layer = this.data$.layers[layerId].get();
+    snapshot = snapshotVersioning(layer);
+    const branchName = `branch-${Object.keys(layer.branches).length}`;
+    const newBranches = {
+      ...layer.branches,
+      [branchName]: {
+        base: { branch: layer.currentBranch, step: layer.branchStep },
+        history: [{}],
+      },
+    };
+    this.data$.layers[layerId].branches.set(newBranches);
+    this.data$.layers[layerId].currentBranch.set(branchName);
+    this.data$.layers[layerId].branchStep.set(0);
+  };
+  const undo = () => {
+    this.data$.layers[layerId].branches.set(snapshot.branches);
+    this.data$.layers[layerId].currentBranch.set(snapshot.currentBranch);
+    this.data$.layers[layerId].branchStep.set(snapshot.branchStep);
+  };
+
+  return { execute, undo };
+}
+
+export function resetVersioning(this: Workspace, layerId: string): Change {
+  let snapshot: VersioningSnapshot;
+
+  const execute = () => {
+    const layer = this.data$.layers[layerId].get();
+    snapshot = snapshotVersioning(layer);
+    const merged = this.versioningManager.assembleChanges(layerId);
+    this.data$.layers[layerId].branches.set({
+      master: { base: null, history: [merged] },
+    });
+    this.data$.layers[layerId].currentBranch.set('master');
+    this.data$.layers[layerId].branchStep.set(0);
+  };
+  const undo = () => {
+    this.data$.layers[layerId].branches.set(snapshot.branches);
+    this.data$.layers[layerId].currentBranch.set(snapshot.currentBranch);
+    this.data$.layers[layerId].branchStep.set(snapshot.branchStep);
   };
 
   return { execute, undo };

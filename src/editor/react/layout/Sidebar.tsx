@@ -2,8 +2,9 @@ import styled from 'styled-components';
 import { DOMWrapper } from '../atoms/DOMWrapper';
 import { useAppContext } from '../App';
 import LayersPanel from '../organisms/LayersPanel';
+import VersioningPanel from '../organisms/VersioningPanel';
 
-export const sidebarWidth = 120;
+export const sidebarWidth = 150;
 
 export function Sidebar() {
   const { ws } = useAppContext();
@@ -13,6 +14,7 @@ export function Sidebar() {
       <DOMWrapper el={ws.alphabet.element} />
       <DOMWrapper el={ws.colorPicker.element} />
       <LayersPanel />
+      <VersioningPanel />
     </Container>
   );
 }
