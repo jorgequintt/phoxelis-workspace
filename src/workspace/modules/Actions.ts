@@ -13,7 +13,7 @@ export function draw(
 ): Change {
   const previousPhoxels: { phox: Phox | null; r: number; c: number }[] = [];
   const phoxelis = this.phoxelis;
-  const dp = this.state$.dp.get();
+  const dp = {...this.state$.dp.get()};
   const drawMode = this.state$.drawMode.get();
 
   const execute = () => {
