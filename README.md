@@ -11,31 +11,37 @@ Built on top of [Phoxelis](https://github.com/jorgequintt/phoxelis), a canvas re
 ## Features
 
 **Drawing**
-- Freehand draw plus shape tools: line (Bresenham), rectangle, filled rectangle, ellipse, and filled ellipse (midpoint algorithm).
-- Six draw modes — control exactly what gets applied to each cell:
-  - `draw` (char + fg + bg), `char`, `fg`, `bg`, `color` (fg + bg), and `erase`.
+- Freehand draw (with adjustable **pencil radius**) plus shape tools: line (Bresenham), rectangle, filled rectangle, ellipse, and filled ellipse (midpoint algorithm), and a **text tool** that types glyphs straight onto the canvas.
+- Seven draw modes — control exactly what gets applied to each cell:
+  - `draw` (char + fg + bg), `char`, `fg`, `bg` (also paints empty cells), `color` (fg + bg), `erase`, and `motion`.
+- **Mirror drawing** — toggle mirror mode, pick a mirror point, and every stroke is reflected vertically, horizontally, and diagonally.
+- **Motion mode** — a draw mode that cycles through a named sequence of glyphs (loop or hold) as you stroke.
 - Live draft preview: strokes render onto a separate "draft screen" as you draw and only commit to the canvas when you release.
+
+**Selection**
+- **Select tool** — drag a rectangular marquee, then move the region by dragging or nudging with the arrow keys; copy / cut / paste / delete it. Operates on the active layer.
 
 **Layers**
 - Multiple layers with per-layer **opacity**, **visibility**, and full **reordering** (up/down/top/bottom).
 - Add and delete layers (with confirmation), each rendered to its own canvas target and composited per frame.
+- **Versioning** — each layer keeps a git-like history of per-step changes: add versions, fork **branches**, switch between them, and reset back to a single history.
 
 **Palette & typography**
 - A reusable **phox palette** rendered right inside the canvas — click any entry to pick up that `{ char, fg, bg }` combination.
 - **Modify Palette Phox** mode: edit a character's glyph or colors and write it straight back into the palette.
 - An **alphabet selector** that lets you browse every glyph in the loaded BDF font and pick a character by clicking.
-- Full HSV color wheel (via iro.js) with separate **foreground / background** targets.
+- Full HSV color wheel (via iro.js) with separate **foreground / background** targets and a one-click **swap colors** button.
 
 **Document management**
 - New document dialog — choose grid **rows × cols** and one of five built-in **Trithemius** bitmap fonts.
 - Save / load documents (`.phx`) using the browser's File System Access API.
-- Export workspaces as `.phoxelis` JSON for later re-import.
+- **Export as PNG** at 1×/2×/4×/8× scale, or export the workspace as `.phoxelis` JSON for later re-import.
 
 **Workflow & navigation**
 - Full **undo / redo** (Ctrl+Z / Ctrl+Y), implemented as a command-pattern `Change` system with a 100-step history.
 - Pan and zoom the canvas (Ctrl+drag to pan, Shift+drag to zoom, pinch gestures on touch) and view the canvas in **fullscreen**.
 - **Reference images** — drop in an image, pan/zoom it independently, and use it as a visual guide while drawing.
-- Hotkey manager that supports both keyboard and mouse-button combinations (e.g. hold Ctrl to temporarily pan, Shift to zoom).
+- Hotkey manager that supports both keyboard and mouse-button combinations (e.g. hold Ctrl to temporarily pan, Shift to zoom), plus selection hotkeys (copy / cut / paste, delete, arrow-key nudging).
 
 ## Tech Stack
 
@@ -63,6 +69,8 @@ src/
 │       ├── LayerManager.ts       Layer CRUD, reordering, canvas targets
 │       ├── ChangesManager.ts     Undo/redo history stack
 │       ├── HotkeyManager.ts      Keyboard + mouse hotkey routing
+│       ├── SelectionManager.ts   Rectangular selection: copy/cut/paste/move
+│       ├── VersioningManager.ts  Per-layer branch/version history
 │       └── Actions.ts            Undoable "Change" factories (draw, new/delete layer, …)
 │
 └── editor/     The presentation layer — React & Mantine
@@ -100,6 +108,9 @@ npm run preview   # preview the production build
 | `Ctrl+O` | Load document |
 | `Ctrl+Shift+O` | New document |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
+| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy / Cut / Paste selection |
+| `Delete` / `Backspace` | Delete selection |
+| `←` `↑` `↓` `→` | Nudge selection |
 | `Ctrl+drag` | Pan canvas |
 | `Shift+drag` | Zoom canvas |
 | Pinch | Zoom (touch) |
@@ -116,4 +127,4 @@ Five Trithemius bitmap fonts ship in `public/fonts/`, ranging from 5×8 to 9×15
 
 ## Status
 
-Actively developed hobby project — see `git log` for the roadmap-in-progress (recent work: Mantine v9 UI migration, layer undo/redo, new-document dialog, fullscreen mode, toolbar).
+Actively developed hobby project — see `git log` for the roadmap-in-progress (recent work: select & text tools, mirror drawing, motion mode, per-layer versioning, PNG export, fullscreen mode, updated title & favicon).

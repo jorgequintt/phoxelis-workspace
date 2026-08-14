@@ -61,7 +61,7 @@ src/
 ├── workspace/         The ENGINE — pure TypeScript, framework-agnostic, owns all state
 │   ├── Workspace.ts       Central orchestrator: canvas, observable state, render loop
 │   ├── elements/          Imperative DOM widgets (Drawboard, palette, alphabet, colorPicker, refImage)
-│   └── modules/           Capabilities (Toolbox, DrawManager, LayerManager, ChangesManager, HotkeyManager, Actions)
+│   └── modules/           Capabilities (Toolbox, DrawManager, LayerManager, ChangesManager, HotkeyManager, SelectionManager, VersioningManager, Actions)
 ├── editor/            The PRESENTATION layer — React & Mantine, thin UI over the engine
 │   ├── Editor.ts          Base class: sessions, file save/load, command methods
 │   └── react/             ReactEditor, App, layout/, organisms/, compounds/, atoms/
@@ -75,9 +75,9 @@ able to swap in by subclassing `Editor` (see `ReactEditor`).
 
 ### Directory conventions (atomic design)
 
-- `editor/react/atoms/` — primitives (`DOMWrapper`, `SideButton`)
-- `editor/react/organisms/` — feature components (`Toolbar`, `LayersPanel`, `NavBar`, `ToolsMenu`, `DrawModeMenu`)
-- `editor/react/compounds/` — composite/configurable components (`Menubar`, `NewDocumentModal`)
+- `editor/react/atoms/` — primitives (`DOMWrapper`, `SideButton`, `MenuIcon`, `AlphabetPicker`)
+- `editor/react/organisms/` — feature components (`Toolbar`, `LayersPanel`, `VersioningPanel`, `NavBar`, `ToolsMenu`, `DrawModeMenu`, `LayerListItem`)
+- `editor/react/compounds/` — composite/configurable components (`Menubar`, `NewDocumentModal`, `ExportModal`, `LoadDocumentModal`, `SaveDocumentModal`, `MotionModal`)
 - `editor/react/layout/` — page composition (`Content`, `Sidebar`, `Footer`)
 
 ## Core concepts
@@ -86,8 +86,8 @@ able to swap in by subclassing `Editor` (see `ReactEditor`).
 
 `Workspace` owns two observables:
 
-- `data$` — document data (`layers: Record<layerId, WorkspaceLayer>`). `WorkspaceLayer = { name, opacity, visible, position }`.
-- `state$` — UI/tool state (`dp` = current phox `{char,fg,bg}`, `drawMode`, `tool`, `activeLayer`, `paletteData`, `selectedColorType`, `movingRefImage`, `pencilRadius`).
+- `data$` — document data (`layers: Record<layerId, WorkspaceLayer>` and `motions: Record<motionId, Motion>`). `WorkspaceLayer = { name, opacity, visible, position, branches, currentBranch, branchStep }`; `Motion = { id, name, chars }`.
+- `state$` — UI/tool state (`dp` = current phox `{char,fg,bg}`, `drawMode` (incl. `'motion'`), `tool` (incl. `'select'`, `'text'`), `activeLayer`, `paletteData`, `selectedColorType`, `movingRefImage`, `pencilRadius`, `mirrorEnabled` / `mirrorPoint` / `mirrorSelectingPoint`, `textCursor`, `selection` / `selectionMove` / `clipboard`, `activeMotionId` / `motionWrap`).
 
 React components read observables with `useValue(ws.state$.xxx)` and mutate with
 `ws.state$.xxx.set(value)` (dot-notation `ws.state$.dp.fg.set(...)` also works). Imperative
@@ -126,11 +126,37 @@ Tools draw a live preview onto a separate `draftScreen` Phoxelis instance while 
 is down (`drawManager.draft(r, c)`), then on pointer-up call `submit()`, which dispatches a
 single undoable `draw` change and resets the draft. See `Toolbox.createTools()`.
 
+`draft()` and the `draw`/`drawPhoxes` actions apply **mirror reflection** when
+`state$.mirrorEnabled` is set — cells are expanded via `DrawManager.reflectCells()`
+(vertical/horizontal/diagonal, clamped & de-duplicated). When `drawMode === 'motion'`,
+`DrawManager.getMotionChar()` advances a per-stroke cursor through the active motion's
+`chars` (looping or holding per `state$.motionWrap`).
+
+Two tools deliberately commit outside the draft lifecycle but still go through
+`dispatchAction(drawPhoxes, ...)` so they stay undoable: the **text tool** (one
+change per keystroke / Ctrl+V paste) and **selection moves** (see `SelectionManager`).
+
 ### Render loop
 
 `Workspace.startRenderLoop()` runs `requestAnimationFrame`, calling
 `phoxelis.renderFrame(layerOptions)` (compositing each layer onto its `layersTargets`
 canvas with per-layer opacity/visibility) then `draftScreen.renderFrame()`.
+
+### Versioning (per-layer branch history)
+
+Each layer keeps a git-like history in `data$.layers[layerId].branches`:
+a map of branch names to `Branch = { base, history }` where `history` is an array of
+per-step change maps (`Record<"r,c", Phox | null>`, one entry per recorded draw).
+`currentBranch` + `branchStep` point into that history. `VersioningManager.apply()` merges
+all ancestor steps via `assembleVersioningChanges()` and rewrites the layer's cells;
+`goNext`/`goPrevious`/`goTo`/`switchBranch`/`goToParentBranch` move around in it.
+
+- The `draw`/`drawPhoxes` actions call `versioningManager.recordChanges(layerId, changes)`
+  so every stroke lands in the branch history.
+- `addVersion`, `createBranch`, and `resetVersioning` are undoable actions in `Actions.ts`
+  that mutate the `branches` structure (snapshot-restore on undo).
+- `VersioningManager.snapshot()` / `restore()` are used when (un)doing draw changes so a
+  reverted stroke doesn't leave stale history.
 
 ## Code conventions
 
@@ -159,10 +185,12 @@ canvas with per-layer opacity/visibility) then `draftScreen.renderFrame()`.
 | `src/workspace/Workspace.ts` | Central orchestrator; `Workspace.create()` is an async static factory (font loading); constructor is protected |
 | `src/workspace/modules/Actions.ts` | All undoable action factories + `Change` interface |
 | `src/workspace/modules/Toolbox.ts` | Tool definitions & pointer/pinch wiring; `createTools()` builds each tool |
-| `src/workspace/modules/DrawManager.ts` | Applies `dp` per draw-mode to real canvas (`draw`) or draft screen (`draft`) |
+| `src/workspace/modules/DrawManager.ts` | Applies `dp` per draw-mode to real canvas (`draw`) or draft screen (`draft`); mirror reflection (`reflectCells`) and motion-char cycling |
 | `src/workspace/modules/LayerManager.ts` | Layer CRUD, reordering, canvas targets |
 | `src/workspace/modules/ChangesManager.ts` | 100-step undo/redo stacks |
 | `src/workspace/modules/HotkeyManager.ts` | Keyboard + mouse-button hotkey routing |
+| `src/workspace/modules/SelectionManager.ts` | Rectangular selection: copy/cut/paste, drag & arrow-key moves (all via `drawPhoxes`) |
+| `src/workspace/modules/VersioningManager.ts` | Per-layer git-like version history (`branches`, `currentBranch`, `branchStep`, `base`) |
 | `src/workspace/elements/Drawboard.ts` | Canvas container, pointer→cell mapping, panzoom, hammer pinch |
 | `src/editor/Editor.ts` | Sessions, save/load (File System Access API), command methods |
 | `src/editor/react/ReactEditor.tsx` | `Editor` subclass rendering `<App>` via React root |
@@ -178,5 +206,3 @@ canvas with per-layer opacity/visibility) then `draftScreen.renderFrame()`.
 - `documentName` and `last_doc` (localStorage) persist sessions across reloads (`main.ts`
   auto-loads the last document); save/load uses `navigator.storage.getDirectory()` (File
   System Access API), which only works in Chromium browsers.
-- `index.html` references `/favicon.svg` which is **not present** in `public/` — the 404 is
-  pre-existing; don't treat it as a regression.
