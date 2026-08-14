@@ -133,10 +133,9 @@ export class DrawManager {
       );
     } else if (drawMode === 'bg') {
       const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, layerId);
-      if (!underlyingPhoxel) return;
       phoxelis.renderPhoxel(
-        underlyingPhoxel.char,
-        underlyingPhoxel.fg,
+        underlyingPhoxel?.char ?? ' ',
+        underlyingPhoxel?.fg ?? dp.fg,
         dp.bg,
         r,
         c,
@@ -148,7 +147,9 @@ export class DrawManager {
   }
 
   draft(r: number, c: number) {
-    for (const [cr, cc] of this.isMirroring() ? this.reflectCells(r, c) : ([[r, c]] as PhoxelPosition[])) {
+    for (const [cr, cc] of this.isMirroring()
+      ? this.reflectCells(r, c)
+      : ([[r, c]] as PhoxelPosition[])) {
       this.renderDraftCell(cr, cc);
     }
   }
@@ -180,8 +181,13 @@ export class DrawManager {
       draftScreen.renderPhoxel(underlyingPhoxel.char, dp.fg, underlyingPhoxel.bg, r, c);
     } else if (drawMode === 'bg') {
       const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, activeLayer);
-      if (!underlyingPhoxel) return;
-      draftScreen.renderPhoxel(underlyingPhoxel.char, underlyingPhoxel.fg, dp.bg, r, c);
+      draftScreen.renderPhoxel(
+        underlyingPhoxel?.char ?? ' ',
+        underlyingPhoxel?.fg ?? dp.fg,
+        dp.bg,
+        r,
+        c,
+      );
     } else if (drawMode === 'erase') {
       draftScreen.renderPhoxel('D', '#FF0000', '#FF000055', r, c);
     }
