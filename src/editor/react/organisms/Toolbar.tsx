@@ -1,5 +1,5 @@
 import { useAppContext } from '../App';
-import { Paper, SegmentedControl, Select, Tooltip } from '@mantine/core';
+import { Button, Paper, SegmentedControl, Select, Tooltip } from '@mantine/core';
 import { openModal } from '@mantine/modals';
 import { FloppyDiskIcon } from '@phosphor-icons/react/dist/csr/FloppyDisk';
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
@@ -20,6 +20,9 @@ export function Toolbar() {
   const motions = useValue(ws.data$.motions);
   const activeMotionId = useValue(ws.state$.activeMotionId);
   const motionWrap = useValue(ws.state$.motionWrap);
+  const mirrorEnabled = useValue(ws.state$.mirrorEnabled);
+  const mirrorSelectingPoint = useValue(ws.state$.mirrorSelectingPoint);
+  const mirrorPoint = useValue(ws.state$.mirrorPoint);
 
   const motionOptions = Object.values(motions).map((m) => ({
     value: m.id,
@@ -66,6 +69,30 @@ export function Toolbar() {
               }
             />
             <OptionValue>{pencilRadius}</OptionValue>
+          </ToolbarSection>
+        )}
+        {mirrorEnabled && (
+          <ToolbarSection>
+            <OptionLabel>Mirror</OptionLabel>
+            <Button
+              size="xs"
+              variant={mirrorSelectingPoint ? 'filled' : 'default'}
+              onClick={() =>
+                ws.state$.mirrorSelectingPoint.set(!mirrorSelectingPoint)
+              }
+            >
+              Set point
+            </Button>
+            <OptionValue>
+              {mirrorPoint ? `${mirrorPoint.r}, ${mirrorPoint.c}` : '—'}
+            </OptionValue>
+            <Button
+              size="xs"
+              variant="default"
+              onClick={() => ws.state$.mirrorPoint.set(null)}
+            >
+              Clear
+            </Button>
           </ToolbarSection>
         )}
         {drawMode === 'motion' && (

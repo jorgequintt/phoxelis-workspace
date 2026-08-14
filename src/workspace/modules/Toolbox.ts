@@ -127,6 +127,19 @@ export class Toolbox {
       handlers: {
         onPointerDown: (e) => {
           drawboard.element.setPointerCapture(e.pointerId);
+          if (
+            this.ws.state$.mirrorSelectingPoint.get() &&
+            !e.ctrlKey &&
+            !e.shiftKey &&
+            !e.altKey
+          ) {
+            this.ws.state$.mirrorPoint.set({
+              r: drawboard.mousePos.y,
+              c: drawboard.mousePos.x,
+            });
+            this.ws.state$.mirrorSelectingPoint.set(false);
+            return;
+          }
           tool.onPointerDown?.(e);
         },
         onPointerMove: (e) => {

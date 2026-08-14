@@ -33,6 +33,7 @@ export class Drawboard {
   element: HTMLDivElement;
   mousePos: { x: number; y: number } = { x: -1, y: -1 };
   refImage: { img: HTMLImageElement; wrapper: HTMLDivElement };
+  mirrorOverlay: HTMLCanvasElement;
   hammer: HammerManager;
   scale = panzoomConfiguration.startScale;
   refImageScale = panzoomConfiguration.startScale;
@@ -56,6 +57,14 @@ export class Drawboard {
     layersWrapper.appendChild(ws.phoxelis.canvas);
     layersWrapper.appendChild(this.refImage.wrapper);
     layersWrapper.appendChild(ws.draftScreen.canvas);
+
+    this.mirrorOverlay = document.createElement('canvas');
+    this.mirrorOverlay.width = ws.config.size.cols * ws.font.width;
+    this.mirrorOverlay.height = ws.config.size.rows * ws.font.height;
+    this.mirrorOverlay.style =
+      'position: absolute; top: 0; left: 0; pointer-events: none;';
+    layersWrapper.appendChild(this.mirrorOverlay);
+
     drawboard.appendChild(layersWrapper);
 
     this.hammer = new Hammer(drawboard);
@@ -122,6 +131,33 @@ export class Drawboard {
     this.refImage.img.src = base64;
     this.refImageScale = 1;
     this.refImagePanzoom?.reset();
+  }
+
+  renderMirrorOverlay() {
+    const ctx = this.mirrorOverlay.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, this.mirrorOverlay.width, this.mirrorOverlay.height);
+
+    if (!this.ws.state$.mirrorEnabled.get()) return;
+    const point = this.ws.state$.mirrorPoint.get();
+    if (!point) return;
+
+    const { width, height } = this.ws.font;
+    const x = point.c * width + width / 2;
+    const y = point.r * height + height / 2;
+
+    ctx.strokeStyle = '#40E0D0';
+    ctx.fillStyle = '#40E0D0';
+    ctx.lineWidth = 1;
+
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, this.mirrorOverlay.height);
+    ctx.moveTo(0, y);
+    ctx.lineTo(this.mirrorOverlay.width, y);
+    ctx.stroke();
+
+    ctx.fillRect(x - 2, y - 2, 5, 5);
   }
 
   getReferenceImageConfig() {

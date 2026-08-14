@@ -7,6 +7,7 @@ import { useValue } from '@legendapp/state/react';
 export function ToolsMenu() {
   const { ws } = useAppContext();
   const currentTool = useValue(ws.state$.tool);
+  const mirrorEnabled = useValue(ws.state$.mirrorEnabled);
 
   return (
     <Container>
@@ -22,9 +23,26 @@ export function ToolsMenu() {
           {t.icon}
         </SideButton>
       ))}
+      <Divider />
+      <SideButton
+        active={mirrorEnabled}
+        title="Mirror (toggle)"
+        onClick={() => {
+          ws.state$.mirrorEnabled.set(!mirrorEnabled);
+        }}
+      >
+        ⧉
+      </SideButton>
     </Container>
   );
 }
+
+const Divider = styled.div`
+  width: 28px;
+  height: 1px;
+  background: #555;
+  margin: 4px 0;
+`;
 
 const Container = styled.div`
   width: 40px;

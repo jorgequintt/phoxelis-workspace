@@ -15,10 +15,11 @@ export function draw(
   const phoxelis = this.phoxelis;
   const dp = {...this.state$.dp.get()};
   const drawMode = this.state$.drawMode.get();
+  const positions = this.drawManager.expandPositions(phoxelPositions);
 
   const execute = () => {
     this.drawManager.startMotionStroke();
-    phoxelPositions.forEach(([r, c]) => {
+    positions.forEach(([r, c]) => {
       const origPhox = phoxelis.getPhoxFromPosition(r, c, layerId);
       previousPhoxels.push(origPhox ? { phox: origPhox, r, c } : { phox: null, r, c });
 

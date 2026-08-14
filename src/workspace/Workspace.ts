@@ -52,6 +52,9 @@ interface State {
   selectedColorType: 'fg' | 'bg';
   movingRefImage: boolean;
   pencilRadius: number;
+  mirrorEnabled: boolean;
+  mirrorPoint: { r: number; c: number } | null;
+  mirrorSelectingPoint: boolean;
 }
 
 export interface WorkspaceData {
@@ -104,8 +107,11 @@ export class Workspace {
     },
     selectedColorType: 'fg',
     movingRefImage: false,
-    pencilRadius: 0
-  });
+    pencilRadius: 0,
+    mirrorEnabled: false,
+    mirrorPoint: null,
+    mirrorSelectingPoint: false
+  } as State);
   drawboard: Drawboard;
   colorPicker: ReturnType<typeof createColorPicker>;
   alphabet: ReturnType<typeof createAlphabetSelector>;
@@ -172,6 +178,10 @@ export class Workspace {
         },
       },
     );
+
+    this.state$.mirrorEnabled.onChange(() => this.drawboard.renderMirrorOverlay());
+    this.state$.mirrorPoint.onChange(() => this.drawboard.renderMirrorOverlay());
+    this.drawboard.renderMirrorOverlay();
 
     this.startRenderLoop();
 

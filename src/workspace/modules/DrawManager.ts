@@ -1,5 +1,5 @@
 import type { Phox } from 'phoxelis';
-import type { Workspace } from '../Workspace';
+import type { PhoxelPosition, Workspace } from '../Workspace';
 
 export type DrawModeName = 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase' | 'motion';
 
@@ -43,6 +43,56 @@ export class DrawManager {
       : motion.chars[Math.min(this.motionCursor, motion.chars.length - 1)];
     this.motionCursor++;
     return char;
+  }
+
+  isMirroring(): boolean {
+    const { state$ } = this.ws;
+    return state$.mirrorEnabled.get() && state$.mirrorPoint.get() !== null;
+  }
+
+  /** Reflect a cell across the mirror point: original + vertical, horizontal and
+   * diagonal reflections, clamped to the canvas and de-duplicated. */
+  reflectCells(r: number, c: number): PhoxelPosition[] {
+    const {
+      state$,
+      config: { size },
+    } = this.ws;
+    const point = state$.mirrorPoint.get();
+    if (!point) return [[r, c]];
+
+    const candidates: PhoxelPosition[] = [
+      [r, c],
+      [2 * point.r - r, c],
+      [r, 2 * point.c - c],
+      [2 * point.r - r, 2 * point.c - c],
+    ];
+
+    const seen = new Set<string>();
+    const result: PhoxelPosition[] = [];
+    for (const [cr, cc] of candidates) {
+      if (cr < 0 || cr >= size.rows || cc < 0 || cc >= size.cols) continue;
+      const key = `${cr};${cc}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push([cr, cc]);
+    }
+    return result;
+  }
+
+  /** Expand a list of positions with their mirror reflections (when mirroring). */
+  expandPositions(positions: PhoxelPosition[]): PhoxelPosition[] {
+    if (!this.isMirroring()) return positions;
+    const seen = new Set<string>();
+    const result: PhoxelPosition[] = [];
+    for (const [r, c] of positions) {
+      for (const [cr, cc] of this.reflectCells(r, c)) {
+        const key = `${cr};${cc}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push([cr, cc]);
+      }
+    }
+    return result;
   }
 
   draw(drawMode: DrawModeName, dp: Phox, r: number, c: number, layerId: string) {
@@ -98,6 +148,12 @@ export class DrawManager {
   }
 
   draft(r: number, c: number) {
+    for (const [cr, cc] of this.isMirroring() ? this.reflectCells(r, c) : ([[r, c]] as PhoxelPosition[])) {
+      this.renderDraftCell(cr, cc);
+    }
+  }
+
+  private renderDraftCell(r: number, c: number) {
     const { state$, phoxelis, draftScreen } = this.ws;
     const dp = state$.dp.get();
     const drawMode = state$.drawMode.get();
