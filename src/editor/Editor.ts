@@ -35,15 +35,32 @@ export class Editor {
     return fileDataString;
   }
 
+  async listDocuments() {
+    const root = await navigator.storage.getDirectory();
+    const names: string[] = [];
+    for await (const [name] of root.entries()) {
+      if (name.endsWith(`.${ext}`)) {
+        names.push(name.slice(0, -(ext.length + 1)));
+      }
+    }
+    return names.sort();
+  }
+
+  async deleteDocument(name: string) {
+    const root = await navigator.storage.getDirectory();
+    await root.removeEntry(`${name}.${ext}`);
+  }
+
   async saveDocument(name: string, workspace: Workspace) {
     try {
       const workspaceData = workspace.exportData();
       const dataString = JSON.stringify(workspaceData);
       await this.saveFile(dataString, `${name}.${ext}`);
       localStorage.setItem('last_doc', name);
-      alert('Document saved');
+      return true;
     } catch (error) {
       console.error(`saveDocument error: ${error}`);
+      return false;
     }
   }
 
@@ -76,6 +93,19 @@ export class Editor {
     }
   }
 
+  /* Hooks to be overridden by extending UIs to replace browser prompts/alerts */
+  protected async requestSaveName(): Promise<string | null> {
+    return prompt();
+  }
+
+  protected async requestDocumentToLoad(): Promise<string | null> {
+    return prompt();
+  }
+
+  protected onDocumentSaved(_name: string) {
+    alert('Document saved');
+  }
+
   public async saveDocumentCommand() {
     if (!this.editorSession) {
       console.error('exportPhoxelisCommand: No active editor session.');
@@ -83,26 +113,27 @@ export class Editor {
     }
 
     if (!this.editorSession.documentName) {
-      const docName = prompt();
+      const docName = await this.requestSaveName();
 
       if (!docName) {
-        alert('No name provided. Not saving');
         return;
       }
 
       this.editorSession.documentName = docName;
     }
-    await this.saveDocument(
+    const saved = await this.saveDocument(
       this.editorSession.documentName,
       this.editorSession.currentWorkspace,
     );
+    if (saved) {
+      this.onDocumentSaved(this.editorSession.documentName);
+    }
   }
 
   async loadDocumentCommand() {
-    const docName = prompt();
+    const docName = await this.requestDocumentToLoad();
 
     if (!docName) {
-      alert('No name provided. Not saving');
       return;
     }
 

@@ -2,6 +2,8 @@ import type { PropsWithChildren } from 'react';
 import { createTheme, MantineProvider } from '@mantine/core';
 import '@mantine/core/styles.css';
 import { ModalsProvider } from '@mantine/modals';
+import { Notifications } from '@mantine/notifications';
+import '@mantine/notifications/styles.css';
 
 const theme = createTheme({
   scale: 0.95,
@@ -24,7 +26,10 @@ const theme = createTheme({
 export function Mantine(props: PropsWithChildren) {
   return (
     <MantineProvider defaultColorScheme="dark" theme={theme}>
-      <ModalsProvider>{props.children}</ModalsProvider>
+      <ModalsProvider>
+        <Notifications />
+        {props.children}
+      </ModalsProvider>
     </MantineProvider>
   );
 }
