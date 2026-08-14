@@ -1,5 +1,6 @@
 import {
   bresenhamCells,
+  circleCells,
   drawEllipseFill,
   drawEllipseOutline,
 } from '../../utils/rendering';
@@ -313,8 +314,12 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       drawing: false,
     },
     addPhoxelToDraft(p: Phoxel) {
-      this.data!.draftPhoxels.set(`${p.r};${p.c}`, p);
-      drawManager.draft(p.r, p.c);
+      const radius = ws.state$.pencilRadius.get();
+      const cells = circleCells(p.r, p.c, radius, size);
+      for (const [r, c] of cells) {
+        this.data!.draftPhoxels.set(`${r};${c}`, { ...p, r, c });
+        drawManager.draft(r, c);
+      }
     },
     onPointerDown() {
       this.data.drawing = true;

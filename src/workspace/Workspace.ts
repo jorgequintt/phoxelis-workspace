@@ -42,6 +42,7 @@ interface State {
   };
   selectedColorType: 'fg' | 'bg';
   movingRefImage: boolean;
+  pencilRadius: number;
 }
 
 export interface WorkspaceData {
@@ -90,6 +91,7 @@ export class Workspace {
     },
     selectedColorType: 'fg',
     movingRefImage: false,
+    pencilRadius: 0
   });
   drawboard: Drawboard;
   colorPicker: ReturnType<typeof createColorPicker>;

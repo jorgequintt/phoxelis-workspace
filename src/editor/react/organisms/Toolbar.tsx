@@ -3,31 +3,51 @@ import { Paper, Tooltip } from '@mantine/core';
 import { FloppyDiskIcon } from '@phosphor-icons/react/dist/csr/FloppyDisk';
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
+import { useValue } from '@legendapp/state/react';
 import styled from 'styled-components';
 
 const iconSize = 24;
 
 export function Toolbar() {
   const { ws, ed } = useAppContext();
+  const currentTool = useValue(ws.state$.tool);
+  const pencilRadius = useValue(ws.state$.pencilRadius);
 
   return (
     <Paper shadow="md" p="xs" radius="xs" withBorder>
       <ToolbarInner>
-        <Tooltip label="Save (Ctrl+S)" position="bottom">
-          <ToolbarButton onClick={() => ed.saveDocumentCommand()}>
-            <FloppyDiskIcon size={iconSize} />
-          </ToolbarButton>
-        </Tooltip>
-        <Tooltip label="Undo (Ctrl+Z)" position="bottom">
-          <ToolbarButton onClick={() => ws.changesManager.undoLastChange()}>
-            <ArrowCounterClockwiseIcon size={iconSize} />
-          </ToolbarButton>
-        </Tooltip>
-        <Tooltip label="Redo (Ctrl+Y)" position="bottom">
-          <ToolbarButton onClick={() => ws.changesManager.redoLastChange()}>
-            <ArrowClockwiseIcon size={iconSize} />
-          </ToolbarButton>
-        </Tooltip>
+        <ToolbarSection>
+          <Tooltip label="Save (Ctrl+S)" position="bottom">
+            <ToolbarButton onClick={() => ed.saveDocumentCommand()}>
+              <FloppyDiskIcon size={iconSize} />
+            </ToolbarButton>
+          </Tooltip>
+          <Tooltip label="Undo (Ctrl+Z)" position="bottom">
+            <ToolbarButton onClick={() => ws.changesManager.undoLastChange()}>
+              <ArrowCounterClockwiseIcon size={iconSize} />
+            </ToolbarButton>
+          </Tooltip>
+          <Tooltip label="Redo (Ctrl+Y)" position="bottom">
+            <ToolbarButton onClick={() => ws.changesManager.redoLastChange()}>
+              <ArrowClockwiseIcon size={iconSize} />
+            </ToolbarButton>
+          </Tooltip>
+        </ToolbarSection>
+        {currentTool === 'draw' && (
+          <ToolbarSection>
+            <OptionLabel>Radius</OptionLabel>
+            <input
+              type="range"
+              min={0}
+              max={10}
+              value={pencilRadius}
+              onChange={(e) =>
+                ws.state$.pencilRadius.set(Number(e.target.value))
+              }
+            />
+            <OptionValue>{pencilRadius}</OptionValue>
+          </ToolbarSection>
+        )}
       </ToolbarInner>
     </Paper>
   );
@@ -35,8 +55,31 @@ export function Toolbar() {
 
 const ToolbarInner = styled.div`
   display: flex;
+  gap: 10px;
+  align-items: center;
+`;
+
+const ToolbarSection = styled.div`
+  display: flex;
   gap: 5px;
   align-items: center;
+
+  & + & {
+    padding-left: 10px;
+    border-left: 1px solid #555;
+  }
+`;
+
+const OptionLabel = styled.span`
+  color: #ccc;
+  font-size: 13px;
+`;
+
+const OptionValue = styled.span`
+  color: #ccc;
+  font-size: 13px;
+  min-width: 20px;
+  text-align: center;
 `;
 
 const ToolbarButton = styled.button`

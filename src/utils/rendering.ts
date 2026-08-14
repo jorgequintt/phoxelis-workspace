@@ -122,3 +122,23 @@ export function drawEllipseFill(
     }
   }
 }
+
+/** Returns the cell positions within a circular radius of the center */
+export function circleCells(
+  centerR: number,
+  centerC: number,
+  radius: number,
+  size: { rows: number; cols: number },
+): Array<[r: number, c: number]> {
+  if (radius <= 0) return [[centerR, centerC]];
+  const cells: Array<[r: number, c: number]> = [];
+  drawEllipseFill(
+    (r, c) => cells.push([r, c]),
+    centerR,
+    centerC,
+    radius,
+    radius,
+    size,
+  );
+  return cells;
+}
