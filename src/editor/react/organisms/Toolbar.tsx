@@ -1,17 +1,37 @@
 import { useAppContext } from '../App';
-import { Paper, Tooltip } from '@mantine/core';
+import { Paper, SegmentedControl, Select, Tooltip } from '@mantine/core';
+import { openModal } from '@mantine/modals';
 import { FloppyDiskIcon } from '@phosphor-icons/react/dist/csr/FloppyDisk';
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
+import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
+import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { useValue } from '@legendapp/state/react';
 import styled from 'styled-components';
+import { MotionModal } from '../compounds/MotionModal';
 
 const iconSize = 24;
 
 export function Toolbar() {
   const { ws, ed } = useAppContext();
   const currentTool = useValue(ws.state$.tool);
+  const drawMode = useValue(ws.state$.drawMode);
   const pencilRadius = useValue(ws.state$.pencilRadius);
+  const motions = useValue(ws.data$.motions);
+  const activeMotionId = useValue(ws.state$.activeMotionId);
+  const motionWrap = useValue(ws.state$.motionWrap);
+
+  const motionOptions = Object.values(motions).map((m) => ({
+    value: m.id,
+    label: m.name,
+  }));
+  const activeMotion = activeMotionId ? motions[activeMotionId] : undefined;
+
+  const deleteActiveMotion = () => {
+    if (!activeMotionId) return;
+    ws.data$.motions[activeMotionId].delete();
+    ws.state$.activeMotionId.set(null);
+  };
 
   return (
     <Paper shadow="md" p="xs" radius="xs" withBorder>
@@ -46,6 +66,46 @@ export function Toolbar() {
               }
             />
             <OptionValue>{pencilRadius}</OptionValue>
+          </ToolbarSection>
+        )}
+        {drawMode === 'motion' && (
+          <ToolbarSection>
+            <Select
+              size="xs"
+              w={150}
+              placeholder="Select motion"
+              data={motionOptions}
+              value={activeMotionId ?? null}
+              onChange={(v) => ws.state$.activeMotionId.set(v)}
+            />
+            <Tooltip label="New motion" position="bottom">
+              <ToolbarButton
+                onClick={() =>
+                  openModal({
+                    title: 'New Motion',
+                    children: <MotionModal />,
+                  })
+                }
+              >
+                <PlusIcon size={iconSize} />
+              </ToolbarButton>
+            </Tooltip>
+            {activeMotion && (
+              <Tooltip label="Delete motion" position="bottom">
+                <ToolbarButton onClick={deleteActiveMotion}>
+                  <TrashIcon size={iconSize} />
+                </ToolbarButton>
+              </Tooltip>
+            )}
+            <SegmentedControl
+              size="xs"
+              value={motionWrap ? 'loop' : 'hold'}
+              onChange={(v) => ws.state$.motionWrap.set(v === 'loop')}
+              data={[
+                { label: 'Loop', value: 'loop' },
+                { label: 'Hold', value: 'hold' },
+              ]}
+            />
           </ToolbarSection>
         )}
       </ToolbarInner>

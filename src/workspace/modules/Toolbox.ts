@@ -317,12 +317,15 @@ export function createTools(ws: Workspace, tb: Toolbox) {
       const radius = ws.state$.pencilRadius.get();
       const cells = circleCells(p.r, p.c, radius, size);
       for (const [r, c] of cells) {
-        this.data!.draftPhoxels.set(`${r};${c}`, { ...p, r, c });
+        const key = `${r};${c}`;
+        if (this.data!.draftPhoxels.has(key)) continue;
+        this.data!.draftPhoxels.set(key, { ...p, r, c });
         drawManager.draft(r, c);
       }
     },
     onPointerDown() {
       this.data.drawing = true;
+      drawManager.startMotionStroke();
       this.addPhoxelToDraft({
         phox: ws.state$.dp.get(),
         r: dbd.mousePos.y,
@@ -383,6 +386,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
 
       // Clear draft and redraw preview rectangle
       draftScreen.reset(true);
+      drawManager.startMotionStroke();
       const { startR, startC } = this.data!;
       const r1 = Math.min(startR, dbd.mousePos.y);
       const r2 = Math.max(startR, dbd.mousePos.y);
@@ -455,6 +459,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     draft() {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
+      drawManager.startMotionStroke();
       const { startR, startC } = this.data!;
       const r1 = Math.min(startR, dbd.mousePos.y);
       const r2 = Math.max(startR, dbd.mousePos.y);
@@ -516,6 +521,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     draft() {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
+      drawManager.startMotionStroke();
       const { startR, startC } = this.data!;
       const cells = bresenhamCells(startR, startC, dbd.mousePos.y, dbd.mousePos.x);
       for (const { r, c } of cells) {
@@ -566,6 +572,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     draft() {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
+      drawManager.startMotionStroke();
       const { startR, startC } = this.data!;
       const rx = Math.abs(dbd.mousePos.x - startC);
       const ry = Math.abs(dbd.mousePos.y - startR);
@@ -621,6 +628,7 @@ export function createTools(ws: Workspace, tb: Toolbox) {
     draft() {
       if (!this.data!.drawing) return;
       draftScreen.reset(true);
+      drawManager.startMotionStroke();
       const { startR, startC } = this.data!;
       const rx = Math.abs(dbd.mousePos.x - startC);
       const ry = Math.abs(dbd.mousePos.y - startR);

@@ -1,7 +1,7 @@
 import type { Phox } from 'phoxelis';
 import type { Workspace } from '../Workspace';
 
-export type DrawModeName = 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase';
+export type DrawModeName = 'draw' | 'char' | 'fg' | 'bg' | 'color' | 'erase' | 'motion';
 
 export type DrawModeDefinition = {
   name: DrawModeName;
@@ -16,13 +16,33 @@ export const drawModeDefs: DrawModeDefinition[] = [
   { name: 'bg', icon: 'B', tooltip: 'Background color only' },
   { name: 'color', icon: '◉', tooltip: 'Color (fg + bg) only' },
   { name: 'erase', icon: '✕', tooltip: 'Erase' },
+  { name: 'motion', icon: '▶', tooltip: 'Motion' },
 ];
 
 export class DrawManager {
   ws: Workspace;
+  private motionCursor = 0;
 
   constructor(ws: Workspace) {
     this.ws = ws;
+  }
+
+  startMotionStroke() {
+    this.motionCursor = 0;
+  }
+
+  getMotionChar(): string | null {
+    const { state$, data$ } = this.ws;
+    const motionId = state$.activeMotionId.get();
+    if (!motionId) return null;
+    const motion = data$.motions.get()[motionId];
+    if (!motion || motion.chars.length === 0) return null;
+
+    const char = state$.motionWrap.get()
+      ? motion.chars[this.motionCursor % motion.chars.length]
+      : motion.chars[Math.min(this.motionCursor, motion.chars.length - 1)];
+    this.motionCursor++;
+    return char;
   }
 
   draw(drawMode: DrawModeName, dp: Phox, r: number, c: number, layerId: string) {
@@ -30,6 +50,10 @@ export class DrawManager {
 
     if (drawMode === 'draw') {
       phoxelis.renderPhoxel(dp.char, dp.fg, dp.bg, r, c, layerId);
+      return;
+    } else if (drawMode === 'motion') {
+      const char = this.getMotionChar() ?? dp.char;
+      phoxelis.renderPhoxel(char, dp.fg, dp.bg, r, c, layerId);
       return;
     } else if (drawMode === 'char') {
       const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, layerId);
@@ -81,6 +105,10 @@ export class DrawManager {
 
     if (drawMode === 'draw') {
       draftScreen.renderPhoxel(dp.char, dp.fg, dp.bg, r, c);
+      return;
+    } else if (drawMode === 'motion') {
+      const char = this.getMotionChar() ?? dp.char;
+      draftScreen.renderPhoxel(char, dp.fg, dp.bg, r, c);
       return;
     } else if (drawMode === 'char') {
       const underlyingPhoxel = phoxelis.getPhoxFromPosition(r, c, activeLayer);

@@ -27,8 +27,15 @@ export type WorkspaceLayer = {
   position: number;
 };
 
+export type Motion = {
+  id: string;
+  name: string;
+  chars: string[];
+};
+
 interface DocumentData {
   layers: Record<string, WorkspaceLayer>;
+  motions: Record<string, Motion>;
 }
 
 interface State {
@@ -36,6 +43,8 @@ interface State {
   drawMode: DrawModeName;
   tool: ToolName;
   activeLayer: string;
+  activeMotionId: string | null;
+  motionWrap: boolean;
   paletteData: {
     selectedPhox: number;
     modifyingPhox: boolean;
@@ -48,6 +57,7 @@ interface State {
 export interface WorkspaceData {
   phoxelis: ReturnType<PhoxelisObj['exportPhoxelis']>;
   layers: DocumentData['layers'];
+  motions: DocumentData['motions'];
   refImage: {
     src: string;
     config: {
@@ -79,12 +89,15 @@ export class Workspace {
   layersTargets: Record<string, HTMLCanvasElement> = {};
   data$: Observable<DocumentData> = observable({
     layers: {},
+    motions: {},
   } as DocumentData); // TODO fix?
   state$: Observable<State> = observable({
     dp: { char: 'D', fg: '#00FF00', bg: '#FF00FF' },
     drawMode: 'draw',
     tool: 'draw',
     activeLayer: '',
+    activeMotionId: null,
+    motionWrap: true,
     paletteData: {
       selectedPhox: -1,
       modifyingPhox: false,
@@ -179,6 +192,7 @@ export class Workspace {
         };
       });
       this.data$.layers.set(newLayers);
+      this.data$.motions.set(data.motions ?? {});
       this.state$.activeLayer.set(this.phoxelis.layers[0].id);
       this.drawboard.setReferenceImage(data.refImage.src);
     }
@@ -223,6 +237,7 @@ export class Workspace {
       fontName,
       data: {
         layers: data$.layers.get(),
+        motions: data$.motions.get(),
         phoxelis: phoxelisData,
         refImage: {
           src: refImage.img.src ?? '',
