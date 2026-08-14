@@ -1,4 +1,19 @@
 
+export function scaleCanvas(
+  source: HTMLCanvasElement,
+  scale: number,
+): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = source.width * scale;
+  canvas.height = source.height * scale;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
 export function bresenhamCells(
   r0: number,
   c0: number,

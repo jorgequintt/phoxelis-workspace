@@ -1,9 +1,11 @@
 import _ from 'lodash';
 import {
   downloadArrayBuffer as downloadAsFile,
+  downloadBlob,
   fileToBase64,
   promptForFile,
 } from '../utils/general';
+import { scaleCanvas } from '../utils/rendering';
 import {
   Workspace,
   type WorkspaceExportConfig,
@@ -146,6 +148,26 @@ export class Editor {
 
   public async newDocumentCommand() {
     await this.startSession();
+  }
+
+  public exportPngCommand(scale: number) {
+    if (!this.editorSession) {
+      console.error('exportPngCommand: No active editor session.');
+      return;
+    }
+
+    const canvas = scaleCanvas(
+      this.editorSession.currentWorkspace.phoxelis.canvas,
+      scale,
+    );
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      downloadBlob(
+        blob,
+        `${this.editorSession?.documentName ?? 'untitled'}.png`,
+      );
+    }, 'image/png');
   }
 
   public exportPhoxelisCommand() {

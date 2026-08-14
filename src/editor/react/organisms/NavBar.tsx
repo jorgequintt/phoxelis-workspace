@@ -2,6 +2,7 @@ import { useValue } from '@legendapp/state/react';
 import { useAppContext } from '../App';
 import { Menubar, type MenubarItem, type MenuEntry } from '../compounds/Menubar';
 import { NewDocumentModal } from '../compounds/NewDocumentModal';
+import { ExportModal } from '../compounds/ExportModal';
 import { Paper } from '@mantine/core';
 import { openModal } from '@mantine/modals';
 
@@ -35,7 +36,16 @@ export function NavBar() {
     },
     {
       type: 'option',
-      name: 'Export',
+      name: 'Export PNG',
+      command: () =>
+        openModal({
+          title: 'Export PNG',
+          children: <ExportModal onSubmit={(scale) => ed.exportPngCommand(scale)} />,
+        }),
+    },
+    {
+      type: 'option',
+      name: 'Export .phoxelis',
       command: () => ed.exportPhoxelisCommand(),
     },
   ];

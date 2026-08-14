@@ -120,7 +120,7 @@ export class Workspace {
     motions: {},
   } as DocumentData);
   state$: Observable<State> = observable({
-    dp: { char: '0', fg: '#FFFFFF', bg: '#000000' },
+    dp: { char: '0', fg: '#FFFFFF', bg: '#0077AA' },
     drawMode: 'draw',
     tool: 'draw',
     activeLayer: '',
