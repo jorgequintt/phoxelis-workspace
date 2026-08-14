@@ -121,7 +121,8 @@ export class Workspace {
     this.draftScreen = Phoxelis(size.rows, size.cols, font);
     this.changesManager = new ChangesManager();
     this.layerManager = new LayerManager(this);
-    this.layerManager.createLayer();
+    const baseLayerId = this.layerManager.createLayer();
+    this.state$.activeLayer.set(baseLayerId);
 
     // Elements
     this.drawboard = new Drawboard(this);
