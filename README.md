@@ -37,6 +37,12 @@ Built on top of [Phoxelis](https://github.com/jorgequintt/phoxelis), a canvas re
 - Save / load documents (`.phx`) using the browser's File System Access API.
 - **Export as PNG** at 1×/2×/4×/8× scale, or export the workspace as `.phoxelis` JSON for later re-import.
 
+**PWA & offline**
+- **Installable** as a Progressive Web App (standalone window, app icon, splash screen).
+- **Works fully offline** — all app code, fonts, and icons are precached by a service worker; documents are stored locally via the File System Access API.
+- Update prompt with a reload button when a new version is deployed.
+- See [`docs/PWA.md`](docs/PWA.md) for implementation details and how to customize it.
+
 **Workflow & navigation**
 - Full **undo / redo** (Ctrl+Z / Ctrl+Y), implemented as a command-pattern `Change` system with a 100-step history.
 - Pan and zoom the canvas (Ctrl+drag to pan, Shift+drag to zoom, pinch gestures on touch) and view the canvas in **fullscreen**.

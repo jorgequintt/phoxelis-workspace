@@ -12,6 +12,9 @@ node_modules
 dist-ssr
 *.local
 
+# vite-plugin-pwa dev build output
+dev-dist
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
