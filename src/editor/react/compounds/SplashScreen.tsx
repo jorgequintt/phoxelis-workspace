@@ -1,11 +1,13 @@
 import { Anchor, Button, Text } from '@mantine/core';
 import { closeAllModals, openModal } from '@mantine/modals';
 import { ArrowUpRightIcon } from '@phosphor-icons/react/dist/csr/ArrowUpRight';
+import { ClockCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
 import { FilePlusIcon } from '@phosphor-icons/react/dist/csr/FilePlus';
 import { FolderOpenIcon } from '@phosphor-icons/react/dist/csr/FolderOpen';
 import { QuestionMarkIcon } from '@phosphor-icons/react/dist/csr/QuestionMark';
 import styled from 'styled-components';
 import { useAppContext } from '../App';
+import { getLastDocument } from '../../../utils/session';
 import { NewDocumentModal } from './NewDocumentModal';
 import { openStartModal } from './StartModal';
 import elizaImage from '../../../assets/eliza.png';
@@ -52,6 +54,7 @@ export function openSplashScreen() {
 
 export function SplashScreen({ art }: { art: SplashArt }) {
   const { ed } = useAppContext();
+  const lastDoc = getLastDocument();
 
   return (
     <SplashContainer art={art}>
@@ -66,6 +69,19 @@ export function SplashScreen({ art }: { art: SplashArt }) {
           A browser-based phoxel/ASCII art editor.
         </Text>
         <OptionsStack>
+          {lastDoc && (
+            <Button
+              leftSection={<ClockCounterClockwiseIcon size={20} />}
+              justify="flex-start"
+              variant="default"
+              onClick={() => {
+                closeAllModals();
+                ed.loadDocument(lastDoc).catch((error) => console.error(error));
+              }}
+            >
+              Load latest document
+            </Button>
+          )}
           <Button
             leftSection={<FilePlusIcon size={20} />}
             justify="flex-start"

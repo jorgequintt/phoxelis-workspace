@@ -4,6 +4,7 @@ import { notifications } from '@mantine/notifications';
 import { registerSW } from 'virtual:pwa-register';
 import { ReactEditor } from './editor/react/ReactEditor';
 import { PwaUpdateMessage } from './editor/react/atoms/PwaUpdateMessage';
+import { getLastDocument, isSessionActive } from './utils/session';
 
 // PWA service worker registration with prompt-to-update. See docs/PWA.md.
 const updateSW = registerSW({
@@ -31,7 +32,7 @@ const updateSW = registerSW({
 });
 
 const editor = new ReactEditor();
-const lastDocId = localStorage.getItem('last_doc');
+const lastDocId = isSessionActive() ? getLastDocument() : null;
 if (lastDocId) {
   editor.loadDocument(lastDocId);
 } else {

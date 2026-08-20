@@ -6,6 +6,7 @@ import {
   promptForFile,
 } from '../utils/general';
 import { scaleCanvas } from '../utils/rendering';
+import { setLastDocument } from '../utils/session';
 import {
   Workspace,
   type WorkspaceExportConfig,
@@ -58,7 +59,7 @@ export class Editor {
       const workspaceData = workspace.exportData();
       const dataString = JSON.stringify(workspaceData);
       await this.saveFile(dataString, `${name}.${ext}`);
-      localStorage.setItem('last_doc', name);
+      setLastDocument(name);
       return true;
     } catch (error) {
       console.error(`saveDocument error: ${error}`);

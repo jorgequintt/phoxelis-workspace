@@ -30,6 +30,7 @@ export default defineConfig({
       include: [
         'src/utils/rendering.ts',
         'src/utils/general.ts',
+        'src/utils/session.ts',
         'src/workspace/Workspace.ts',
         'src/workspace/modules/Actions.ts',
         'src/workspace/modules/ChangesManager.ts',

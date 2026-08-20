@@ -8,8 +8,7 @@ import { Content } from './layout/Content';
 import { Footer } from './layout/Footer';
 import { Mantine } from './Mantine';
 import { openSplashScreen } from './compounds/SplashScreen';
-
-const splashKey = 'phoebis_splash_shown';
+import { isSessionActive, markSessionActive } from '../../utils/session';
 
 interface AppContextValue {
   ws: Workspace;
@@ -35,10 +34,10 @@ export default function App({ ws, ed }: Props) {
   });
 
   useEffect(() => {
-    if (sessionStorage.getItem(splashKey)) {
+    if (isSessionActive()) {
       return;
     }
-    sessionStorage.setItem(splashKey, '1');
+    markSessionActive();
     requestAnimationFrame(() => openSplashScreen());
   }, []);
 
