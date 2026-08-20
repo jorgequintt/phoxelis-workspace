@@ -124,10 +124,11 @@ export function NavBar() {
   const helpMenuOptions: MenuEntry[] = [
     {
       type: 'option',
-      name: 'How to use',
+      name: 'Getting started',
       command: () =>
         openModal({
-          title: 'Start',
+          title: 'Getting started',
+          size: 'lg',
           children: <StartModal />,
         }),
     },

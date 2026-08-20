@@ -9,7 +9,6 @@ import { useAppContext } from '../App';
 import { NewDocumentModal } from './NewDocumentModal';
 import { StartModal } from './StartModal';
 import elizaImage from '../../../assets/eliza.png';
-import lampImage from '../../../assets/lamp.png';
 import roseImage from '../../../assets/rose.png';
 
 interface SplashArt {
@@ -21,10 +20,6 @@ interface SplashArt {
   backgroundPosition: string;
 }
 
-// Per-image framing: tweak `backgroundSize` (e.g. '100%', 'cover', 'contain',
-// '120% auto') and `backgroundPosition` (e.g. 'center', '50% 30%') to position
-// each image. `background` is the container color shown around the image.
-// Scaling down below 100% reveals the whole image instead of cutting it.
 const SPLASH_ARTS: SplashArt[] = [
   {
     image: roseImage,
@@ -103,12 +98,13 @@ export function SplashScreen({ art }: { art: SplashArt }) {
             onClick={() => {
               closeAllModals();
               openModal({
-                title: 'Start',
+                title: 'Getting started',
+                size: 'lg',
                 children: <StartModal />,
               });
             }}
           >
-            How to use
+            Getting started
           </Button>
         </OptionsStack>
       </ContentPanel>
