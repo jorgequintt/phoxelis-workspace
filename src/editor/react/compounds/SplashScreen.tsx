@@ -29,7 +29,7 @@ const SPLASH_ARTS: SplashArt[] = [
   {
     image: roseImage,
     name: 'Rose',
-    href: 'https://example.com/portfolio/rose',
+    href: 'https://www.behance.net/gallery/132072831/longing',
     background: '#000000',
     backgroundSize: '90%',
     backgroundPosition: '120px 50%',
@@ -37,7 +37,7 @@ const SPLASH_ARTS: SplashArt[] = [
   {
     image: elizaImage,
     name: 'Eliza',
-    href: 'https://example.com/portfolio/eliza',
+    href: 'https://www.behance.net/gallery/254244873/Eliza',
     background: '#000000',
     backgroundSize: '100%',
     backgroundPosition: '152px 50%',
