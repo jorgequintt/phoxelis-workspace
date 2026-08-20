@@ -94,6 +94,32 @@ const DRAW_MODES: { icon: string; name: string; description: string }[] = [
   },
 ];
 
+const VERSIONING_FEATURES: { name: string; description: string }[] = [
+  {
+    name: 'Versions',
+    description:
+      'Every stroke is recorded as a step in the current branch. Use the \u25C0 \u25B6 arrows or the step dropdown to step back and forth in time.',
+  },
+  {
+    name: 'Add version',
+    description:
+      'Insert a new empty step as a checkpoint \u2014 everything drawn afterwards becomes a separate version you can jump back to.',
+  },
+  {
+    name: 'New branch',
+    description:
+      'Fork from the current state to experiment freely without touching the main line. The tree shows how branches relate to each other.',
+  },
+  {
+    name: 'Go to parent',
+    description: 'Jump back to the branch the current one was created from.',
+  },
+  {
+    name: 'Reset',
+    description: 'Collapse the entire history into a single starting point.',
+  },
+];
+
 const SHORTCUTS: { keys: string[]; action: string }[] = [
   { keys: ['Ctrl', 'Z'], action: 'Undo last change' },
   { keys: ['Ctrl', 'Y'], action: 'Redo last change' },
@@ -172,6 +198,26 @@ export function StartModal() {
                 </Text>
               </Stack>
             </ToolRow>
+          ))}
+        </Stack>
+
+        <Divider />
+
+        <Stack gap="sm">
+          <Title order={5}>Versioning</Title>
+          <Text size="xs" c="dimmed">
+            The Versioning panel at the bottom of the sidebar keeps a git-like history for
+            the active layer. Use it to step backwards, checkpoint, and branch your work.
+          </Text>
+          {VERSIONING_FEATURES.map((f) => (
+            <Stack key={f.name} gap={0}>
+              <Text size="sm" fw={600}>
+                {f.name}
+              </Text>
+              <Text size="xs" c="dimmed">
+                {f.description}
+              </Text>
+            </Stack>
           ))}
         </Stack>
 
