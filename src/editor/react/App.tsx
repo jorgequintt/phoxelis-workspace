@@ -7,6 +7,9 @@ import { Toolbar } from './organisms/Toolbar';
 import { Content } from './layout/Content';
 import { Footer } from './layout/Footer';
 import { Mantine } from './Mantine';
+import { openSplashScreen } from './compounds/SplashScreen';
+
+const splashKey = 'phoebis_splash_shown';
 
 interface AppContextValue {
   ws: Workspace;
@@ -30,6 +33,14 @@ export default function App({ ws, ed }: Props) {
   useEffect(() => {
     ws.onMounted();
   });
+
+  useEffect(() => {
+    if (sessionStorage.getItem(splashKey)) {
+      return;
+    }
+    sessionStorage.setItem(splashKey, '1');
+    requestAnimationFrame(() => openSplashScreen());
+  }, []);
 
   return (
     <AppContext.Provider value={{ ws, ed }}>

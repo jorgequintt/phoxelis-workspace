@@ -1,8 +1,12 @@
 import { defineConfig } from 'vite';
 import reactPlugin from '@vitejs/plugin-react-swc';
 import { VitePWA } from 'vite-plugin-pwa';
+import pkg from './package.json';
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: [
     reactPlugin(),
     // PWA: makes the app installable and usable offline. See docs/PWA.md.

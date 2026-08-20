@@ -3,6 +3,8 @@ import { useAppContext } from '../App';
 import { Menubar, type MenubarItem, type MenuEntry } from '../compounds/Menubar';
 import { NewDocumentModal } from '../compounds/NewDocumentModal';
 import { ExportModal } from '../compounds/ExportModal';
+import { openSplashScreen } from '../compounds/SplashScreen';
+import { StartModal } from '../compounds/StartModal';
 import { Button, Paper, Tooltip } from '@mantine/core';
 import { openModal } from '@mantine/modals';
 import { FrameCornersIcon } from '@phosphor-icons/react/dist/csr/FrameCorners';
@@ -119,10 +121,28 @@ export function NavBar() {
     }
   ];
 
+  const helpMenuOptions: MenuEntry[] = [
+    {
+      type: 'option',
+      name: 'How to use',
+      command: () =>
+        openModal({
+          title: 'Start',
+          children: <StartModal />,
+        }),
+    },
+    {
+      type: 'option',
+      name: 'Splash screen',
+      command: () => openSplashScreen(),
+    },
+  ];
+
   const menubar: MenubarItem[] = [
     { name: 'File', menu: fileMenuOptions, width: 220 },
     { name: 'Edit', menu: editMenuOptions, width: 220 },
     { name: 'View', menu: viewMenuOptions, width: 220 },
+    { name: 'Help', menu: helpMenuOptions, width: 220 },
   ];
 
   return (
