@@ -7,7 +7,7 @@ import { QuestionMarkIcon } from '@phosphor-icons/react/dist/csr/QuestionMark';
 import styled from 'styled-components';
 import { useAppContext } from '../App';
 import { NewDocumentModal } from './NewDocumentModal';
-import { openStartModal, StartModal } from './StartModal';
+import { openStartModal } from './StartModal';
 import elizaImage from '../../../assets/eliza.png';
 import roseImage from '../../../assets/rose.png';
 
