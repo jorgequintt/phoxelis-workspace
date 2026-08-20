@@ -2,6 +2,17 @@ import { Fragment } from 'react';
 import { Divider, Group, Kbd, ScrollArea, Stack, Text, Title } from '@mantine/core';
 import { MenuIcon } from '../atoms/MenuIcon';
 import styled from 'styled-components';
+import { openModal } from '@mantine/modals';
+
+export function openStartModal() {
+  openModal({
+    title: 'Getting started',
+    size: 'lg',
+    padding: 'lg',
+    centered: true,
+    children: <StartModal />,
+  });
+}
 
 const TOOLS: { icon: string; name: string; description: string }[] = [
   {
@@ -140,7 +151,7 @@ export function StartModal() {
   return (
     <ScrollArea.Autosize mah={440} offsetScrollbars>
       <Stack gap="lg" pr="xs">
-        <Stack gap="xs">
+        <Stack>
           <Text size="sm" c="dimmed">
             Phoxelis is a browser-based phoxel art editor — a blend of pixel art and
             terminal art. Every canvas cell is a <b>phox</b>: a glyph from a bitmap font

@@ -7,7 +7,7 @@ import { QuestionMarkIcon } from '@phosphor-icons/react/dist/csr/QuestionMark';
 import styled from 'styled-components';
 import { useAppContext } from '../App';
 import { NewDocumentModal } from './NewDocumentModal';
-import { StartModal } from './StartModal';
+import { openStartModal, StartModal } from './StartModal';
 import elizaImage from '../../../assets/eliza.png';
 import roseImage from '../../../assets/rose.png';
 
@@ -97,11 +97,7 @@ export function SplashScreen({ art }: { art: SplashArt }) {
             variant="default"
             onClick={() => {
               closeAllModals();
-              openModal({
-                title: 'Getting started',
-                size: 'lg',
-                children: <StartModal />,
-              });
+              openStartModal();
             }}
           >
             Getting started

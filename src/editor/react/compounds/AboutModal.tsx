@@ -1,7 +1,18 @@
 import { Anchor, Divider, Group, Stack, Text, Title } from '@mantine/core';
+import { openModal } from '@mantine/modals';
 import { GithubLogoIcon } from '@phosphor-icons/react/dist/csr/GithubLogo';
 
 const DEVELOPER_GITHUB = 'https://github.com/jorgequintt';
+
+export function openAboutModal(){
+  openModal({
+    title: 'About',
+    size: 'lg',
+    padding: 'lg',
+    centered: true,
+    children: <AboutModal />,
+  });
+}
 
 export function AboutModal() {
   return (

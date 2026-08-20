@@ -4,8 +4,8 @@ import { Menubar, type MenubarItem, type MenuEntry } from '../compounds/Menubar'
 import { NewDocumentModal } from '../compounds/NewDocumentModal';
 import { ExportModal } from '../compounds/ExportModal';
 import { openSplashScreen } from '../compounds/SplashScreen';
-import { StartModal } from '../compounds/StartModal';
-import { AboutModal } from '../compounds/AboutModal';
+import { openStartModal, StartModal } from '../compounds/StartModal';
+import { AboutModal, openAboutModal } from '../compounds/AboutModal';
 import { Button, Paper, Tooltip } from '@mantine/core';
 import { openModal } from '@mantine/modals';
 import { FrameCornersIcon } from '@phosphor-icons/react/dist/csr/FrameCorners';
@@ -127,11 +127,7 @@ export function NavBar() {
       type: 'option',
       name: 'Getting started',
       command: () =>
-        openModal({
-          title: 'Getting started',
-          size: 'lg',
-          children: <StartModal />,
-        }),
+        openStartModal()
     },
     {
       type: 'option',
@@ -142,10 +138,7 @@ export function NavBar() {
       type: 'option',
       name: 'About',
       command: () =>
-        openModal({
-          title: 'About',
-          children: <AboutModal />,
-        }),
+        openAboutModal()
     },
   ];
 
