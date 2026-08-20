@@ -15,19 +15,57 @@ comes from a bitmap (BDF) font. It is a React UI wrapped around the
 - Rendering: Phoxelis (canvas), `@panzoom/panzoom`, Hammer.js
 - Color: iro.js (`@jaames/iro`)
 - Build: Vite 8 + SWC, PostCSS (Mantine preset)
-- No test framework. No linter/formatter configured.
+- Tests: Vitest 4 + happy-dom + `@vitest/coverage-v8`. No linter/formatter configured.
 
 ## Commands
 
 ```bash
-npm install     # install deps (requires the yalc-linked phoxelis, see below)
-npm run dev     # start Vite dev server (vite --host --force)
-npm run build   # type-check (tsc) THEN production build (vite build)
-npm run preview # serve the production build
+npm install       # install deps (requires the yalc-linked phoxelis, see below)
+npm run dev       # start Vite dev server (vite --host --force)
+npm run build     # type-check (tsc) THEN production build (vite build)
+npm run preview   # serve the production build
+npm run test      # run tests in watch mode
+npm run test:run  # run tests once (no watch)
+npm run test:coverage  # run tests once + enforce coverage thresholds
 ```
 
 `npm run build` runs `tsc` first and **fails on type errors** — always run it after
-changes. There is no lint or test script.
+changes. There is no linter. `npm run test:run` is enforced on commit (`.husky/pre-commit`)
+and in CI.
+
+## Testing
+
+Tests live in `src/__tests__/`, mirroring the `src/` tree (e.g. a test for
+`src/workspace/modules/DrawManager.ts` goes in
+`src/__tests__/workspace/modules/DrawManager.test.ts`). The production `tsconfig.json`
+excludes `src/__tests__`; tests are type-checked separately via `tsconfig.test.json`
+(`npx tsc -p tsconfig.test.json`).
+
+Key facts about the current setup:
+
+- `vitest.config.ts` is **separate** from `vite.config.ts` and does not load the PWA
+  plugin (build side effects, slow). Tests run in `happy-dom` with explicit imports
+  from `vitest` (no globals).
+- `src/__tests__/setup.ts` stubs `fetch`/`requestAnimationFrame`/`cancelAnimationFrame`
+  and rejects any network fetch (font loading is never valid inside tests).
+- **Coverage thresholds are scoped** in `vitest.config.ts` via `coverage.include` to the
+  files the current suites fully cover. When you add a suite that thoroughly covers a
+  module, **add that file to `coverage.include`** — this keeps thresholds strict without
+  letting untested DOM/React code drag them down.
+- The engine `phoxelis` creates canvas/2D contexts and fetches fonts at runtime, so unit
+  tests **never instantiate a real `PhoxelisObj`**. Pure logic is tested directly; once a
+  suite needs the engine API, mock `phoxelis` (or the specific manager dependency).
+
+Contract for new features (enforced by the above):
+
+- **Every new undoable action factory in `Actions.ts` must come with a test** that
+  round-trips `execute() → undo()` (and ideally `→ redo() → undo()`) and asserts the
+  document returns to its initial state.
+- **Every pure/algorithmic util** (`src/utils/*`, math in `DrawManager`, versioning
+  assembly) must have tests covering edge cases (empty input, degenerate radii, bounds
+  clamping, wrap vs. hold, de-duplication).
+- `npm run test:coverage` must stay green before merging — adding new untested code to
+  an already-covered file will fail the thresholds.
 
 ## Critical dependency: Phoxelis via yalc
 

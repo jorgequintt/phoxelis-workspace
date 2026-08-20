@@ -12,6 +12,9 @@ node_modules
 dist-ssr
 *.local
 
+# Vitest coverage output
+/coverage
+
 # vite-plugin-pwa dev build output
 dev-dist
 
